@@ -176,8 +176,154 @@ def _extract_texts(hwpx_path):
     return texts
 
 
+# ─── 글자 테두리 버그 탐지·제거 (jkf87/hwpx-skill 차용, 2026-06-16) ───
+# hwp2hwpx 변환기·일부 LLM 산출물이 charPr 다수에 동일 SOLID 테두리 borderFill을
+# 참조시켜 "모든 글자에 네모 테두리"가 보이는 버그. 표 셀(tc) borderFill은
+# section에 있어 건드리지 않으므로 표 테두리는 보존된다. (내 스킬은 생성 시
+# Rule 24로 예방하나, convert_hwp.py·외부 양식 편집 경로는 사후 보정이 필요.)
+_CHARPR_OPEN_RE = re.compile(r"<(?:\w+:)?charPr\b[^>]*?>")
+_BORDERREF_RE = re.compile(r'\s*borderFillIDRef="\d+"')
+_CHARPR_REF_RE = re.compile(r'<(?:\w+:)?charPr\b[^>]*?borderFillIDRef="(\d+)"')
+_BORDER_SOLID_RE = re.compile(
+    r'(?:left|right|top|bottom)Border type="'
+    r'(?:SOLID|DASH|DOT|THICK|DOUBLE|WAVE)"')
+
+
+def _borderfill_is_solid(header_xml, bid):
+    """header.xml에서 borderFill id=bid가 실제 테두리선을 가지는지."""
+    m = re.search(rf'<(?:\w+:)?borderFill\b[^>]*\bid="{bid}"', header_xml)
+    if not m:
+        return False
+    close = re.search(r"</(?:\w+:)?borderFill>", header_xml[m.start():])
+    block = (header_xml[m.start():m.start() + close.end()]
+             if close else header_xml[m.start():m.start() + 600])
+    return bool(_BORDER_SOLID_RE.search(block))
+
+
+def detect_char_border_bug(hwpx_path):
+    """글자모양(charPr)에 테두리가 박힌 변환기/LLM 버그인지 탐지.
+
+    charPr의 절반 이상이 '실제 테두리선이 있는' borderFill을 참조할 때만
+    버그로 판정한다(의도적 글자 테두리는 일부 charPr만 참조).
+
+    Returns: {"bug": bool, "bordered_charpr": int, "total_charpr": int}
+    """
+    with zipfile.ZipFile(hwpx_path) as zf:
+        names = [n for n in zf.namelist() if n.endswith("header.xml")]
+        if not names:
+            return {"bug": False, "bordered_charpr": 0, "total_charpr": 0}
+        h = zf.read(names[0]).decode("utf-8")
+
+    total = len(re.findall(r"<(?:\w+:)?charPr\b", h))
+    solid_cache, bordered = {}, 0
+    for bid in _CHARPR_REF_RE.findall(h):
+        if bid not in solid_cache:
+            solid_cache[bid] = _borderfill_is_solid(h, bid)
+        if solid_cache[bid]:
+            bordered += 1
+    bug = total > 0 and bordered >= max(2, total * 0.5)
+    return {"bug": bug, "bordered_charpr": bordered, "total_charpr": total}
+
+
+def strip_char_borders(hwpx_path, output_path=None):
+    """charPr에 박힌 글자 테두리 참조(borderFillIDRef)를 제거.
+
+    header.xml의 charPr만 손대므로 표 셀(section의 tc) 테두리는 보존된다.
+    idempotent — 제거할 게 없으면 원본을 그대로 두고 0을 반환한다.
+
+    Returns: 제거한 참조 수.
+    """
+    src = Path(hwpx_path)
+    dst = Path(output_path) if output_path else src
+
+    with zipfile.ZipFile(src, "r") as zf:
+        headers = {n: zf.read(n).decode("utf-8")
+                    for n in zf.namelist() if n.endswith("header.xml")}
+
+    patched, total = {}, 0
+    for name, h in headers.items():
+        h2 = _CHARPR_OPEN_RE.sub(
+            lambda m: _BORDERREF_RE.sub("", m.group(0)), h)
+        removed = h.count("borderFillIDRef") - h2.count("borderFillIDRef")
+        if removed:
+            patched[name] = h2.encode("utf-8")
+            total += removed
+
+    if not patched:
+        if dst != src:
+            shutil.copyfile(src, dst)
+        return 0
+
+    tmp = str(dst) + ".tmp"
+    with zipfile.ZipFile(src, "r") as zin:
+        with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as zout:
+            for item in zin.infolist():
+                data = patched.get(item.filename, zin.read(item.filename))
+                if item.filename == "mimetype":
+                    zout.writestr(item, data, compress_type=zipfile.ZIP_STORED)
+                else:
+                    zout.writestr(item, data)
+    os.replace(tmp, str(dst))
+    return total
+
+
+# ─── secPr 완전성 점검 (jkf87/hwpx-skill check_openable 차용, 2026-06-16) ─
+# XML 유효성(validate.py)·구조 보존 비교로는 못 잡는, secPr 자식요소
+# (pagePr/margin) 누락 및 LLM이 손수 만든 가짜 secPr를 검출 → 한컴 '손상된
+# 문서' 복구 대화상자 사고 방지.
+_SECPR_REQUIRED = ("pagePr", "margin")
+_SECPR_BOGUS_ATTRS = ("pageWidth", "pageHeight", "leftMargin",
+                       "rightMargin", "topMargin")
+
+
+def check_secpr_openable(hwpx_path):
+    """첫 섹션 secPr의 완전성 점검 — 한컴 열림 가능성 정적 검사.
+
+    Returns: {"errors": [...], "warnings": [...]}
+    """
+    errors, warnings = [], []
+    try:
+        from lxml import etree
+    except ImportError:
+        return {"errors": [], "warnings": ["lxml 미설치 — secPr 점검 건너뜀"]}
+
+    with zipfile.ZipFile(hwpx_path, "r") as zf:
+        secs = sorted(n for n in zf.namelist()
+                       if n.startswith("Contents/section") and n.endswith(".xml"))
+        if not secs:
+            return {"errors": ["섹션 파일 없음"], "warnings": []}
+        data = zf.read(secs[0])
+
+    try:
+        root = etree.fromstring(data)
+    except etree.XMLSyntaxError as e:
+        return {"errors": [f"section0.xml 파싱 실패: {e}"], "warnings": []}
+
+    hp = "http://www.hancom.co.kr/hwpml/2011/paragraph"
+    secprs = root.findall(f".//{{{hp}}}secPr")
+    if not secprs:
+        errors.append("첫 섹션에 <hp:secPr>가 없음 — 한컴이 열지 못함")
+        return {"errors": errors, "warnings": warnings}
+
+    secpr = secprs[0]
+    child_tags = {etree.QName(c).localname for c in secpr.iter() if c is not secpr}
+    for req in _SECPR_REQUIRED:
+        if req not in child_tags:
+            label = "용지 크기" if req == "pagePr" else "여백"
+            errors.append(
+                f"secPr에 <hp:{req}> 없음 — {label} 미정의로 한컴 열기 실패")
+
+    bogus = [a for a in _SECPR_BOGUS_ATTRS if a in secpr.attrib]
+    if bogus:
+        errors.append(
+            f"secPr에 비표준 속성 {bogus} — LLM이 손수 작성한 가짜 secPr로 보임. "
+            "정상 HWPX의 secPr(pagePr/margin 자식 요소)로 교체 필요")
+
+    return {"errors": errors, "warnings": warnings}
+
+
 def verify(source_path=None, result_path=None, json_output=None,
-            strict=False, spec_path=None):
+            strict=False, spec_path=None, fix_borders=False):
     """HWPX 검수를 실행한다.
 
     Args:
@@ -186,6 +332,7 @@ def verify(source_path=None, result_path=None, json_output=None,
         json_output: JSON 리포트 경로 (선택)
         strict: True 면 polaris-dvc로 JID 위반까지 검출
         spec_path: polaris-dvc 규칙 spec JSON (--strict 와 함께 사용, 선택)
+        fix_borders: True 면 검사 전 글자 테두리 버그를 자동 제거
 
     Returns:
         dict: 검수 결과
@@ -196,6 +343,13 @@ def verify(source_path=None, result_path=None, json_output=None,
         report["status"] = "FAIL"
         report["issues"].append(f"결과 파일 없음: {result_path}")
         return report
+
+    # 0. (선택) 글자 테두리 버그 자동 제거 — 검사 전에 보정
+    if fix_borders:
+        removed = strip_char_borders(result_path)
+        report["actions"] = [f"글자 테두리 borderFillIDRef {removed}개 제거"]
+        print(f"🔧 글자 테두리 borderFillIDRef {removed}개 제거됨"
+              if removed else "🔧 제거할 글자 테두리 없음")
 
     # 1. 결과 파일 구조 분석
     result_info = _count_structure(result_path)
@@ -218,6 +372,21 @@ def verify(source_path=None, result_path=None, json_output=None,
     for v in result_info.get("zip_bomb_violations", []):
         report["issues"].append(
             f"엔트리 크기 상한 초과 ({v['entry']}: {v['size']} > {v['limit']}) — zip bomb 가능성"
+        )
+
+    # 1.3. secPr 완전성 (한컴 열림 가능성) — '손상된 문서' 사고 방지
+    secpr_check = check_secpr_openable(result_path)
+    report["issues"].extend(secpr_check["errors"])
+    report["warnings"].extend(secpr_check["warnings"])
+
+    # 1.4. 글자 테두리 버그 (모든 글자에 네모 테두리)
+    cb = detect_char_border_bug(result_path)
+    result_info["char_border_bug"] = cb["bug"]
+    if cb["bug"]:
+        report["warnings"].append(
+            f"글자 테두리 버그 ({cb['bordered_charpr']}/{cb['total_charpr']} "
+            "charPr이 테두리 borderFill 참조) — 모든 글자에 네모 테두리. "
+            "`verify_hwpx.py --result <file> --fix-borders`로 제거"
         )
 
     # 1.5. polaris-dvc strict 검증 (선택적)
@@ -378,10 +547,13 @@ def main():
     parser.add_argument("--strict", action="store_true",
                           help="polaris-dvc로 JID 위반 검출 (선택)")
     parser.add_argument("--spec", help="polaris-dvc 규칙 spec JSON 경로 (선택)")
+    parser.add_argument("--fix-borders", action="store_true",
+                          help="검사 전 글자 테두리 버그를 자동 제거 (대상 파일 직접 수정)")
 
     args = parser.parse_args()
     report = verify(args.source, args.result, args.json,
-                     strict=args.strict, spec_path=args.spec)
+                     strict=args.strict, spec_path=args.spec,
+                     fix_borders=args.fix_borders)
 
     sys.exit(0 if report["status"] in ("PASS", "WARN") else 1)
 

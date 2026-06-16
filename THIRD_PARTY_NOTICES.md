@@ -58,6 +58,14 @@ SOFTWARE.
 - **저장소**: https://github.com/jkf87/hwpx-skill
 - **역할**: 본 스킬의 최초 기반(base fork). 이후 독자적으로 확장됨.
 - **변경 사항 요약**: `README.md` 참조.
+- **추가 차용 (2026-06-16, jkf87 v1.0.5 기준)**: 아래 안전장치를 본 스킬 스타일(정규식 + lxml, 표준 라이브러리)로 재구현.
+
+| 스킬 내 위치 | 참조한 jkf87 구현 | 재구현 내용 |
+|---|---|---|
+| `verify_hwpx.py` `detect_char_border_bug`/`strip_char_borders` | `fill_hwpx.py` 동명 함수 | 변환기/LLM이 charPr 다수에 SOLID 테두리 borderFill을 박는 "모든 글자 네모 테두리" 버그 탐지·제거 (표 셀 테두리 보존, idempotent) |
+| `verify_hwpx.py` `check_secpr_openable` | `fill_hwpx.py` `check_openable` 의 secPr 점검부 | secPr 자식요소(pagePr/margin) 누락 + 가짜 secPr(비표준 속성) 휴리스틱 검출 — 한컴 '손상된 문서' 사고 방지 |
+
+> raw LLM 파일 탐지(`detect_raw_llm`)와 PreToolUse 가드 훅은 본 스킬의 더미 lineSegArray 주입 전략(polaris-dvc 통과용)과 상충하므로 의도적으로 미차용.
 
 ---
 

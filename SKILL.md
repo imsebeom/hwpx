@@ -21,7 +21,7 @@ ${CLAUDE_SKILL_DIR}/
 │   ├── validate.py            # HWPX 구조 검증
 │   ├── analyze_template.py    # HWPX 심층 분석 (xpath_local 사용)
 │   ├── clone_form.py           # ★ 양식 복제 (Workflow F)
-│   ├── verify_hwpx.py         # ★ 서브에이전트 검수 도구 (+ zip bomb 체크)
+│   ├── verify_hwpx.py         # ★ 서브에이전트 검수 도구 (+ zip bomb·secPr 완전성·글자 테두리 버그)
 │   ├── text_extract.py        # 텍스트 추출
 │   ├── md2hwpx.py             # 마크다운→HWPX 자동 변환
 │   ├── hwpx_modifier.py       # ★ 양식 세밀 수정 (+ collect_all_fields)
@@ -1095,13 +1095,20 @@ meta = info("input.hwp")  # title, author, version, section_count, embedded_bind
 # 1) 네임스페이스 정합 (한글 Viewer 호환)
 python3 "${CLAUDE_SKILL_DIR}/scripts/fix_namespaces.py" out.hwpx
 
-# 2) 구조 검증 + polaris-dvc strict 검증
+# 2) 글자 테두리 버그 제거 (★ 변환기가 모든 글자에 네모 테두리를 박는 경우)
+python3 "${CLAUDE_SKILL_DIR}/scripts/verify_hwpx.py" --result out.hwpx --fix-borders
+
+# 3) 구조 검증 + polaris-dvc strict 검증
 python3 "${CLAUDE_SKILL_DIR}/scripts/verify_hwpx.py" --result out.hwpx --strict
 ```
 
+> **⚠️ 글자 테두리**: hwp2hwpx 변환 엔진은 charPr 다수에 SOLID 테두리 borderFill을 참조시켜
+> **모든 글자에 네모 테두리**가 보이는 산출물을 만들 때가 있다. 위 2)의 `--fix-borders`로 제거한다
+> (표 셀 테두리는 보존). 이 보정을 거치지 않으면 사용자에게 테두리투성이 문서가 전달된다.
+
 ### 출처
 
-[jkf87/hwpx-skill](https://github.com/jkf87/hwpx-skill) Workflow H (2026-04-02) 차용. 변환 엔진은 [jkf87/hwp2hwpx-python-refactor](https://github.com/jkf87/hwp2hwpx-python-refactor).
+[jkf87/hwpx-skill](https://github.com/jkf87/hwpx-skill) Workflow H (2026-04-02) 차용. 변환 엔진은 [jkf87/hwp2hwpx-python-refactor](https://github.com/jkf87/hwp2hwpx-python-refactor). 글자 테두리 자동 제거는 jkf87 v1.0.5(2026-06) 차용.
 
 ---
 
@@ -1458,10 +1465,19 @@ python3 "${CLAUDE_SKILL_DIR}/scripts/verify_hwpx.py" \
 # polaris-dvc strict 검증 (JID 위반 검출)
 python3 "${CLAUDE_SKILL_DIR}/scripts/verify_hwpx.py" --result output.hwpx --strict
 
+# 글자 테두리 버그 자동 제거 (검사 전 보정 — 대상 파일 직접 수정)
+python3 "${CLAUDE_SKILL_DIR}/scripts/verify_hwpx.py" --result output.hwpx --fix-borders
+
 # 쪽수 드리프트 가드 (레퍼런스 양식 보존이 중요한 경우, 워크플로 O 참조)
 python3 "${CLAUDE_SKILL_DIR}/scripts/page_guard.py" \
   --reference reference.hwpx --output output.hwpx
 ```
+
+> **글자 테두리 버그**: hwp→hwpx 변환(워크플로우 K) 또는 외부에서 받은 hwpx 양식을 편집할 때,
+> 원본 charPr 다수가 SOLID 테두리 borderFill을 참조해 **모든 글자에 네모 테두리**가 표시되는
+> 경우가 있다. `verify_hwpx.py`가 자동 경고하며, `--fix-borders`로 제거한다(표 셀 테두리는 보존, idempotent).
+> **secPr 완전성**: 검수 시 첫 섹션 secPr의 `pagePr`/`margin` 자식과 가짜 secPr(비표준 속성)를 점검해
+> 한컴 '손상된 문서' 사고를 사전 차단한다(XML 유효성 검사로는 못 잡음).
 
 ### 검수 항목
 
@@ -1473,6 +1489,8 @@ python3 "${CLAUDE_SKILL_DIR}/scripts/page_guard.py" \
 | 런 보존 | 원본 대비 런(run) 수 | **감소 시 FAIL** |
 | 테이블·이미지 | 원본 대비 수량 | 감소 시 FAIL |
 | section 크기 | 원본 대비 비율 | 50% 미만 시 FAIL |
+| **secPr 완전성** | 첫 섹션 secPr의 pagePr/margin 자식 + 가짜 secPr 휴리스틱 | 누락·가짜 시 FAIL (한컴 '손상 문서' 방지) |
+| **글자 테두리 버그** | charPr 절반 이상이 SOLID 테두리 borderFill 참조 | 검출 시 WARN (`--fix-borders`로 제거) |
 | **polaris-dvc** (`--strict`) | JID 위반 (구조·컨테이너·규칙) | 위반 1건 이상 |
 
 ### polaris-dvc strict 모드
@@ -1570,6 +1588,7 @@ subprocess.run(["python3", f"{SKILL_DIR}/scripts/fix_namespaces.py", "output.hwp
 29. **시험 문제지는 워크플로우 J**: PDF 시험지/문제지/평가지 변환 시 `exam_builder.py` 사용. 엔드노트 정답, 탭 정렬 선택지 등 시험 전용 XML 패턴 지원. JSON 데이터를 입력받아 section0.xml을 동적 생성
 27. **글머리기호/번호는 텍스트로 삽입**: 한글의 `<hp:numbering>` 구조를 사용하지 않는다. 목록은 `"- 항목"`, `"1. 항목"` 텍스트를 직접 넣고 paraPr 들여쓰기로 단계를 표현. 의도적 설계 — 호환성과 단순성을 위해 네이티브 글머리기호를 사용하지 않음
 30. **템플릿 활용 시 플레이스홀더 검토 필수**: `fill_cells_directly()`로 기존 HWPX에 내용을 채울 때, 검증된 템플릿이 없으면 반드시 (1) `analyze_form_table()`로 구조 분석 → (2) 플레이스홀더(`{{제목}}` 등) 템플릿 생성 → (3) **STOP하여 사용자에게 열어 보여주고 검토** → (4) 확인 후 실제 내용 채우기 순서를 따른다. 이미 검증된 플레이스홀더 템플릿이 존재하면 이 단계를 건너뛸 수 있다
+31. **글자 테두리 버그·secPr 완전성 검수**: hwp→hwpx 변환(워크플로우 K)이나 외부 hwpx 양식 편집 후에는 `verify_hwpx.py`가 (a) charPr 절반 이상이 SOLID 테두리 borderFill을 참조하는 "모든 글자 네모 테두리" 버그를 자동 경고하고 → `--fix-borders`로 제거(표 셀 테두리 보존, idempotent), (b) 첫 섹션 secPr의 pagePr/margin 누락·가짜 secPr를 FAIL로 검출(한컴 '손상된 문서' 사고 방지)한다. XML 유효성(validate.py)으로는 둘 다 못 잡으므로 변환·외부양식 경로에서는 반드시 verify_hwpx.py까지 거친다 (jkf87/hwpx-skill v1.0.5 차용, THIRD_PARTY_NOTICES 2번)
 
 ---
 
