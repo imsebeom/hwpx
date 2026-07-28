@@ -103,7 +103,8 @@
             cellSpacing="0" borderFillIDRef="3" noAdjust="0">
       <hp:sz width="42520" widthRelTo="ABSOLUTE"
              height="전체높이" heightRelTo="ABSOLUTE" protect="0"/>
-      <hp:pos treatAsChar="1" affectLSpacing="0" flowWithText="1"
+      <!-- 표는 반드시 treatAsChar="0" — 1이면 쪽을 넘기지 못해 행이 사라진다 -->
+      <hp:pos treatAsChar="0" affectLSpacing="0" flowWithText="1"
               allowOverlap="0" holdAnchorAndSO="0"
               vertRelTo="PARA" horzRelTo="COLUMN"
               vertAlign="TOP" horzAlign="LEFT"
