@@ -115,6 +115,12 @@ def zip_replace_all(
         "lineseg_injected": 0,
     }
 
+    # 입력=출력 경로면 ZipFile(out, "w")가 입력을 즉시 truncate 하므로 임시 파일 경유
+    final_out: str | None = None
+    if _same_path(in_hwpx, out_hwpx):
+        final_out = str(out_hwpx)
+        out_hwpx = _make_temp_hwpx_path(Path(final_out).parent, ".zip_replace_all-")
+
     with zipfile.ZipFile(in_hwpx, "r") as zin:
         with zipfile.ZipFile(out_hwpx, "w", compression=zipfile.ZIP_DEFLATED) as zout:
             for info in zin.infolist():
@@ -159,6 +165,9 @@ def zip_replace_all(
                     _clone_zipinfo(info, force_stored=info.filename == "mimetype"),
                     data,
                 )
+
+    if final_out is not None:
+        os.replace(out_hwpx, final_out)
 
     return stats
 

@@ -129,3 +129,20 @@ section_xml = section_xml[:p_start] + pic_xml + "\n" + section_xml[p_start:]
 |------|------|
 | HwpxDocument.open() 실패 | XML-first 접근 또는 ZIP-level 치환 사용 |
 | ObjectFinder 에러 | `pip install python-hwpx --break-system-packages` |
+
+## "문서는 열리는데 특정 지점부터 내용이 통째로 사라짐 (표·그림 소실)"
+
+증상: 한글이 오류 없이 문서를 열지만, 특정 문단(주로 표가 든 문단)부터 그 뒤 내용 전체가 렌더링되지 않음. PDF 변환 시 페이지 수가 크게 부족. validate.py·verify_hwpx.py 구조 검사, 표 격자(rowCnt/colCnt/cellSpan) 검증, ID 참조 범위 검사 모두 통과.
+
+| 원인 | 해결 |
+|------|------|
+| **낡은/불일치 linesegarray** — 다른 문서(특히 용지 방향·폭이 다른 원본)에서 섹션·표를 이식하면 셀 내부 문단의 lineseg 캐시(textpos/vertpos/horzsize)가 실제 내용과 어긋나고, 한글이 해당 문단부터 조용히 파싱을 중단·폐기함 | 해당 섹션의 `<hp:linesegarray>` 전체 제거 → (polaris JID 11004 대응 필요 시) `zip_replace_all(..., ensure_linesegs=True)`로 더미 재주입. 더미 lineseg는 렌더링을 깨지 않음(2026-07-05 실측: 331개 주입 후 11페이지 완전 렌더링) |
+
+**진단법 (한글 재저장 프로브)**: COM으로 열어 HWPX로 재저장한 뒤 섹션별 `<hp:p>`/`<hp:tbl>` 수를 원본과 비교하면, 한글 파서가 어느 문단에서 내용을 버렸는지 정확히 드러난다. 렌더링 문제와 달리 파싱 단계 폐기는 이 방법으로만 확실히 잡힌다.
+
+```python
+hwp.Open(src, '', 'forceopen:true')
+hwp.HParameterSet.HFileOpenSave.Format = 'HWPX'  # 재저장 후 zip 열어 문단 수 비교
+```
+
+**함정**: `zip_replace_all()` 함수를 입력=출력 같은 경로로 직접 호출하면 과거엔 입력이 truncate 되어 파일이 파괴됐다(2026-07-05 수정 완료 — 이제 임시 파일 경유). 수정 전 버전 사용 시 반드시 출력 경로를 분리할 것.
