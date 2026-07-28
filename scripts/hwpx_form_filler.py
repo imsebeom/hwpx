@@ -745,7 +745,8 @@ class HwpxFormFiller:
                 for file in files:
                     file_path = os.path.join(root, file)
                     arcname = os.path.relpath(file_path, self.temp_dir)
-                    if file == 'mimetype':
+                    # KS X 6101:2024 8.3 — version.xml도 mimetype과 함께 비압축
+                    if arcname.replace('\\', '/') in ('mimetype', 'version.xml'):
                         zf.write(file_path, arcname, compress_type=zipfile.ZIP_STORED)
                     else:
                         zf.write(file_path, arcname)

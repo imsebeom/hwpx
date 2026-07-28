@@ -92,8 +92,13 @@ def update_metadata(content_hpf: Path, title: str | None, creator: str | None) -
     )
 
 
+# KS X 6101:2024 8.3 — version.xml은 암호화·압축을 하지 말아야 한다.
+# mimetype과 함께 비압축으로 저장한다(한컴 저장본도 두 파일 모두 STORED).
+STORED_ENTRIES = ("mimetype", "version.xml")
+
+
 def pack_hwpx(input_dir: Path, output_path: Path) -> None:
-    """Create HWPX archive with mimetype as first entry (ZIP_STORED)."""
+    """Create HWPX archive with mimetype first; mimetype/version.xml uncompressed."""
     mimetype_file = input_dir / "mimetype"
     if not mimetype_file.is_file():
         raise SystemExit(f"Missing 'mimetype' in {input_dir}")
@@ -109,7 +114,8 @@ def pack_hwpx(input_dir: Path, output_path: Path) -> None:
         for rel_path in all_files:
             if rel_path == "mimetype":
                 continue
-            zf.write(input_dir / rel_path, rel_path, compress_type=ZIP_DEFLATED)
+            compress = ZIP_STORED if rel_path in STORED_ENTRIES else ZIP_DEFLATED
+            zf.write(input_dir / rel_path, rel_path, compress_type=compress)
 
 
 def validate_hwpx(hwpx_path: Path) -> list[str]:
@@ -143,6 +149,11 @@ def validate_hwpx(hwpx_path: Path) -> list[str]:
             info = zf.getinfo("mimetype")
             if info.compress_type != ZIP_STORED:
                 errors.append("mimetype is not ZIP_STORED")
+
+        # KS X 6101:2024 8.3 — version.xml은 압축하지 않는다
+        if "version.xml" in names:
+            if zf.getinfo("version.xml").compress_type != ZIP_STORED:
+                errors.append("version.xml is not ZIP_STORED (KS X 6101 8.3)")
 
         for name in names:
             if name.endswith(".xml") or name.endswith(".hpf"):
