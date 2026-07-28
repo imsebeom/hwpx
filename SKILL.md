@@ -28,7 +28,8 @@ ${CLAUDE_SKILL_DIR}/
 │   ├── hwpx_form_filler.py    # ★ 양식 부분 추출/표 조작 (Workflow H)
 │   ├── hwpx_writer.py         # 줄간격 XML 생성 유틸리티
 │   ├── exam_builder.py          # ★ 시험 문제지 생성 (Workflow J)
-│   ├── convert_hwp.py           # HWP(바이너리) → HWPX 변환 (Workflow K, jkf87 포팅)
+│   ├── hwp_to_hwpx_hancom.py    # ★ HWP → HWPX 변환 (Workflow K 1차: 한컴 COM SaveAs, Windows 최우선)
+│   ├── convert_hwp.py           # HWP(바이너리) → HWPX 변환 (Workflow K 폴백: jkf87 순수 Python)
 │   ├── writing_optimizer.py     # ★ 공공기관 보고서 글쓰기 자동 변환 (Workflow P, public-doc-to-hwpx 포팅)
 │   └── office/{unpack,pack}.py
 ├── templates/
@@ -94,7 +95,7 @@ pip install python-hwpx lxml --break-system-packages
  ├─ "붙임 추출/표 행 추가/셀 채우기" → 워크플로우 H (표 조작)
  ├─ "여러 HWPX를 하나로 합쳐줘" → 워크플로우 I (병합)
  ├─ "시험 문제지/PDF 시험지 → HWPX" → 워크플로우 J (시험 문제지)
- ├─ ".hwp(바이너리) → HWPX 변환" → 워크플로우 K (HWP→HWPX 순수 Python)
+ ├─ ".hwp(바이너리) → HWPX 변환" → 워크플로우 K (1차 한컴 COM SaveAs / 폴백 순수 Python)
  ├─ "{학교명}/{담당자} 일괄 치환 (양식 표 셀 포함)" → 워크플로우 L (zip-level 전역 치환)
  ├─ "빨간 글씨 일괄 검정으로/스타일별 부분 치환" → 워크플로우 M (스타일 필터 치환)
  ├─ "학생 작품 첨삭 메모 자동 삽입" → 워크플로우 N (자동 첨삭 메모)
@@ -1043,15 +1044,37 @@ xml = build_section_xml(data)
 ## 워크플로우 K: HWP(바이너리) → HWPX 변환
 
 > **레거시 .hwp 바이너리 파일을 .hwpx 개방형 XML로 변환.**
-> jkf87/hwp2hwpx-python-refactor 래퍼. 한컴오피스/LibreOffice 미설치 환경(서버·리눅스)에서 유일한 순수 Python 경로.
+> **.hwp 는 어떤 작업이든 먼저 이 워크플로우로 .hwpx 로 변환하고 시작한다.** 이후 다른 워크플로우(F 양식 복제, C 편집, E 추출 등)는 변환된 .hwpx 를 대상으로 수행한다.
 
-### 언제 사용
+### 경로 선택 (★ 한컴 COM 최우선)
 
-- 사용자가 `.hwp` (바이너리) 파일을 주고 "이걸로 작업" 또는 "HWPX로 바꿔줘" 라고 할 때
-- 한컴오피스 COM·LibreOffice headless 모두 쓸 수 없는 환경
-- 한글 미설치 서버 자동화 파이프라인
+| 순위 | 방법 | 스크립트 | 조건 | 품질 |
+|------|------|----------|------|------|
+| **1차** | 한컴 COM `SaveAs(HWPX)` | `hwp_to_hwpx_hancom.py` | Windows + 한컴오피스 설치 | ★★★ 표·이미지·서식 100% 보존 |
+| 폴백 | 순수 Python (jkf87) | `convert_hwp.py` | 한컴·LibreOffice 無 (서버·리눅스) | ⚠️ 표·이미지 손실 (아래 한계 참조) |
 
-### 한계 ⚠️ 중요
+> **한컴이 설치돼 있으면 무조건 1차 경로를 쓴다.** 방금 실측(2026-07-06): 교과 평가계획 .hwp 6개를 `SaveAs(HWPX)`로 무손실 일괄 변환 성공. `HWPFrame.HwpObject` COM 자동화가 정공법이고, LibreOffice `--convert-to` 는 hwpx 출력을 지원하지 않는다.
+
+> **⚠️ 확장자 위장 함정 (2026-07-06 실측)**: `.hwp` 확장자여도 **내용이 이미 HWPX(ZIP)** 인 파일이 섞여 있을 수 있다(GUI 저장·이관 과정에서 발생). 이때 `hwp.Open(경로, "HWP", ...)` 로 **바이너리 HWP라고 못박아 열면 열기 실패(False) → 빈 문서 → 표 통째 소실**된다. 반드시 **파일 시그니처로 실제 포맷을 먼저 판별**하라: 선두 4바이트가 `50 4B 03 04`(=`PK`, ZIP)이면 이미 hwpx이므로 **복사만** 하고, `D0 CF 11 E0`(OLE)이면 COM 변환한다. `hwp_to_hwpx_hancom.py` 는 이 판별을 내장했다. 또한 `Open` 의 반환값(False)을 반드시 체크할 것 — 조용히 빈 문서가 만들어지는 것을 막는다.
+
+### 1차: 한컴 COM SaveAs (Windows 최우선)
+
+```bash
+# 파일 하나 또는 폴더(폴더 내 *.hwp 전부) 또는 여러 파일 나열
+python "${CLAUDE_SKILL_DIR}/scripts/hwp_to_hwpx_hancom.py" "input.hwp"
+python "${CLAUDE_SKILL_DIR}/scripts/hwp_to_hwpx_hancom.py" "폴더경로"
+```
+
+- 원본 `.hwp` 옆에 동일명 `.hwpx` 생성 (원본 보존).
+- 보안 팝업은 `RegisterModule("FilePathCheckDLL", "FilePathCheckerModule")`로 자동 우회.
+- 핵심: `hwp.Open(경로, "HWP", "forceopen:true")` → `hwp.SaveAs(out, "HWPX", "")`.
+- 무손실이므로 별도 fix_namespaces/verify 후처리 불필요(한컴 자체 출력).
+
+### 폴백: 순수 Python (jkf87)
+
+> 아래는 **한컴·LibreOffice 를 모두 쓸 수 없는 환경**에서만 쓴다. 표·이미지가 풍부한 문서에는 부적합.
+
+### 한계 ⚠️ 중요 (폴백 순수 Python 경로)
 
 2026-05-04 5MB 정부 보고서 24페이지 변환 실측 결과:
 - **표 셀 텍스트 통째 누락** — 표 외곽선만 남고 내부 콘텐츠가 사라짐. 목차·예산표 등 셀 기반 페이지가 빈 표로 변환됨
@@ -1589,6 +1612,9 @@ subprocess.run(["python3", f"{SKILL_DIR}/scripts/fix_namespaces.py", "output.hwp
 27. **글머리기호/번호는 텍스트로 삽입**: 한글의 `<hp:numbering>` 구조를 사용하지 않는다. 목록은 `"- 항목"`, `"1. 항목"` 텍스트를 직접 넣고 paraPr 들여쓰기로 단계를 표현. 의도적 설계 — 호환성과 단순성을 위해 네이티브 글머리기호를 사용하지 않음
 30. **템플릿 활용 시 플레이스홀더 검토 필수**: `fill_cells_directly()`로 기존 HWPX에 내용을 채울 때, 검증된 템플릿이 없으면 반드시 (1) `analyze_form_table()`로 구조 분석 → (2) 플레이스홀더(`{{제목}}` 등) 템플릿 생성 → (3) **STOP하여 사용자에게 열어 보여주고 검토** → (4) 확인 후 실제 내용 채우기 순서를 따른다. 이미 검증된 플레이스홀더 템플릿이 존재하면 이 단계를 건너뛸 수 있다
 31. **글자 테두리 버그·secPr 완전성 검수**: hwp→hwpx 변환(워크플로우 K)이나 외부 hwpx 양식 편집 후에는 `verify_hwpx.py`가 (a) charPr 절반 이상이 SOLID 테두리 borderFill을 참조하는 "모든 글자 네모 테두리" 버그를 자동 경고하고 → `--fix-borders`로 제거(표 셀 테두리 보존, idempotent), (b) 첫 섹션 secPr의 pagePr/margin 누락·가짜 secPr를 FAIL로 검출(한컴 '손상된 문서' 사고 방지)한다. XML 유효성(validate.py)으로는 둘 다 못 잡으므로 변환·외부양식 경로에서는 반드시 verify_hwpx.py까지 거친다 (jkf87/hwpx-skill v1.0.5 차용, THIRD_PARTY_NOTICES 2번)
+32. **★ charPr 신설은 charProperties 목록 끝에만 append (인덱스 함정)**: 한글은 charPr을 id 속성이 아닌 **header.xml 목록 내 물리적 순서(0-based 인덱스)**로 해석한다. 새 charPr을 목록 중간(예: id="0" 직후)에 삽입하면 그 뒤 모든 charPrIDRef가 한 칸씩 밀려 문서 전체 서식이 오염된다(본문이 흰색·머리말체로 렌더링되어 "공간은 차지하는데 안 보이는 글자" 증상, validate.py로는 못 잡음). 반드시 id 순서 = 목록 순서를 유지하며 끝에 append하고 itemCnt를 갱신할 것. 진단법: 한글 COM으로 PDF 변환 → PyMuPDF `page.get_text("dict")`의 span `color`/`font`로 흰색(ffffff)·엉뚱한 폰트 검출 (2026-07-09 실측: 청색 표시 작업 중 중간 삽입으로 45p로 부풀었다가 순서 복원 후 36p 정상화)
+33. **표 행 삭제 시 3종 동시 보정**: `<hp:tr>` 제거 후 ① 남은 모든 tr의 tc `cellAddr rowAddr`을 0부터 재번호 ② `<hp:tbl rowCnt>` 차감 ③ `<hp:tbl><hp:sz height>`에서 삭제 행 높이 합 차감. 세로 병합(rowSpan)이 삭제 구간을 가로지르면 rowSpan·병합 셀 height도 보정. 행이 삭제 대상인지 판별은 각 tr의 첫 tc cellAddr 기준. (역으로, 표가 통째로 다음 쪽으로 밀리면 데이터 행 `cellSz height`를 최소값(~800)으로 줄여 내용 맞춤 수축 가능)
+34. **편집 기준본은 hwpx 실물**: md 원고와 실제 제출·유통 hwpx는 다를 수 있다(사용자 수동 수정·버전 분기). 착수 전 `text_extract.py` 또는 `<hp:t>` 정규식 덤프로 실물 텍스트를 뽑아 원고와 대조하고, 완료 후에는 인물명·부서/보직명·연도 등 식별자를 전수 grep해 초안 가정값 잔존을 점검한다 (2026-07-09: 5월 초안의 가상 보직이 최종본에 잔존해 사용자 지적으로 발견)
 
 ---
 
@@ -1601,6 +1627,7 @@ subprocess.run(["python3", f"{SKILL_DIR}/scripts/fix_namespaces.py", "output.hwp
 - **공문서 양식**: [references/official-doc-style.md](references/official-doc-style.md)
 - **python-hwpx API**: [references/python-hwpx-api.md](references/python-hwpx-api.md) — 라이브러리 시그니처 + 1.9 ↔ 2.x 마이그레이션
 - **글쓰기 원칙 (공공기관)**: [references/writing-principles.md](references/writing-principles.md) — 개조식·두괄식·Why→How→What·「적의를 보이는 것들」 (Workflow P 근거)
+- **탈AI 문체**: `~/.claude/references/writing-style.md` — 공허 수식어, 대구, 3개 병렬 강박, 미들닷, 상투적 마무리 등 AI 티 제거. writing-principles(문장 줄이기)와 상호 보완 — 본문 콘텐츠 작성 시 함께 적용
 - **레이아웃 최적화 규칙**: [references/layout-rules.md](references/layout-rules.md) — 한 문장 35–45자·페이지 걸침·12개 자동 변환 표 (Workflow P 근거)
 - **보고서 기호**: □(16pt) → ○(15pt) → ―(15pt) → ※(13pt)
 - **공문서 번호**: 1. → 가. → 1) → 가) → (1) → (가) → ① → ㉮
