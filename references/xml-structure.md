@@ -143,6 +143,28 @@
 | 3열 균등 | 14173 + 14173 + 14174 | |
 | 행 높이 | 2400~3600 | 셀당 보통 값 |
 
+### 표가 페이지 경계에서 잘릴 때 (`tbl@pageBreak`)
+
+KS X 6101:2024 표 194가 정의하는 세 값이다. 위 예시의 `CELL`이 기본이지만, 잘림이 문제라면 값을 바꾸는 것이 정공법이다.
+
+| 값 | 동작 | 언제 |
+|----|------|------|
+| `CELL` | 셀 내부 텍스트까지 나뉜다 | 긴 표의 기본값 |
+| `TABLE` | 표는 나뉘되 **셀은 나뉘지 않는다** | 셀 하나가 두 쪽에 걸치는 것만 막고 싶을 때 |
+| `NONE` | **나뉘지 않는다** — 표 전체가 다음 쪽으로 넘어간다 | 작은 표가 페이지 끝에서 쪼개질 때 |
+
+`repeatHeader="1"`을 함께 쓰면 나뉜 쪽에서도 제목 행이 반복된다. 표 앞 문단이 함께 넘어가야 하면 그 문단 paraPr에 `keepWithNext="1"`을 준다.
+
+### 표의 부분 영역 서식 (`cellzone`)
+
+셀마다 `borderFillIDRef`를 지정하는 대신, 사각 영역을 한 번에 지정할 수 있다 (§10.9.3.3). `<hp:tbl>` 안에서 `inMargin` 다음, `tr` 앞에 온다.
+
+```xml
+<hp:cellzoneList>
+  <hp:cellzone startRowAddr="1" startColAddr="1" endRowAddr="2" endColAddr="3" borderFillIDRef="7"/>
+</hp:cellzoneList>
+```
+
 ---
 
 ## 이미지 삽입 (BinData)

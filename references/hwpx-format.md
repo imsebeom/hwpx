@@ -147,57 +147,89 @@ document.hwpx (ZIP archive)
 <hh:charProperties itemCnt="...">
   <hh:charPr id="0" height="1000" textColor="#000000" shadeColor="none"
              useFontSpace="0" useKerning="0" symMark="NONE"
-             borderFillIDRef="0">
-    <hh:fontRef hangul="한양신명조" latin="Times New Roman" .../>
+             borderFillIDRef="2">
+    <hh:fontRef hangul="0" latin="0" hanja="0" japanese="0" other="0" symbol="0" user="0"/>
     <hh:ratio hangul="100" latin="100" .../>
     <hh:spacing hangul="0" latin="0" .../>
     <hh:relSz hangul="100" latin="100" .../>
     <hh:offset hangul="0" latin="0" .../>
-    <hh:bold/>          <!-- 볼드 (요소 존재 시 활성) -->
-    <hh:italic/>        <!-- 이탤릭 -->
-    <hh:underline type="BOTTOM" shape="SOLID" color="#000000"/>
-    <hh:strikeout type="NONE"/>
+    <hh:underline type="NONE" shape="SOLID" color="#000000"/>
+    <hh:strikeout shape="NONE" color="#000000"/>
     <hh:outline type="NONE"/>
-    <hh:shadow type="NONE"/>
-    <hh:emboss type="NONE"/>
-    <hh:engrave type="NONE"/>
-    <hh:supscript type="NONE"/>
+    <hh:shadow type="NONE" color="#C0C0C0" offsetX="10" offsetY="10"/>
   </hh:charPr>
 </hh:charProperties>
 ```
 
-- `height`: 글자 크기 (HWPUNIT 단위, 1000 = 10pt)
+- `height`: 글자 크기 (HWPUNIT, 1000 = 10pt) — KS X 6101:2024 표 46
 - `textColor`: 글자 색상 (#RRGGBB)
-- 볼드/이탤릭: 해당 요소 존재 여부로 판단
+- `fontRef`: 언어별 **글꼴 ID 참조값**(fontface 내 id). 글꼴 이름이 아니다
+- `borderFillIDRef`: 글자 테두리를 쓸 때만 존재하는 조건부 속성. 테두리 있는 borderFill을 가리키면 글자마다 네모가 그려진다 (Critical Rule 24)
+
+**⚠️ 요소 존재 = 속성 활성 (KS X 6101:2024 표 46)**
+
+`italic`, `bold`, `emboss`(양각), `engrave`(음각), `supscript`(위첨자), `subscript`(아래첨자)는 **속성 없는 빈 요소이며, 존재하는 것만으로 그 서식이 켜진다.** `type="NONE"`을 붙여 나열하면 안 된다 — 실제로 양각·위첨자가 적용된다. 필요할 때만 `<hh:bold/>` 처럼 넣는다.
+
+**하위 요소 순서는 스키마상 강제**(부속서 C `CharShapeType`은 `xs:sequence`):
+
+```
+fontRef → ratio → spacing → relSz → offset → italic? → bold? → underline?
+       → strikeout? → outline? → shadow? → emboss? → engrave? → supscript? → subscript?
+```
+
+앞의 5개는 필수, 나머지는 선택. **italic이 bold보다 앞**이다.
 
 ### ParaShape (문단 서식)
 
+정렬·여백은 **속성이 아니라 자식 요소**다. 아래는 한컴 실제 출력 순서(KS X 6101:2024 §9.3.8 샘플 34와 동일).
+
 ```xml
 <hh:paraProperties itemCnt="...">
-  <hh:paraPr id="0" align="JUSTIFY" vertalign="BASELINE"
-             headingType="NONE" level="0" tabPrIDRef="0"
-             condense="0" fontLineHeight="0" snapToGrid="1"
-             suppressLineNumbers="0" checked="0">
-    <hh:margin indent="0" left="0" right="0"/>
-    <hh:lineSpacing type="PERCENT" value="160" unit="HWPUNIT"/>
+  <hh:paraPr id="0" tabPrIDRef="0" condense="0" fontLineHeight="0" snapToGrid="1"
+             suppressLineNumbers="0" checked="0" textDir="LTR">
+    <hh:align horizontal="JUSTIFY" vertical="BASELINE"/>
     <hh:heading type="NONE" idRef="0" level="0"/>
-    <hh:border borderFillIDRef="0" offsetLeft="0" offsetRight="0"
-               offsetTop="0" offsetBottom="0" connect="0" ignoreMargin="0"/>
+    <hh:breakSetting breakLatinWord="KEEP_WORD" breakNonLatinWord="KEEP_WORD"
+                     widowOrphan="0" keepWithNext="0" keepLines="0"
+                     pageBreakBefore="0" lineWrap="BREAK"/>
     <hh:autoSpacing eAsianEng="0" eAsianNum="0"/>
+    <hh:margin>
+      <hc:intent value="0" unit="HWPUNIT"/>   <!-- >0 들여쓰기, <0 내어쓰기 -->
+      <hc:left value="0" unit="HWPUNIT"/>
+      <hc:right value="0" unit="HWPUNIT"/>
+      <hc:prev value="0" unit="HWPUNIT"/>     <!-- 문단 위 간격 -->
+      <hc:next value="0" unit="HWPUNIT"/>     <!-- 문단 아래 간격 -->
+    </hh:margin>
+    <hh:lineSpacing type="PERCENT" value="160" unit="HWPUNIT"/>
+    <hh:border borderFillIDRef="2" offsetLeft="0" offsetRight="0"
+               offsetTop="0" offsetBottom="0" connect="0" ignoreMargin="0"/>
   </hh:paraPr>
 </hh:paraProperties>
 ```
 
-- `align`: `JUSTIFY`, `LEFT`, `RIGHT`, `CENTER`
-- `lineSpacing`: `type="PERCENT"`, `value="160"` = 160% 줄간격
+- `align@horizontal`: `JUSTIFY`, `LEFT`, `RIGHT`, `CENTER`, `DISTRIBUTE`(배분), `DISTRIBUTE_SPACE`(나눔)
+- `lineSpacing`: `type="PERCENT"`, `value="160"` = 160% 줄간격. PERCENT일 때 0~500% 제한
+- `margin` 하위는 **`hc:` 접두사**이며 값과 단위를 `value`/`unit`으로 함께 쓴다. 문단 위/아래 간격은 `prev`/`next`이고, `<hp:spacing before= after=>` 같은 요소는 실물에 없다
+- `breakSetting`으로 쪽 나눔을 제어한다: `keepLines`(문단 보호), `keepWithNext`(다음 문단과 함께 — 제목이 페이지 끝에 홀로 남는 것 방지), `pageBreakBefore`, `widowOrphan`(외톨이줄 보호)
+
+> **자식 순서 주의**: 부속서 C 스키마는 `align → heading → breakSetting → margin → lineSpacing → border → autoSpacing` 순서를 규정하지만, **한컴 실물과 표준 본문 샘플은 `autoSpacing`을 `breakSetting` 바로 뒤**에 둔다. 실물 순서를 따른다.
 
 ## 단위 변환
+
+KS X 6101:2024 §7.2.4 전체 환산표:
 
 | 단위 | 설명 | 변환 |
 |------|------|------|
 | HWPUNIT | 한글 내부 단위 | 1 HWPUNIT = 1/7200 인치 |
 | pt (포인트) | 글꼴 크기 | 1pt = 100 HWPUNIT |
-| mm (밀리미터) | 용지/여백 | 1mm ≈ 283.46 HWPUNIT |
+| mm (밀리미터) | 용지/여백 | 1mm = 283.456 HWPUNIT |
+| cm | | 1cm = 2834.56 HWPUNIT |
+| inch | | 1inch = 7200 HWPUNIT |
+| pixel | | 1px = 75 HWPUNIT |
+| char | 글자 단위 | 1char = 500 HWPUNIT |
+| twips | | 1twip = 5 HWPUNIT |
+
+> **⚠️ `unit` 속성의 기본값은 CHAR이다** (§7.2.5 표 2). `value`/`unit` 쌍을 쓰는 요소(`hc:intent`, `hc:left`, `lineSpacing` 등)에서 `unit`을 생략하면 HWPUNIT이 아니라 **CHAR(=500 HWPUNIT)로 해석**되어 값이 500배가 된다. 항상 `unit="HWPUNIT"`을 명시할 것. (단위 표기가 아예 없는 일반 속성 — `width`, `height`, `cellSz` 등 — 은 HWPUNIT으로 해석한다.)
 
 ### 일반적인 값
 

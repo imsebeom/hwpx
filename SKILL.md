@@ -1583,7 +1583,7 @@ subprocess.run(["python3", f"{SKILL_DIR}/scripts/fix_namespaces.py", "output.hwp
 
 1. **HWPX만 지원**: `.hwp`(바이너리)는 미지원
 2. **secPr 필수**: 첫 문단 첫 run에 secPr + colPr
-3. **mimetype**: 첫 ZIP 엔트리, ZIP_STORED
+3. **mimetype**: 첫 ZIP 엔트리, ZIP_STORED. **`version.xml`도 ZIP_STORED**(KS X 6101:2024 §8.3이 압축·암호화를 금지하며 한컴 저장본도 비압축이다). ZIP을 새로 패키징하는 경로에서 놓치기 쉽다 — 원본 `ZipInfo`를 그대로 `writestr`에 넘기면 압축 방식이 보존된다
 4. **네임스페이스**: `hp:`, `hs:`, `hh:`, `hc:` 접두사 유지
 5. **fix_namespaces 필수**: 모든 빌드 후 반드시 실행
 6. **fix_namespaces 호출법**: `subprocess.run()` 사용 (`exec()` 금지)
@@ -1612,8 +1612,8 @@ subprocess.run(["python3", f"{SKILL_DIR}/scripts/fix_namespaces.py", "output.hwp
 27. **글머리기호/번호는 텍스트로 삽입**: 한글의 `<hp:numbering>` 구조를 사용하지 않는다. 목록은 `"- 항목"`, `"1. 항목"` 텍스트를 직접 넣고 paraPr 들여쓰기로 단계를 표현. 의도적 설계 — 호환성과 단순성을 위해 네이티브 글머리기호를 사용하지 않음
 30. **템플릿 활용 시 플레이스홀더 검토 필수**: `fill_cells_directly()`로 기존 HWPX에 내용을 채울 때, 검증된 템플릿이 없으면 반드시 (1) `analyze_form_table()`로 구조 분석 → (2) 플레이스홀더(`{{제목}}` 등) 템플릿 생성 → (3) **STOP하여 사용자에게 열어 보여주고 검토** → (4) 확인 후 실제 내용 채우기 순서를 따른다. 이미 검증된 플레이스홀더 템플릿이 존재하면 이 단계를 건너뛸 수 있다
 31. **글자 테두리 버그·secPr 완전성 검수**: hwp→hwpx 변환(워크플로우 K)이나 외부 hwpx 양식 편집 후에는 `verify_hwpx.py`가 (a) charPr 절반 이상이 SOLID 테두리 borderFill을 참조하는 "모든 글자 네모 테두리" 버그를 자동 경고하고 → `--fix-borders`로 제거(표 셀 테두리 보존, idempotent), (b) 첫 섹션 secPr의 pagePr/margin 누락·가짜 secPr를 FAIL로 검출(한컴 '손상된 문서' 사고 방지)한다. XML 유효성(validate.py)으로는 둘 다 못 잡으므로 변환·외부양식 경로에서는 반드시 verify_hwpx.py까지 거친다 (jkf87/hwpx-skill v1.0.5 차용, THIRD_PARTY_NOTICES 2번)
-32. **★ charPr 신설은 charProperties 목록 끝에만 append (인덱스 함정)**: 한글은 charPr을 id 속성이 아닌 **header.xml 목록 내 물리적 순서(0-based 인덱스)**로 해석한다. 새 charPr을 목록 중간(예: id="0" 직후)에 삽입하면 그 뒤 모든 charPrIDRef가 한 칸씩 밀려 문서 전체 서식이 오염된다(본문이 흰색·머리말체로 렌더링되어 "공간은 차지하는데 안 보이는 글자" 증상, validate.py로는 못 잡음). 반드시 id 순서 = 목록 순서를 유지하며 끝에 append하고 itemCnt를 갱신할 것. 진단법: 한글 COM으로 PDF 변환 → PyMuPDF `page.get_text("dict")`의 span `color`/`font`로 흰색(ffffff)·엉뚱한 폰트 검출 (2026-07-09 실측: 청색 표시 작업 중 중간 삽입으로 45p로 부풀었다가 순서 복원 후 36p 정상화)
-33. **표 행 삭제 시 3종 동시 보정**: `<hp:tr>` 제거 후 ① 남은 모든 tr의 tc `cellAddr rowAddr`을 0부터 재번호 ② `<hp:tbl rowCnt>` 차감 ③ `<hp:tbl><hp:sz height>`에서 삭제 행 높이 합 차감. 세로 병합(rowSpan)이 삭제 구간을 가로지르면 rowSpan·병합 셀 height도 보정. 행이 삭제 대상인지 판별은 각 tr의 첫 tc cellAddr 기준. (역으로, 표가 통째로 다음 쪽으로 밀리면 데이터 행 `cellSz height`를 최소값(~800)으로 줄여 내용 맞춤 수축 가능)
+32. **★ charPr 신설은 charProperties 목록 끝에만 append (인덱스 함정)**: 한글은 charPr을 id 속성이 아닌 **header.xml 목록 내 물리적 순서(0-based 인덱스)**로 해석한다(표준 스키마는 `charPrIDRef`를 id 참조로 정의하므로 이는 구현 고유 동작이다 — [ks-x-6101.md](references/ks-x-6101.md) 참조). 새 charPr을 목록 중간(예: id="0" 직후)에 삽입하면 그 뒤 모든 charPrIDRef가 한 칸씩 밀려 문서 전체 서식이 오염된다(본문이 흰색·머리말체로 렌더링되어 "공간은 차지하는데 안 보이는 글자" 증상, validate.py로는 못 잡음). 반드시 id 순서 = 목록 순서를 유지하며 끝에 append하고 itemCnt를 갱신할 것. 진단법: 한글 COM으로 PDF 변환 → PyMuPDF `page.get_text("dict")`의 span `color`/`font`로 흰색(ffffff)·엉뚱한 폰트 검출 (2026-07-09 실측: 청색 표시 작업 중 중간 삽입으로 45p로 부풀었다가 순서 복원 후 36p 정상화)
+33. **표 행 삭제 시 3종 동시 보정**: `<hp:tr>` 제거 후 ① 남은 모든 tr의 tc `cellAddr rowAddr`을 0부터 재번호 ② `<hp:tbl rowCnt>` 차감 ③ `<hp:tbl><hp:sz height>`에서 삭제 행 높이 합 차감. 세로 병합(rowSpan)이 삭제 구간을 가로지르면 rowSpan·병합 셀 height도 보정. 행이 삭제 대상인지 판별은 각 tr의 첫 tc cellAddr 기준. (역으로, 표가 통째로 다음 쪽으로 밀리면 데이터 행 `cellSz height`를 최소값(~800)으로 줄여 내용 맞춤 수축 가능). **표가 페이지 경계에서 잘리는 문제는 `<hp:tbl pageBreak>` 값으로 먼저 다룬다** — `NONE`(표를 나누지 않고 통째로 다음 쪽), `TABLE`(표는 나누되 셀은 안 나눔), `CELL`(기본, 셀 내부까지 나눔) + `repeatHeader="1"`(나뉜 쪽 제목 행 반복). KS X 6101:2024 표 194
 34. **편집 기준본은 hwpx 실물**: md 원고와 실제 제출·유통 hwpx는 다를 수 있다(사용자 수동 수정·버전 분기). 착수 전 `text_extract.py` 또는 `<hp:t>` 정규식 덤프로 실물 텍스트를 뽑아 원고와 대조하고, 완료 후에는 인물명·부서/보직명·연도 등 식별자를 전수 grep해 초안 가정값 잔존을 점검한다 (2026-07-09: 5월 초안의 가상 보직이 최종본에 잔존해 사용자 지적으로 발견)
 
 ---
@@ -1621,6 +1621,7 @@ subprocess.run(["python3", f"{SKILL_DIR}/scripts/fix_namespaces.py", "output.hwp
 ## 상세 참조
 
 - **XML 구조·이미지·표지 패턴**: [references/xml-structure.md](references/xml-structure.md)
+- **국가표준 대조 (KS X 6101:2024)**: [references/ks-x-6101.md](references/ks-x-6101.md) — 표준 규정 vs 한컴 실물이 다른 지점, 스킬 규칙의 조항 근거, 미사용 표준 기능(표 쪽나눔 제어·cellzone·캡션·형광펜 등). **표준과 실물이 충돌하면 실물이 정답**
 - **템플릿별 스타일 ID 맵**: [references/template-styles.md](references/template-styles.md)
 - **트러블슈팅**: [references/troubleshooting.md](references/troubleshooting.md)
 - **보고서 양식**: [references/report-style.md](references/report-style.md)

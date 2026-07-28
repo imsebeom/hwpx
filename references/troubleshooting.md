@@ -140,6 +140,8 @@ section_xml = section_xml[:p_start] + pic_xml + "\n" + section_xml[p_start:]
 
 **진단법 (한글 재저장 프로브)**: COM으로 열어 HWPX로 재저장한 뒤 섹션별 `<hp:p>`/`<hp:tbl>` 수를 원본과 비교하면, 한글 파서가 어느 문단에서 내용을 버렸는지 정확히 드러난다. 렌더링 문제와 달리 파싱 단계 폐기는 이 방법으로만 확실히 잡힌다.
 
+**제거해도 되는 근거**: `linesegarray`는 KS X 6101:2024 스키마에 정의되지 않은 요소다. 부속서 E의 `PType`(문단)은 `xs:sequence`로 `run`만 자식으로 가지며, lineseg는 본문 샘플에만 등장한다. 한컴이 넣는 줄바꿈 위치 캐시일 뿐이므로 제거는 규격 위반이 아니고, 한글이 다시 열 때 재계산한다.
+
 ```python
 hwp.Open(src, '', 'forceopen:true')
 hwp.HParameterSet.HFileOpenSave.Format = 'HWPX'  # 재저장 후 zip 열어 문단 수 비교

@@ -76,38 +76,59 @@ document.hwpx (ZIP)
 </hh:charPr>
 ```
 
-- `height`: 1/100pt 단위 (1600 = 16pt)
+- `height`: 글자 크기, 단위는 HWPUNIT (1600 = 16pt)
 - `textColor`: 글자 색상
 - `fontRef hangul="N"`: HANGUL fontface 내 id=N 글꼴 참조
+- `bold`/`italic`은 **빈 요소의 존재만으로 활성**된다. `type="NONE"` 같은 속성을 붙여 나열하지 말 것
 
 ### 문단 속성 (paraPr)
 
 ```xml
-<hh:paraPr id="28">
+<hh:paraPr id="28" tabPrIDRef="0" condense="0" fontLineHeight="0" snapToGrid="1"
+           suppressLineNumbers="0" checked="0" textDir="LTR">
   <hh:align horizontal="JUSTIFY" vertical="BASELINE"/>
   <hh:heading type="NONE" idRef="0" level="0"/>
-  <hh:margin><hc:intent value="-2606" unit="HWPUNIT"/></hh:margin>
+  <hh:breakSetting breakLatinWord="KEEP_WORD" breakNonLatinWord="KEEP_WORD"
+                   widowOrphan="0" keepWithNext="0" keepLines="0"
+                   pageBreakBefore="0" lineWrap="BREAK"/>
+  <hh:autoSpacing eAsianEng="0" eAsianNum="0"/>
+  <hh:margin>
+    <hc:intent value="-2606" unit="HWPUNIT"/>
+    <hc:left value="0" unit="HWPUNIT"/>
+    <hc:right value="0" unit="HWPUNIT"/>
+    <hc:prev value="0" unit="HWPUNIT"/>
+    <hc:next value="0" unit="HWPUNIT"/>
+  </hh:margin>
   <hh:lineSpacing type="PERCENT" value="160" unit="HWPUNIT"/>
-  <hp:spacing before="0" after="0" .../>
+  <hh:border borderFillIDRef="2" offsetLeft="0" offsetRight="0"
+             offsetTop="0" offsetBottom="0" connect="0" ignoreMargin="0"/>
 </hh:paraPr>
 ```
 
-- `horizontal`: JUSTIFY, CENTER, LEFT, RIGHT
+- `horizontal`: JUSTIFY, CENTER, LEFT, RIGHT, DISTRIBUTE, DISTRIBUTE_SPACE
 - `hc:intent value`: 들여쓰기 (음수 = 내어쓰기)
-- `lineSpacing`: 줄간격 (PERCENT=160 → 160%)
-- `spacing before/after`: 문단 전/후 간격
+- `lineSpacing`: 줄간격 (PERCENT=160 → 160%, 0~500% 제한)
+- **문단 전/후 간격은 `hc:prev` / `hc:next`** 다. `<hp:spacing before= after=>`는 실물에 존재하지 않는다
+- `unit`을 생략하면 CHAR(500 HWPUNIT)로 해석되므로 항상 명시한다
 
 ### 테두리/배경 (borderFill)
 
 ```xml
-<hh:borderFill id="9">
+<hh:borderFill id="9" threeD="0" shadow="0" centerLine="NONE" breakCellSeparateLine="0">
+  <hh:slash type="NONE" Crooked="0" isCounter="0"/>
+  <hh:backSlash type="NONE" Crooked="0" isCounter="0"/>
   <hh:leftBorder type="SOLID" width="0.12 mm" color="#006699"/>
-  <!-- ... 기타 테두리 ... -->
+  <!-- rightBorder / topBorder / bottomBorder / diagonal 동일 형식 -->
   <hh:fillBrush>
-    <hh:windowBrush faceColor="#193AAA" .../>
+    <hc:winBrush faceColor="#193AAA" hatchColor="#999999" alpha="0"/>
   </hh:fillBrush>
 </hh:borderFill>
 ```
+
+- 면 채우기 요소는 **`hc:winBrush`** 다 (`hh:windowBrush`가 아니다 — KS X 6101:2024 §9.3.3.2.4)
+- `fillBrush`는 `winBrush`(면) / `gradation`(그러데이션) / `imgBrush`(그림) 중 **하나만** 가진다
+- `width`는 mm 단위 문자열이며 값은 열거형이다: 0.1 / 0.12 / 0.15 / 0.2 / 0.25 / 0.3 / 0.4 / 0.5 / 0.6 / 0.7 / 1.0 / 1.5 / 2.0 / 3.0 / 4.0 / 5.0
+- `type`(선 종류): NONE, SOLID, DOT, THICK, DASH, DASH_DOT, DASH_DOT_DOT, LONG_DASH, CIRCLE, DOUBLE_SLIM, SLIM_THICK, THICK_SLIM, SLIM_THICK_SLIM, WAVE, DOUBLEWAVE
 
 ## section0.xml 주요 요소
 
