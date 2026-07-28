@@ -162,6 +162,17 @@ def validate_hwpx(hwpx_path: Path) -> list[str]:
                 except etree.XMLSyntaxError as e:
                     errors.append(f"Malformed XML: {name}: {e}")
 
+    # 표 격자 정합성 — XML 유효성으로는 잡히지 않지만 rowCnt/colCnt가 없거나
+    # 격자가 어긋나면 한컴이 문서 자체를 열지 못한다 (KS X 6101:2024 10.9.3).
+    # 2026-07-28 minutes 템플릿의 rowCnt/colCnt 누락이 이 검사 없이 통과했었다.
+    try:
+        sys.path.insert(0, str(Path(__file__).parent))
+        from verify_hwpx import check_table_grid
+
+        errors.extend(check_table_grid(hwpx_path)["errors"])
+    except ImportError:
+        pass  # verify_hwpx 없이도 나머지 검사는 동작한다
+
     return errors
 
 
@@ -177,6 +188,17 @@ def build(
 
     if not BASE_DIR.is_dir():
         raise SystemExit(f"Base template not found: {BASE_DIR}")
+
+    # government는 스타일(header)만 제공하는 템플릿이라 본문 뼈대가 비어 있다.
+    # 표지 배너·섹션 바는 hwpx_helpers로 만들어 --section으로 넘겨야 한다.
+    if template == "government" and not section_override:
+        print(
+            "NOTE: government 템플릿은 header(스타일) 제공용이라 본문이 비어 있다. "
+            "내용을 넣으려면 hwpx_helpers의 make_cover_page()/make_section_bar()/"
+            "make_body_para()로 section0.xml을 만들어 --section으로 넘길 것 "
+            "(SKILL.md 워크플로우 A 참조).",
+            file=sys.stderr,
+        )
 
     with tempfile.TemporaryDirectory() as tmpdir:
         work = Path(tmpdir) / "build"
