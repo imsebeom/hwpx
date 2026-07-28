@@ -322,6 +322,87 @@ def check_secpr_openable(hwpx_path):
     return {"errors": errors, "warnings": warnings}
 
 
+def check_table_grid(hwpx_path):
+    """표 격자 정합성 점검 — KS X 6101:2024 10.9.3 기준.
+
+    rowCnt/colCnt 누락이나 격자 불일치는 XML 유효성 검사로는 잡히지 않지만
+    한컴이 표 격자를 구성하지 못해 문서 열기 자체가 실패한다.
+    (2026-07-28: minutes 템플릿의 rowCnt/colCnt 누락을 이 검사로 발견)
+
+    Returns: {"errors": [...], "warnings": [...]}
+    """
+    errors, warnings = [], []
+    try:
+        from lxml import etree
+    except ImportError:
+        return {"errors": [], "warnings": ["lxml 미설치 — 표 격자 점검 건너뜀"]}
+
+    hp = "http://www.hancom.co.kr/hwpml/2011/paragraph"
+    q = lambda name: f"{{{hp}}}{name}"
+
+    with zipfile.ZipFile(hwpx_path, "r") as zf:
+        secs = sorted(n for n in zf.namelist()
+                      if n.startswith("Contents/section") and n.endswith(".xml"))
+        blobs = [(n, zf.read(n)) for n in secs]
+
+    for name, data in blobs:
+        try:
+            root = etree.fromstring(data)
+        except etree.XMLSyntaxError:
+            continue  # 파싱 오류는 다른 검사가 보고한다
+
+        for idx, tbl in enumerate(root.iter(q("tbl"))):
+            where = f"{name} 표#{idx}"
+            rows = tbl.findall(q("tr"))
+
+            if tbl.get("rowCnt") is None or tbl.get("colCnt") is None:
+                errors.append(
+                    f"{where}: <hp:tbl>에 rowCnt/colCnt 없음 — 한컴이 표 격자를 "
+                    f"만들지 못해 문서가 열리지 않는다 (실제 행 {len(rows)}개)")
+                continue
+
+            row_cnt, col_cnt = int(tbl.get("rowCnt")), int(tbl.get("colCnt"))
+            if row_cnt != len(rows):
+                errors.append(
+                    f"{where}: rowCnt={row_cnt}인데 실제 <hp:tr>는 {len(rows)}개")
+
+            filled = set()
+            overlaps = []
+            for tc in tbl.iter(q("tc")):
+                addr = tc.find(q("cellAddr"))
+                if addr is None:
+                    errors.append(f"{where}: <hp:cellAddr> 없는 셀 존재")
+                    continue
+                span = tc.find(q("cellSpan"))
+                col = int(addr.get("colAddr", 0))
+                row = int(addr.get("rowAddr", 0))
+                cspan = int(span.get("colSpan", 1)) if span is not None else 1
+                rspan = int(span.get("rowSpan", 1)) if span is not None else 1
+                for dr in range(rspan):
+                    for dc in range(cspan):
+                        cell = (row + dr, col + dc)
+                        if cell in filled:
+                            overlaps.append(cell)
+                        filled.add(cell)
+
+                sub = tc.find(q("subList"))
+                if sub is None or not sub.findall(q("p")):
+                    errors.append(
+                        f"{where}: 셀({row},{col})의 subList에 <hp:p>가 없음 "
+                        "— KS X 6101 11.1.2는 빈 셀에도 문단 1개를 요구한다")
+
+            if overlaps:
+                errors.append(f"{where}: 셀 주소 중복 {sorted(set(overlaps))[:6]}")
+            holes = [(r, c) for r in range(row_cnt) for c in range(col_cnt)
+                     if (r, c) not in filled]
+            if holes:
+                errors.append(
+                    f"{where}: 격자에 빈 칸 {holes[:6]}"
+                    f"{' 외' if len(holes) > 6 else ''} — rowCnt×colCnt와 불일치")
+
+    return {"errors": errors, "warnings": warnings}
+
+
 def verify(source_path=None, result_path=None, json_output=None,
             strict=False, spec_path=None, fix_borders=False):
     """HWPX 검수를 실행한다.
@@ -378,6 +459,11 @@ def verify(source_path=None, result_path=None, json_output=None,
     secpr_check = check_secpr_openable(result_path)
     report["issues"].extend(secpr_check["errors"])
     report["warnings"].extend(secpr_check["warnings"])
+
+    # 1.35. 표 격자 정합성 (rowCnt/colCnt 누락·격자 구멍) — 한컴 열기 실패 방지
+    grid_check = check_table_grid(result_path)
+    report["issues"].extend(grid_check["errors"])
+    report["warnings"].extend(grid_check["warnings"])
 
     # 1.4. 글자 테두리 버그 (모든 글자에 네모 테두리)
     cb = detect_char_border_bug(result_path)
