@@ -316,6 +316,8 @@ def render_preview(hwpx_path: str, out_dir: Optional[str] = None,
     # 이전 산출물이 남아 있으면 조용한 SaveAs 실패를 성공으로 오판한다
     if os.path.exists(pdf_path):
         os.remove(pdf_path)
+    for old in out.glob(f"{stem}-*.png"):   # 옛 PNG가 남으면 쪽 수가 실제보다 많아 보인다
+        old.unlink()
 
     # COM 인스턴스 재생성은 연속 호출에서 산발적으로 실패한다 (RPC 오류)
     last_err = None
@@ -340,7 +342,27 @@ def render_preview(hwpx_path: str, out_dir: Optional[str] = None,
         check=True, capture_output=True,
     )
     pngs = sorted(str(p) for p in out.glob(f"{stem}-*.png"))
+    # 앞 N쪽만 PNG로 만들므로 뒤쪽 표가 통째로 안 보일 수 있다 (2026-09-13 강의일지 3쪽 중 충실도 표를 못 봄)
+    total = _pdf_pages(exe, pdf_path)
+    if total and total > pages:
+        import sys
+        print(f"⚠ PDF {total}쪽 중 앞 {pages}쪽만 PNG로 만들었다. 나머지는 --pages {total} 로 다시 뽑거나 {pdf_path} 를 직접 본다",
+              file=sys.stderr)
     return pngs or [pdf_path]
+
+
+def _pdf_pages(pdftoppm_exe: str, pdf_path: str) -> Optional[int]:
+    """pdftoppm 옆의 pdfinfo 로 총 쪽 수. 없으면 None."""
+    info = Path(pdftoppm_exe).with_name("pdfinfo" + Path(pdftoppm_exe).suffix)
+    if not info.exists():
+        return None
+    try:
+        # 한글 경로가 cp949로 섞여 나오므로 text=True(utf-8)로 받으면 디코딩에서 죽는다. Pages 줄은 ASCII다
+        r = subprocess.run([str(info), pdf_path], capture_output=True, check=True)
+    except Exception:
+        return None
+    m = re.search(r"^Pages:\s+(\d+)", r.stdout.decode("utf-8", errors="ignore"), re.M)
+    return int(m.group(1)) if m else None
 
 
 # ---------------------------------------------------------------------------
