@@ -401,10 +401,11 @@ class HwpxFormFiller:
                             parent = parent.getparent()
         
         # 수정된 셀들의 linesegarray 제거
+        # 부모를 통해 지운다 — findall('.//')는 손자까지 잡는데 p.remove()는 직계 자식만
+        # 지울 수 있어, 셀 안에 표가 있으면 ValueError로 죽는다 (2026-09-16)
         for cell in modified_cells:
-            for p in cell.findall('.//{*}p'):
-                for linesegarray in p.findall('.//{*}linesegarray'):
-                    p.remove(linesegarray)
+            for lsa in cell.findall('.//{*}linesegarray'):
+                lsa.getparent().remove(lsa)
         
         return filled
     
@@ -541,9 +542,9 @@ class HwpxFormFiller:
                         filled += 1
 
             # linesegarray 제거 (한글이 자동으로 줄간격 재계산)
-            for p in cell.findall('.//{*}p'):
-                for linesegarray in p.findall('.//{*}linesegarray'):
-                    p.remove(linesegarray)
+            # 부모를 통해 지운다 — 위 fill_table_cells와 같은 이유 (2026-09-16)
+            for lsa in cell.findall('.//{*}linesegarray'):
+                lsa.getparent().remove(lsa)
 
         return filled
     
