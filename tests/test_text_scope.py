@@ -29,7 +29,7 @@ def main():
     xml = '<hp:p id="17"><hp:run charPrIDRef="7"><hp:t>7회 중 17회</hp:t><hp:t>a<hp:tab/>7</hp:t></hp:run></hp:p>'
     out, n = replace_in_text_nodes(xml, {"7": "4", "17": "X"})
     assert out == '<hp:p id="17"><hp:run charPrIDRef="7"><hp:t>4회 중 X회</hp:t><hp:t>a<hp:tab/>4</hp:t></hp:run></hp:p>', out
-    assert n == 4, n
+    assert n == 3, n  # 「17」이 긴 키라 먼저 먹고(1), 남은 「7」 둘(2). id="17" 과 charPrIDRef="7" 은 무사
     assert risky_replacement_keys({"7": "4", "4.2": "", "학교명": "x"}) == ["7", "4.2"]
 
     with tempfile.TemporaryDirectory() as d:
