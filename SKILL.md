@@ -244,6 +244,15 @@ def format_spacing(hwpx_path):
 
 > charPrIDRef 값은 템플릿에 따라 다르다. report 기준: `8`=##, `13`=###. 다른 템플릿은 `references/template-styles.md` 참조.
 
+⚠ **표가 있는 문서면 같은 후처리에서 `<hp:tbl>`의 `pageBreak`를 `NONE`으로 바꾼다.** md2hwpx 산출물은 기본값이 `CELL`이라 표가 페이지 경계에서 **셀 내부까지 쪼개진다** — 앞쪽에 머리와 두어 행만 남고 나머지가 다음 쪽으로 넘어가 읽을 수 없게 된다. `validate.py`는 통과하므로 PDF로 렌더해야 드러난다(규칙 33). 짧은 표는 통째로 넘기는 편이 언제나 낫다. `##` 앞 빈 줄은 위 코드가 2개를 넣는데 실측으로는 **1개가 적당하다** — 2개면 문서가 성겨져 표가 앞 쪽에 들어가지 못하고 밀린다.
+>
+> ```python
+> section = re.sub(r"<hp:tbl\b[^>]*>",
+>     lambda m: re.sub(r'pageBreak="[^"]*"', 'pageBreak="NONE"', m.group(0))
+>               if "pageBreak=" in m.group(0) else m.group(0)[:-1] + ' pageBreak="NONE">',
+>     section)
+> ```
+
 ### 이미지 인라인 삽입 (md2hwpx.py 생성 후)
 
 md2hwpx.py는 이미지를 자동 삽입하지 않는다. 생성 후 별도로 삽입해야 한다.
