@@ -94,6 +94,62 @@ def force_default_print_method(settings_xml: str) -> tuple[str, int]:
     return _PRINT_METHOD_RE.sub(repl, settings_xml), count
 
 
+_HP_T_RE = re.compile(r"(<hp:t(?:\s[^>]*)?>)(.*?)(</hp:t>)", re.DOTALL)
+_INLINE_TAG_RE = re.compile(r"(<[^>]+>)")
+
+
+def replace_in_text_nodes(xml_text: str, replacements, *, longest_first: bool = True):
+    """XML 문자열에서 **<hp:t> 안의 글자에만** 치환을 적용한다.
+
+    XML 전체에 `str.replace` 를 걸면 속성값까지 바뀐다 — 2026-09-15 실측: 코덱스가 「7→4」,
+    「17→」 같은 짧은 키로 section0.xml 전체를 치환해 `pagePr height="84186"` 이 8 로, 여백 1417 이
+    14 로, 표 7행의 rowAddr 가 4 로 바뀌었고 한글이 그 파일을 열다 멈췄다. 이 함수는 태그와 속성을
+    건드리지 않고 `<hp:t>…</hp:t>` 내부 텍스트(인라인 태그 `<hp:tab/>` 등으로 갈라진 조각 포함)만 바꾼다.
+
+    Args:
+        xml_text: section*.xml 또는 header.xml 문자열
+        replacements: {old: new} — 긴 키부터 적용한다(「재난안전관리」가 「재난」보다 먼저)
+        longest_first: False 면 dict 순서대로
+
+    Returns:
+        (치환된 XML, 치환 횟수)
+    """
+    items = list(dict(replacements).items())
+    if longest_first:
+        items.sort(key=lambda kv: len(kv[0]), reverse=True)
+    count = 0
+
+    def _in_text(m):
+        nonlocal count
+        parts = _INLINE_TAG_RE.split(m.group(2))
+        out = []
+        for part in parts:
+            if part.startswith("<"):
+                out.append(part)
+                continue
+            for old, new in items:
+                if old and old in part:
+                    count += part.count(old)
+                    part = part.replace(old, new)
+            out.append(part)
+        return m.group(1) + "".join(out) + m.group(3)
+
+    return _HP_T_RE.sub(_in_text, xml_text), count
+
+
+def risky_replacement_keys(replacements) -> list:
+    """XML 전체 치환(raw)에 쓰면 속성값을 깨뜨리기 쉬운 키 — 숫자만이거나 3자 미만.
+
+    raw 모드에서 경고를 띄우는 데 쓴다. 판정 기준은 2026-09-15 사고의 키(「7」, 「17」, 「4.2」)에서 왔다.
+    """
+    out = []
+    for old in dict(replacements):
+        s = str(old)
+        if len(s) < 3 or re.fullmatch(r"[\d.,\s]+", s):
+            out.append(s)
+    return out
+
+
 def replace_placeholder_multiline(section_xml: str, key: str, value: str) -> str:
     """placeholder가 들어 있는 셀 paragraph를 multi-line value로 안전하게 치환.
 

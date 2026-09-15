@@ -507,6 +507,8 @@ form_gate.py approve A.hwpx B.hwpx --no-preview   # 이미 검증된 양식 일�
 ```python
 import zipfile, os
 
+from hwpx_helpers import replace_in_text_nodes  # 🔴 XML 전체 str.replace 금지 — 규칙 41
+
 def zip_replace(src, dst, replacements):
     tmp = dst + ".tmp"
     with zipfile.ZipFile(src, "r") as zin:
@@ -515,8 +517,7 @@ def zip_replace(src, dst, replacements):
                 data = zin.read(item.filename)
                 if item.filename.startswith("Contents/") and item.filename.endswith(".xml"):
                     text = data.decode("utf-8")
-                    for old, new in replacements.items():
-                        text = text.replace(old, new)
+                    text, _ = replace_in_text_nodes(text, replacements)  # <hp:t> 안의 글자만
                     data = text.encode("utf-8")
                 if item.filename == "mimetype":
                     zout.writestr(item, data, compress_type=zipfile.ZIP_STORED)
@@ -1248,6 +1249,9 @@ python3 "${CLAUDE_SKILL_DIR}/scripts/verify_hwpx.py" --result out.hwpx --strict
 > 를 한 줄로 일괄 치환할 때 사용.** lxml 트리를 거치지 않아 가장 빠르고, 표 셀까지
 > 빠짐없이 잡는다.
 >
+> 🔴 **치환 범위는 기본이 `<hp:t>` 안의 글자뿐이다**(2026-09-15, 규칙 41). XML 문자열 전체를 바꾸는
+> 옛 동작은 `--raw` 로만 켜지고, 짧거나 숫자뿐인 키(「7」, 「4.2」)를 주면 속성값이 깨질 수 있다고 경고한다.
+>
 > **선행 조건**: 승인된 플레이스홀더 템플릿이어야 한다(「양식 채우기 3단계」).
 > 치환 값이 전부 플레이스홀더면 템플릿 제작으로 보아 통과하고, 치환 목록이 비었으면
 > (lineSegArray 주입 목적 호출) 검사하지 않는다.
@@ -1738,6 +1742,7 @@ subprocess.run(["python3", f"{SKILL_DIR}/scripts/fix_namespaces.py", "output.hwp
 38. **PrintMethod 는 항상 0(기본 인쇄)으로 정규화한다**: `settings.xml` 의 `PrintMethod` 가 `4`면 **모아 찍기**라서 한컴 `SaveAs(PDF)` 와 인쇄가 A4 한 장에 두 쪽을 얹어 낸다. 외부에서 받은 양식에 이 값이 들어 있으면 편집 산출물이 전부 2-up 으로 나오는데, **문서 내용에는 아무 흔적이 없어 PDF 를 눈으로 보기 전까지 드러나지 않는다**(secPr, pagePr 은 정상이다). `fix_namespaces.py` 와 `zip_replace_all.py` 가 저장 시 `hwpx_helpers.force_default_print_method()` 로 0 을 강제하며, `zip_replace_all` 은 `stats["print_method_reset"]` 로 보고한다. 의도적으로 모아 찍기 양식을 만들 일이 있으면 저장 후 다시 설정한다. 소책자 인쇄는 이 값이 아니라 `/booklet` 스킬(면 재배열)로 처리한다 (2026-08-14 민주시민교육 실습지 양식 실측)
 39. **수식은 이미지가 아니라 개체로 넣는다**: `python scripts/add_equation.py in.hwpx -o out.hwpx --after "앵커" --script "1 over 2"` — 한컴 네이티브 `<hp:equation>` 이라 수식 편집기로 다시 열린다. 표 셀은 `--table/--row/--col`(cellAddr 격자, 규칙 37과 같은 좌표계). 수식은 자기완결 개체라 header.xml·BinData 등록이 필요 없고, `treatAsChar="1"` 이 **맞다**(글자 크기 인라인 개체라 쪽을 넘길 일이 없다 — 표가 0이어야 하는 것과 반대). 문법과 함정은 [references/equation-syntax.md](references/equation-syntax.md): `&` 는 글자가 아니라 **열 구분자**라 그대로 쓰면 사라지고, `matrix` 는 **괄호를 그리지 않아** `LEFT ( matrix{…} RIGHT )` 로 감싸야 한다 (2026-09-08 한컴 개봉·PDF 렌더로 토큰 검증)
 40. **명사형 종결 변환은 보고서에만**: `writing_optimizer.py` 의 R3/R4/R5(`~보입니다`→`예상`, `~판단됩니다`→`판단`, `~예정이었으나 유예`)는 개조식 보고서 문체다. **공문·이메일은 서술형에 경어**(`~하시기 바랍니다`)가 행정 규범이라 적용하면 격식 위반이고, 정규식이 관형형을 남겨 **비문을 만든다** — `적정하게 이행된 것으로 판단됩니다` → `적정하게 이행된 판단`(2026-09-08 실측). 그래서 기본은 검토 권장으로만 보고하고 자동 치환하지 않는다. 보고서 원고에는 `--nominal-endings` 로 켜되, 켠 뒤 앞말은 사람이 명사형으로 고친다. 근거는 [references/layout-rules.md](references/layout-rules.md) §8-1
+41. **🔴 텍스트 치환은 `<hp:t>` 안에서만 — XML 전체 `str.replace` 금지**: section0.xml 문자열에 `text.replace(old, new)` 를 걸면 **속성값도 같이 바뀐다.** 2026-09-15 실측(코덱스가 만든 계획서): 「7→4」, 「17→」, 「4.2→」 같은 짧은 키가 `pagePr height="84186"` 을 `8` 로, 여백 `1417` 을 `14` 로, 표 7행 `rowAddr` 를 4 로 바꿨고 **XML 은 유효해서 `validate.py` 를 통과했는데 한글은 그 파일을 열다 멈췄다**(쪽 높이 8 HWPUNIT). 원본과 요소 수 1,706 동일, 속성 다른 요소 413. 처방 = ⓐ 치환은 `hwpx_helpers.replace_in_text_nodes()` 로 한다(태그와 속성은 건드리지 않고 `<hp:t>` 내부 글자만, 인라인 `<hp:tab/>` 조각도 처리). `zip_replace_all.py` 와 `clone_form.py` Phase 1 의 **기본이 이 방식**이고 XML 전체 치환은 `--raw` 를 줘야 한다(짧거나 숫자뿐인 키면 경고) ⓑ `validate.py` 가 **쪽 크기 상식(pagePr 10,000~300,000 HWPUNIT)과 표 격자(cellAddr 중복·빈 칸)** 를 검사한다 — 유효한 XML 이라도 이 둘에 걸리면 INVALID ⓒ 한글이 파일을 열다 멈추면 XML 오류가 아니라 **속성값 오염을 먼저 의심**하고, 글자를 뺀 구조 diff(태그와 속성만 나열해 원본과 대조)로 찾는다. AI 에게 hwpx 편집 스크립트를 쓰게 할 때도 「본문 글자만 바꿔라, 서식과 표 구조는 그대로」를 지시에 넣는다
 
 ---
 

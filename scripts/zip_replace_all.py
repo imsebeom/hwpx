@@ -37,7 +37,9 @@ if str(SCRIPT_DIR) not in sys.path:
 
 from fix_namespaces import fix_hwpx_namespaces  # noqa: E402
 from form_gate import TemplateGateError, guard_write, record_template  # noqa: E402
-from hwpx_helpers import force_default_print_method, inject_dummy_linesegs  # noqa: E402
+from hwpx_helpers import (  # noqa: E402
+    force_default_print_method, inject_dummy_linesegs, replace_in_text_nodes, risky_replacement_keys,
+)
 
 
 def _clone_zipinfo(info: zipfile.ZipInfo, *, force_stored: bool = False) -> zipfile.ZipInfo:
@@ -98,6 +100,7 @@ def zip_replace_all(
     *,
     ensure_linesegs: bool = True,
     skip_gate: bool = False,
+    scope: str = "text",
 ) -> dict[str, int]:
     """HWPX 패키지의 모든 XML 파트에 string-level 치환 적용.
 
@@ -107,6 +110,9 @@ def zip_replace_all(
     Args:
         ensure_linesegs: True 면 section*.xml 에 한해 더미 lineSegArray 주입.
         skip_gate: 템플릿 게이트 검사 생략.
+        scope: "text"(기본) 는 `<hp:t>` 안의 글자에만 치환한다. "raw" 는 XML 문자열 전체에
+            치환한다 — 속성값까지 바뀌므로 플레이스홀더가 태그 밖에 있는 특수한 경우에만 쓴다.
+            (2026-09-15: 「7→4」 같은 짧은 키의 raw 치환이 pagePr height 를 8 로 만들어 한글이 멈췄다)
 
     Returns:
         통계 dict (parts/xml_parts/changed_xml/replacements/decode_failed/
@@ -153,12 +159,15 @@ def zip_replace_all(
                         continue
 
                     original_text = text
-                    replaced_here = 0
-                    for old, new in replacements.items():
-                        count = text.count(old)
-                        if count:
-                            text = text.replace(old, new)
-                            replaced_here += count
+                    if scope == "text":
+                        text, replaced_here = replace_in_text_nodes(text, replacements)
+                    else:
+                        replaced_here = 0
+                        for old, new in replacements.items():
+                            count = text.count(old)
+                            if count:
+                                text = text.replace(old, new)
+                                replaced_here += count
 
                     if text != original_text:
                         stats["changed_xml"] += 1
@@ -239,6 +248,11 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
         action="store_true",
         help="플레이스홀더 템플릿 게이트 생략 (원본에 값 직접 치환)",
     )
+    parser.add_argument(
+        "--raw",
+        action="store_true",
+        help="<hp:t> 안의 글자만이 아니라 XML 문자열 전체를 치환한다 (속성값까지 바뀐다 — 태그 밖 플레이스홀더에만)",
+    )
     return parser.parse_args(argv)
 
 
@@ -277,6 +291,14 @@ def main(argv: list[str]) -> int:
         )
 
     warn_if_xml_like_keys(replacements)
+    if args.raw:
+        risky = risky_replacement_keys(replacements)
+        if risky:
+            print(
+                f"[WARN] --raw 에 짧거나 숫자뿐인 키 {risky} — 속성값(쪽 크기, 여백, 셀 주소)까지 바뀔 수 있다. "
+                "글자만 바꾸려면 --raw 를 빼라",
+                file=sys.stderr,
+            )
 
     temp_dir = input_path.parent
     replace_out = (
@@ -292,6 +314,7 @@ def main(argv: list[str]) -> int:
             replacements,
             ensure_linesegs=args.ensure_linesegs,
             skip_gate=args.skip_template_gate,
+            scope="raw" if args.raw else "text",
         )
     except TemplateGateError as exc:
         print(f"[게이트 차단] {exc}", file=sys.stderr)
