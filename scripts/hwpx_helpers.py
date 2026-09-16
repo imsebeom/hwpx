@@ -1160,7 +1160,8 @@ def build_border_fill_xml(
 #   <hh:spacing hangul="0"   ...>   # 자간 (% — 음수 = 좁게, woo773 `자간`)
 #   <hh:bold/>                       # 진하게 (요소 존재 = 활성)
 #   <hh:italic/>                     # 기울임
-#   <hh:underline type="SOLID"/>     # 밑줄 (type 이 NONE 외이면 활성)
+#   <hh:underline type="BOTTOM" shape="SOLID"/>   # 밑줄 — ⚠ type 은 선 모양이 아니라
+#                                    # 밑줄의 **위치**다(BOTTOM/TOP/CENTER/NONE). 모양은 shape 가 맡는다
 #   textColor 속성                   # 글자색
 #
 # 같은 base_id 에서 동일 변형이면 같은 새 id 를 재사용한다 (dedup).
@@ -1188,7 +1189,9 @@ def apply_charpr_variant(charpr_elem, *, width=None, letter_spacing=None,
             (woo773 `자간(-12)` → letter_spacing=-12)
         bold: True/False/None. None 이면 변경 없음.
         italic: True/False/None.
-        underline: True/False/None. True 면 SOLID 밑줄.
+        underline: True/False/None. True 면 밑줄을 켠다(type="BOTTOM").
+            ⚠ type 에 "SOLID" 를 넣으면 XML 은 유효한데 한글이 밑줄을 그리지 않는다 —
+            PDF 로 렌더해야 드러난다(2026-09-16 실측).
         text_color: ``(r,g,b)`` 또는 ``"#RRGGBB"``. None 이면 변경 없음.
     """
     HH = "{http://www.hancom.co.kr/hwpml/2011/head}"
@@ -1224,8 +1227,20 @@ def apply_charpr_variant(charpr_elem, *, width=None, letter_spacing=None,
 
     if underline is not None:
         un_el = charpr_elem.find(f"{HH}underline")
+        if un_el is None and underline:
+            # underline 요소가 없는 charPr — 스키마 순서상 strikeout 앞에 둔다
+            from lxml import etree as _et
+            un_el = _et.Element(f"{HH}underline")
+            so = charpr_elem.find(f"{HH}strikeout")
+            (charpr_elem.insert(list(charpr_elem).index(so), un_el)
+             if so is not None else charpr_elem.append(un_el))
         if un_el is not None:
-            un_el.set("type", "SOLID" if underline else "NONE")
+            # ⚠ type 은 밑줄의 위치, shape 가 선 모양이다. type="SOLID" 는 그려지지 않는다
+            un_el.set("type", "BOTTOM" if underline else "NONE")
+            if underline and not un_el.get("shape"):
+                un_el.set("shape", "SOLID")
+            if underline and not un_el.get("color"):
+                un_el.set("color", "#000000")
 
     if text_color is not None:
         if isinstance(text_color, tuple):
