@@ -204,7 +204,10 @@ def remap_and_append_section(root_tgt, root_src, cp_map, pp_map, bf_map,
         if elem.get("styleIDRef") is not None and elem.get("styleIDRef") != "0":
             elem.set("styleIDRef", "0")
         ref = elem.get("binaryItemIDRef")
-        if ref and ref.startswith("image"):
+        if ref:
+            # BinData 파일명과 content.hpf 항목에는 접두어가 무조건 붙으므로
+            # 참조도 이름을 가리지 않고 함께 붙여야 한다. "image"로 시작하는 것만
+            # 붙이던 때에는 직접 지은 id(r02_1 등)의 그림이 통째로 사라졌다 (2026-09-16)
             elem.set("binaryItemIDRef", img_prefix + ref)
 
     pid = pid_start
