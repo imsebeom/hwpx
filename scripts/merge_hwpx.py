@@ -123,10 +123,15 @@ def integrate_header(header_tgt, header_src):
     font_map = build_font_map(header_src, header_tgt)
 
     # borderFill 먼저 추가 (charPr/paraPr이 borderFillIDRef 참조 가능)
+    # ⚠ borderFill의 id는 charPr·paraPr과 달리 1부터 시작한다. 0부터로 치고
+    # 더하면 파일마다 id가 하나씩 비고, 한글은 id가 아니라 «순번»으로 찾으므로
+    # 그 뒤 항목이 통째로 한 칸씩 밀려 셀 배경과 테두리가 엉뚱해진다 (2026-09-16)
+    bf_ids = [i for i, _ in find_items(header_src, "borderFill")]
+    bf_base = min(bf_ids) if bf_ids else 0
     bf_map = {}
     bf_container = header_tgt.find(f".//{{{HH}}}borderFills")
     for old_id, elem in find_items(header_src, "borderFill"):
-        new_id = max_bf + 1 + old_id
+        new_id = max_bf + 1 + (old_id - bf_base)
         bf_map[old_id] = new_id
         new_elem = deepcopy(elem)
         new_elem.set("id", str(new_id))
