@@ -511,7 +511,11 @@ class HwpxFormFiller:
                     continue
                 # fallback: 멀티 문단 실패 시 단일 텍스트로 처리
 
-            t_elements = cell.findall('.//{*}t')
+            # 필드(메모, 숨은 설명) 안의 글자는 화면에 보이지 않는다. 셀 첫 run 앞에
+            # 메모가 붙어 있으면 그 t가 먼저 잡혀 값이 안 보이는 곳에 들어가고 칸이
+            # 빈 것처럼 나온다 (2026-09-16 최종보고서 양식 — 같은 함정 두 번째)
+            t_elements = [t for t in cell.findall('.//{*}t')
+                          if not any(a.tag.endswith('}fieldBegin') for a in t.iterancestors())]
 
             if t_elements:
                 # 첫 번째 텍스트 요소에 내용 설정
@@ -524,7 +528,8 @@ class HwpxFormFiller:
                 filled += 1
             else:
                 # 텍스트 요소가 없는 경우: run 요소 찾아서 t 추가
-                runs = cell.findall('.//{*}run')
+                runs = [r for r in cell.findall('.//{*}run')
+                        if not any(a.tag.endswith('}fieldBegin') for a in r.iterancestors())]
                 if runs:
                     # 기존 run에 t 요소 추가
                     ns = '{http://www.hancom.co.kr/hwpml/2011/paragraph}'
