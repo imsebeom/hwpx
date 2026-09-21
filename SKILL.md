@@ -1722,13 +1722,13 @@ subprocess.run(["python3", f"{SKILL_DIR}/scripts/fix_namespaces.py", "output.hwp
 8. **검증 필수**: 생성 후 validate.py 실행
 9. **XML 이스케이프**: `<>&"` 반드시 이스케이프
 10. **ID 고유성**: 모든 문단 id는 문서 내 고유
-11. **이미지**: `<hp:pic>` 필수 구조 준수 → [xml-structure.md](references/xml-structure.md)
+11. **이미지**: `<hp:pic>` 필수 구조 준수 → [xml-structure.md](references/xml-structure.md). ⚠ **`id`·`zOrder`·`numberingType`·`textWrap`·`textFlow`·`lock`·`dropcapstyle`·`href`·`groupLevel`·`instid` 를 빼면 한컴이 문서를 열지 못한다**(2026-09-22 실측 — `reverse` 하나만 주고 나머지를 생략했더니 `validate.py` 는 VALID 인데 COM `Open()` 이 빈 문서를 돌려줬다). 손으로 조립하지 말고 **그 문서에 이미 있는 `<hp:pic>` 하나를 정규식으로 뽑아 속성 구성을 그대로 따른다** — 문서마다 한컴 버전이 다를 수 있다
 12. **템플릿 ID 호환 불가**: government charPr/paraPr/borderFill ID를 report/base 등 다른 템플릿에 사용하면 깨짐. 반드시 해당 템플릿의 ID만 사용. base charPr 3은 "16pt 제목"이 아니라 "9pt 각주"임에 주의
 13. **hwpx_helpers.py 사용 필수**: md2hwpx.py 직접 실행 금지. 반드시 `from hwpx_helpers import *`로 함수를 사용하여 빌드 스크립트를 작성할 것. md2hwpx.py는 government 템플릿(컬러 배너/섹션 바)을 지원하지 않음
 14. **양식 복제 시 Workflow F 필수**: 사용자가 `.hwpx` 양식을 제공하고 내용 변경을 요청하면 `clone_form.py` 사용. 절대로 `<hp:t>` 노드를 순차 덮어쓰기하거나 lxml로 텍스트를 직접 조작하지 말 것 (런 소실·서식 파괴 원인)
 15. **서브에이전트 검수 권장**: 문서 생성 후 별도 서브에이전트로 `validate.py` + `text_extract.py` + 구조 비교를 실행하여 품질 검증
 16. **워크플로우 G/H는 구조 변경 전용**: 단순 텍스트 치환에는 워크플로우 B/F 사용. HwpxModifier/HwpxFormFiller는 들여쓰기 조정, 정규식 치환, 표 행 추가 등 clone_form.py로 불가능한 작업에만 사용
-17. **워크플로우 G/H 사용 후에도 linesegarray 자동 제거**: hwpx_modifier.py, hwpx_form_filler.py는 저장 시 linesegarray를 자동 제거하여 줄바꿈 캐시 무효화를 처리
+17. **워크플로우 G/H 사용 후에도 linesegarray 자동 제거**: hwpx_modifier.py, hwpx_form_filler.py는 저장 시 linesegarray를 자동 제거하여 줄바꿈 캐시 무효화를 처리. 🔴 **lxml 로 section 을 직접 고치는 경로에서도 반드시 제거한다** — 문단 내용을 바꾸고 `<hp:linesegarray>` 를 그대로 두면 **한컴이 문서를 열지 못한다**(2026-09-22 실측, 삽화 삽입). run 을 통째로 지우든 `<hp:t>` 만 지우든 똑같이 깨졌고, 캐시를 지우니 둘 다 열렸다. **`validate.py` 는 VALID 를 내주므로 COM 으로 열어보기 전까지 드러나지 않는다** — 직접 조작한 hwpx 는 `hwp.Open()` 뒤 `hwp.Path` 가 빈 문자열인지로 확인한다
 18. **report 템플릿 borderFill 수정 완료 (2026-03-21)**: 원본 report 템플릿의 paraPr이 SOLID 테두리를 가진 borderFill을 참조하여 문단마다 가로선이 표시되던 문제를 수정. 모든 paraPr의 `borderFillIDRef`를 `"1"` (테두리 없음)으로 변경, diagonal도 `NONE`으로 수정
 19. **표 열 너비는 내용 비례 배분**: md2hwpx.py의 `add_table()`이 열별 최대 텍스트 길이(한글=2, ASCII=1)에 비례하여 열 너비를 자동 배분. 최소 열 너비 2800 HWPUNIT (~10mm)
 20. **이미지는 ZIP 추가 + section0.xml 인라인 삽입 2단계**: `add_images_to_hwpx()`로 BinData에 파일만 추가하면 안 보임. 반드시 `make_image_para()`로 `<hp:pic>` XML을 생성하여 section0.xml에 삽입해야 함
