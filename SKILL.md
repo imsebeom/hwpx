@@ -881,7 +881,7 @@ with HwpxFormFiller("공문.hwpx") as doc:
     }, table_index=0)
 
     # 행 추가
-    doc.add_table_row(table_index=0, after_row=3, contents=["", "새 항목", ""])
+    doc.add_table_row(table_index=0, after_row=3, cell_contents=["", "새 항목", ""])
 
     # 행 복제 후 내용 수정
     doc.duplicate_row_with_content(
@@ -901,7 +901,7 @@ with HwpxFormFiller("공문.hwpx") as doc:
 | `build_cell_grid(table_index)` | **cellAddr 격자 좌표 → 셀 매핑** (좌표 확인은 여기부터) |
 | `analyze_table_structure(table_index)` | 표 구조 분석 (행/열, 레이블/내용 셀 구분) |
 | `fill_cells_directly(cell_data, table_index)` | 좌표 기반 셀 채우기 `{(행,열): "내용"}` — 격자 좌표 |
-| `add_table_row(table_index, after_row, contents)` | 행 추가 (cellAddr/rowSpan/rowCnt 자동 업데이트) |
+| `add_table_row(table_index, after_row, cell_contents)` | 행 추가 (cellAddr/rowSpan/rowCnt 자동 업데이트) |
 | `duplicate_row_with_content(table_index, source_row, mapping)` | 행 복제 후 내용 수정 |
 
 > **셀 채우기 시 `\n`**은 각 줄이 별도 `<hp:p>` 문단으로 생성된다.
