@@ -18,6 +18,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
+import { stripDummyLinesegs } from './hwpx-zip.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.HWPX_EDITOR_PORT || 7780);
@@ -264,7 +265,9 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/doc') {       // 브라우저가 처음 열 문서를 받아 간다
       const s = readSession();
       if (!s.source || !fs.existsSync(s.source)) return sendJson(res, 404, { ok: false });
-      return sendJson(res, 200, { ok: true, fileName: path.basename(s.source), base64: fs.readFileSync(s.source).toString('base64') });
+      let buf = fs.readFileSync(s.source);
+      if (/\.hwpx$/i.test(s.source)) buf = stripDummyLinesegs(buf).buf;   // 원본 파일은 건드리지 않는다
+      return sendJson(res, 200, { ok: true, fileName: path.basename(s.source), base64: buf.toString('base64') });
     }
     return serveStatic(req, res, p);
   } catch (e) {

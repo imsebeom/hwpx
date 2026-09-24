@@ -102,6 +102,29 @@ function insertAt(pXml, k, ctrl) {
 }
 
 /**
+ * 스킬 파이프라인(hwpx_helpers.LINESEG_DUMMY, exam_builder)이 polaris-dvc 호환용으로 박는 한 줄짜리 더미 캐시.
+ * 한글은 열 때 다시 계산하지만 rhwp 는 캐시를 믿어 문단 전체를 한 줄에 눌러 그린다(2026-09-25 실측).
+ * 캐시가 없으면 rhwp 가 스스로 계산하므로 열기 전에 걷어낸다.
+ */
+const LINESEG_DUMMY = '<hp:linesegarray><hp:lineseg textpos="0" vertpos="0" vertsize="900" textheight="900" baseline="765" spacing="360" horzpos="0" horzsize="22960" flags="393216"/></hp:linesegarray>';
+
+/** 반환: { buf, removed } — 더미가 없으면 원래 buf 그대로. */
+export function stripDummyLinesegs(buf) {
+  const entries = readZip(buf);
+  if (!entries) return { buf, removed: 0 };
+  let removed = 0;
+  for (const e of entries) {
+    if (!/^Contents\/section\d+\.xml$/.test(e.name)) continue;
+    const xml = e.data.toString('utf8');
+    const n = xml.split(LINESEG_DUMMY).length - 1;
+    if (!n) continue;
+    e.data = Buffer.from(xml.split(LINESEG_DUMMY).join(''), 'utf8');
+    removed += n;
+  }
+  return removed ? { buf: writeZip(entries), removed } : { buf, removed: 0 };
+}
+
+/**
  * markers: [{ section, isHeader, applyTo, paras: [모델 텍스트, ...] }] (host.js save 가 모은다)
  * 반환: { buf, fixed, skipped: [사유] }
  */
