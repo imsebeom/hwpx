@@ -41,31 +41,37 @@ def native_open_dialog():
     return bool(h)
 
 
-hwnd = find_window()
-cases = [
-    ("Ctrl+N,T 표 만들기", [("CTRL", "N"), ("T",)]),
-    ("Ctrl+Q,A 찾아 바꾸기", [("CTRL", "Q"), ("A",)]),
-    ("Ctrl+H 찾아 바꾸기", [("CTRL", "H")]),
-    ("Ctrl+Q,F 찾기", [("CTRL", "Q"), ("F",)]),
-    ("Ctrl+N,G 구역 설정", [("CTRL", "N"), ("G",)]),
-    ("Ctrl+N,B 글상자", [("CTRL", "N"), ("B",)]),
-    ("Ctrl+F10 문자표", [("CTRL", "F10")]),
-    ("Ctrl+N,I 그림", [("CTRL", "N"), ("I",)]),
-]
-for name, keys in cases:
-    cli("goto", "p6")
-    combo(hwnd, "END")
-    before = texts()
-    for k in keys:
-        combo(hwnd, *k)
-    time.sleep(1.0)
-    if "그림" in name:
-        print(
-            f"{name:<22} → {'윈도 열기 창 뜸(닫음)' if native_open_dialog() else '안 뜸'}"
-        )
+def main():
+    # import 만으로 실제 키 입력 시험이 돌지 않게 main 으로 감싼다(2026-09-25 실수로 한 번 돌았다)
+    hwnd = find_window()
+    cases = [
+        ("Ctrl+N,T 표 만들기", [("CTRL", "N"), ("T",)]),
+        ("Ctrl+Q,A 찾아 바꾸기", [("CTRL", "Q"), ("A",)]),
+        ("Ctrl+H 찾아 바꾸기", [("CTRL", "H")]),
+        ("Ctrl+Q,F 찾기", [("CTRL", "Q"), ("F",)]),
+        ("Ctrl+N,G 구역 설정", [("CTRL", "N"), ("G",)]),
+        ("Ctrl+N,B 글상자", [("CTRL", "N"), ("B",)]),
+        ("Ctrl+F10 문자표", [("CTRL", "F10")]),
+        ("Ctrl+N,I 그림", [("CTRL", "N"), ("I",)]),
+    ]
+    for name, keys in cases:
+        cli("goto", "p6")
+        combo(hwnd, "END")
+        before = texts()
+        for k in keys:
+            combo(hwnd, *k)
+        time.sleep(1.0)
+        if "그림" in name:
+            print(
+                f"{name:<22} → {'윈도 열기 창 뜸(닫음)' if native_open_dialog() else '안 뜸'}"
+            )
+            time.sleep(0.5)
+            continue
+        new = sorted(texts() - before)
+        print(f"{name:<22} → {new[:8] or '새로 보이는 것 없음'}")
+        combo(hwnd, "ESC")
         time.sleep(0.5)
-        continue
-    new = sorted(texts() - before)
-    print(f"{name:<22} → {new[:8] or '새로 보이는 것 없음'}")
-    combo(hwnd, "ESC")
-    time.sleep(0.5)
+
+
+if __name__ == "__main__":
+    main()
