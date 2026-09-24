@@ -2,7 +2,7 @@
 
 `/hwpx` 스킬(`~/.claude/skills/hwpx`, 저장소 imsebeom/hwpx2)에 rhwp 에디터 모드를 붙이는 개발 폴더.
 사용자는 브라우저의 rhwp 에디터로 문서를 보고, 터미널 Claude 가 같은 문서를 실시간으로 고친다.
-완성되면 `editor/` 를 스킬의 `editor/` 로 옮기고 SKILL.md 에 선택 단계를 넣는다.
+**2026-09-25 스킬로 통합 완료** — 코드 원본은 이제 `~/.claude/skills/hwpx/editor/`(설명서 `references/editor-mode.md`, 시험 `editor/tests/`)이다. 이 폴더의 `editor/` 는 개발 당시 사본이고 **여기서 고치지 않는다.** `.build/`(rhwp 소스, Rust 빌드 캐시)는 이 폴더에만 있다.
 
 ## 구조
 - `editor/plugin/claude-plugin.ts` — rhwp-studio 플러그인. JSON op(`doc`/`m`/`run`)를 한 트랜잭션으로 적용
@@ -49,8 +49,8 @@
 - decisions: 위 "결정" 절. 추가로 — 에디터 모드는 실시간 편집만(A/F/H/I/J/N 워크플로는 저장·종료 후 기존 방식), 기본 창은 앱 창(브라우저 탭은 Ctrl+N/T/W 불가), 형제 프로젝트 코드는 복사만 하고 여기서 고치지 않는다
 - 함정(이번 세션): Node 24 rmSync/cpSync 한글 경로 크래시 / SendInput 에 스캔 코드가 없으면 e.code 빈 값 / 한글 입력기 조합은 preventDefault 로 안 멈춤(포커스 뺐다 돌려 버림) / 플러그인 host.automation 은 대화상자 명령을 안 엶(inputHandler.dispatcher) / 앱 창이 화면보다 크면 오른쪽 위 패널이 화면 밖 / 알캡처 등 전역 단축키 프로그램이 키를 먼저 가져감 / goto 직후 바로 치면 첫 글자가 먹힘
 - next_steps:
-  1. 원격 저장소 연결 후 push (2026-09-25 요청, 원격 없음·gh 미로그인으로 보류)
-  2. 사용자가 실제 문서로 앱 창 시운전(`node editor/cli.mjs start <문서>`), 불편 사항 반영
-  3. 그 뒤 ~/.claude/skills/hwpx 로 옮기고 SKILL.md 에 "에디터로 보면서 작업할까요?" 단계 추가, 기존 tests 통과 확인. 빌드 산출물(27MB)은 저장소 대신 GitHub Release 첨부 검토
+  1. (완료 2026-09-25) 스킬 통합: 커밋 807b576~319d2c6, imsebeom/hwpx·hwpx2 main 푸시. 스킬 위치에서 개요·편집·새 판 저장 스모크 통과, tests/test_text_scope.py OK
+  2. 사용자가 실제 문서로 앱 창 시운전(`node ~/.claude/skills/hwpx/editor/cli.mjs start <문서>`), 불편 사항은 스킬 쪽에서 반영
+  3. 빌드 산출물(27MB)을 GitHub Release 첨부로 받게 할지 검토(다른 PC 에서 setup 이 rhwp 받기·빌드를 반복하지 않게)
   4. 연결만 하고 안 눌러 본 단축키(미주, 수식, 글상자, Ctrl+J, 첨자 등) 실측
   5. rhwp 에 쪽 번호 필드 저장 누락 결함 보고(이슈 초안 작성 후 사용자가 게시)
