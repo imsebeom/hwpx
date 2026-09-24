@@ -2,3 +2,8 @@ __pycache__/
 .hwp2hwpx-repo/
 *.bak_*
 *.bak
+
+# 에디터 모드 빌드 산출물 (editor/setup.mjs 가 만든다)
+editor/.build/
+editor/studio-dist/
+editor/sdk/
