@@ -7,7 +7,7 @@
  *   node cli.mjs text                  현재 본문 텍스트
  *   node cli.mjs state                 문서 상태와 사용자 커서 위치
  *   node cli.mjs changes [--all]       아직 안 읽은 사용자 수정 내역 (읽으면 읽음 처리)
- *   node cli.mjs save [출력.hwpx]      현재 문서를 파일로 저장 (기본: <원본>_편집본.hwpx)
+ *   node cli.mjs save [출력.hwpx]      새 판으로 저장 (기본: <이름>_<YYMMDD>_<NN>.hwpx, 덮어쓰기 없음)
  *   node cli.mjs undo                  마지막 배치 되돌리기
  *   node cli.mjs status | stop
  */
@@ -87,6 +87,21 @@ function editBlocker(file) {
   return null;
 }
 
+/**
+ * 저장할 때마다 새 판을 만든다: <이름>_<YYMMDD>_<NN>.hwpx (스킬 build_version.py 와 같은 규칙).
+ * 원본 이름 끝의 _YYMMDD 또는 _YYMMDD_NN 은 떼고 오늘 날짜의 최대 순번 + 1 을 붙인다.
+ */
+function nextVersion(source) {
+  const dir = path.dirname(source);
+  const prefix = path.basename(source).replace(/\.hwpx?$/i, '').replace(/_\d{6}(_\d{2})?$/, '');
+  const d = new Date();
+  const today = `${String(d.getFullYear()).slice(2)}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+  const esc = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const pat = new RegExp(`^${esc}_${today}_(\\d{2})\\.hwpx$`);
+  const max = Math.max(0, ...fs.readdirSync(dir).map((f) => Number(pat.exec(f)?.[1] ?? 0)));
+  return path.join(dir, `${prefix}_${today}_${String(max + 1).padStart(2, '0')}.hwpx`);
+}
+
 function readChanges() {
   try { return fs.readFileSync(CHANGES, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)); } catch { return []; }
 }
@@ -141,7 +156,8 @@ switch (sub) {
   }
   case 'save': {
     const s = JSON.parse(fs.readFileSync(SESSION, 'utf8'));
-    const target = args[0] ? path.resolve(args[0]) : s.source.replace(/\.(hwpx?|HWPX?)$/, '') + '_편집본.hwpx';
+    const target = args[0] ? path.resolve(args[0]) : nextVersion(s.source);
+    if (fs.existsSync(target)) die(`이미 있는 파일은 덮어쓰지 않는다: ${target}`);
     const r = await cmd({ type: 'save' });
     fs.writeFileSync(target, Buffer.from(r.base64, 'base64'));
     await cmd({ type: 'saved', fileName: path.basename(target) });
