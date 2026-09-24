@@ -1,0 +1,13 @@
+# setup.mjs 가 만드는 것 (rhwp 소스, 빌드 산출물)
+editor/.build/
+editor/studio-dist/
+editor/sdk/
+
+# 시험 산출물 (실사용 문서 사본 포함)
+test/rt/
+test/*.png
+test/*.pdf
+test/*_편집본.hwpx
+
+.playwright-mcp/
+.ruff_cache/
