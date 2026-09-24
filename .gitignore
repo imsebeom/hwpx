@@ -13,3 +13,4 @@ test/*_편집본.hwpx
 .ruff_cache/
 test/사전시험_결과.hwpx
 test/pn/
+__pycache__/
