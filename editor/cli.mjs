@@ -16,6 +16,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import zlib from 'node:zlib';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.HWPX_EDITOR_PORT || 7780);
@@ -54,6 +55,38 @@ function openBrowser(url) {
   else spawn(process.platform === 'darwin' ? 'open' : 'xdg-open', [url], { detached: true, stdio: 'ignore' }).unref();
 }
 
+/** zip 중앙 디렉터리에서 { 이름: 내용 읽기 함수 } 를 만든다. */
+function zipEntries(buf) {
+  let eocd = buf.length - 22;
+  while (eocd >= 0 && buf.readUInt32LE(eocd) !== 0x06054b50) eocd--;
+  if (eocd < 0) return null;
+  const entries = {};
+  let p = buf.readUInt32LE(eocd + 16);
+  for (let i = buf.readUInt16LE(eocd + 10); i > 0; i--) {
+    const method = buf.readUInt16LE(p + 10), size = buf.readUInt32LE(p + 20);
+    const nameLen = buf.readUInt16LE(p + 28), extra = buf.readUInt16LE(p + 30), comment = buf.readUInt16LE(p + 32);
+    const local = buf.readUInt32LE(p + 42);
+    const name = buf.toString('utf8', p + 46, p + 46 + nameLen);
+    entries[name] = () => {
+      const start = local + 30 + buf.readUInt16LE(local + 26) + buf.readUInt16LE(local + 28);
+      const raw = buf.subarray(start, start + size);
+      return (method === 8 ? zlib.inflateRawSync(raw) : raw).toString('utf8');
+    };
+    p += 46 + nameLen + extra + comment;
+  }
+  return entries;
+}
+
+/** KS X 6101 §15(암호화), §16(전자서명). 편집하면 안 되는 hwpx 인지 본다. */
+function editBlocker(file) {
+  if (!/\.hwpx$/i.test(file)) return null;
+  const z = zipEntries(fs.readFileSync(file));
+  if (!z) return 'zip 으로 읽히지 않는다(손상된 hwpx)';
+  if (z['META-INF/signatures.xml']) return '전자서명 문서다. 편집하면 서명이 무효가 된다(KS X 6101 §16)';
+  if (z['META-INF/manifest.xml']?.().includes('encryption-data')) return '암호화 문서다. 편집할 수 없다(KS X 6101 §15)';
+  return null;
+}
+
 function readChanges() {
   try { return fs.readFileSync(CHANGES, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)); } catch { return []; }
 }
@@ -71,6 +104,8 @@ switch (sub) {
   case 'start': {
     const file = args[0] && path.resolve(args[0]);
     if (!file || !fs.existsSync(file)) die('사용법: start <문서.hwpx|.hwp>');
+    const blocker = editBlocker(file);
+    if (blocker && !args.includes('--force')) die(`열지 않음: ${blocker}. 사용자가 원하면 --force`);
     fs.mkdirSync(STATE_DIR, { recursive: true });
     fs.writeFileSync(SESSION, JSON.stringify({ source: file, startedAt: new Date().toISOString() }, null, 2));
     fs.writeFileSync(CHANGES, '');
@@ -88,7 +123,8 @@ switch (sub) {
   }
   case 'run': {
     const src = args[0] === '-' || !args[0] ? fs.readFileSync(0, 'utf8') : fs.readFileSync(args[0], 'utf8');
-    const ops = JSON.parse(src);
+    // KS X 6101 §5.3: 본문은 NFC. 맥, 웹에서 온 NFD(자모 분리) 글자는 검색과 치환을 조용히 깨뜨린다.
+    const ops = JSON.parse(src, (k, v) => (typeof v === 'string' ? v.normalize('NFC') : v));
     out((await cmd({ type: 'run', ops: Array.isArray(ops) ? ops : [ops] })).result);
     break;
   }

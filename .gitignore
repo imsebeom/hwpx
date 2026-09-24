@@ -11,3 +11,4 @@ test/*_편집본.hwpx
 
 .playwright-mcp/
 .ruff_cache/
+test/사전시험_결과.hwpx

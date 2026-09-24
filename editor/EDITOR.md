@@ -16,6 +16,8 @@ CLI 경로는 아래에서 `$E` 로 적는다: `node "<스킬>/editor/cli.mjs"`.
 2. 새 문서를 처음부터 만드는 일이면 기존 파이프라인(md2hwpx, 템플릿, 양식 채우기)으로 **초안 파일을 먼저 만들고**, 그 파일을 에디터로 연다. 에디터 모드는 초안 이후의 다듬기를 맡는다.
 3. 최초 1회 빌드: `studio-dist/` 가 없으면 `node "<스킬>/editor/setup.mjs"` (rhwp 저장소 받기, npm 설치, 빌드. 수 분).
 4. `$E start <문서.hwpx>` → 사용자 기본 브라우저에 에디터가 열린다. hwp 도 열리지만 저장은 hwpx 로 한다.
+   전자서명 문서(KS X 6101 §16)와 암호화 문서(§15)는 열지 않고 멈춘다. 서명이 무효가 되는 것을 사용자가 알고도 원할 때만 `--force`.
+5. `run` 은 보내기 전에 모든 문자열을 NFC 로 정규화한다(§5.3). 맥이나 웹에서 온 자모 분리 글자가 검색을 깨뜨리지 않게 하기 위해서다.
 
 ## 2. 대화 규칙
 
@@ -68,6 +70,23 @@ paraLevel numberingId widowOrphan keepWithNext keepLines pageBreakBefore fontLin
 autoSpaceKrNum verticalAlign englishBreakUnit koreanBreakUnit borderConnect borderIgnoreMargin tabAutoLeft tabAutoRight.
 (출처: rhwp `src/document_core/helpers.rs` 의 parse_char_shape_mods, parse_para_shape_mods. 실측 확인은 bold 만.)
 
+### 요청 → 명령 사전 (KS X 6101 기능 목록 기준, 2026-09-25 한컴 렌더로 실측)
+
+| 사용자 요청 | 표준 | 명령 | 결과 |
+|------|------|------|------|
+| 제목이 쪽 끝에 혼자 남지 않게 | `keepWithNext` (표 78) | `applyParaFormat(s, p, {"keepWithNext": true})` | 속성 적용 확인 |
+| 이 문단부터 새 쪽 | `pageBreakBefore` | `applyParaFormat(s, p, {"pageBreakBefore": true})` | 한컴 통과. ⚠ 바로 앞 빈 문단이 이전 쪽을 넘치면 **빈 쪽이 생긴다** — 적용 전후 `pageCount` 를 비교하고, 늘어난 쪽이 비었으면 사용자에게 알린다(빈 문단 제거 방법은 미실측) |
+| 문단이 쪽에서 안 쪼개지게 | `keepLines`, `widowOrphan` | `applyParaFormat` 같은 이름 키 | 미실측 |
+| 표 제목 행을 쪽마다 반복 | `tbl@repeatHeader` (표 194) | `setTableProperties(s, 표문단, 컨트롤, {"repeatHeader": true})` | 한컴 통과 |
+| 표를 행 경계에서만 나누기 | `tbl@pageBreak` | 같은 함수 `{"pageBreak": 2}` — 값 체계가 표준과 다르다: **0 나누지 않음, 1 셀 단위, 2 행 경계** | 속성 적용 확인 |
+| 표 캡션과 번호 | `caption` + `autoNum` (§10.9.2.5) | 같은 함수 `{"hasCaption": true, "captionDirection": 2}` (0 왼쪽, 1 오른쪽, 2 위, 3 아래) → "표 N" 자동 번호 | 한컴 통과. 캡션 제목 글자 넣기는 미실측 |
+| 책갈피 | `bookmark` | `addBookmark(s, p, offset, 이름)`, `getBookmarks()` | 적용 확인 |
+| 수식 | 부속서 I | `insertEquation(s, p, offset, "a over b", 1000, 0)` (글자 크기 HWPUNIT, 색 0) | 한컴 통과 |
+| 머리말/꼬리말 글 | `header`/`footer` | `createHeaderFooter(s, isHeader, 0)` → `insertTextInHeaderFooter(s, isHeader, 0, 0, offset, 글)` | 한컴 통과 |
+| **꼬리말 쪽 번호** | `pageNum` (§10.7.10) | **에디터 모드 불가.** `insertFieldInHf(...,1)` 은 화면에만 보이고 hwpx 저장 시 빠진다. `insertAutoNumberAtCursor` 는 본문 전용, hwpctrl `PageNumPos` 는 미구현 (rhwp 0.8.6) | 사용자에게 알리고 저장, 종료 후 기존 워크플로로 |
+
+표 위치 찾기: `searchText(표 안 글자, 0,0,0, true,false, true)` 의 `cellContext.parentPara`, `ctrlIdx` 가 `setTableProperties` 의 둘째, 셋째 인자다.
+
 ## 4. 에디터 모드에서 하지 않는 일
 
 에디터 모드는 **실시간 편집만** 한다(사용자 결정, 2026-09-25). rhwp API 가 없는 아래 작업은 에디터에서 흉내 내지 않는다.
@@ -80,6 +99,7 @@ autoSpaceKrNum verticalAlign englishBreakUnit koreanBreakUnit borderConnect bord
 | 문서 병합 | I |
 | 시험지 생성 | J |
 | 첨삭 메모 삽입 | N |
+| 꼬리말 쪽 번호 | 템플릿 또는 한컴 |
 
 rhwp 저장본은 기존 스크립트가 그대로 받는다(왕복 보존력 실측: 22쪽 픽셀 차이 0%, 필드, 표, 그림 개수 동일).
 
