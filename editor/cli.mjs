@@ -16,7 +16,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import zlib from 'node:zlib';
+import { readZip, fixHfFields } from './hwpx-zip.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.HWPX_EDITOR_PORT || 7780);
@@ -55,35 +55,14 @@ function openBrowser(url) {
   else spawn(process.platform === 'darwin' ? 'open' : 'xdg-open', [url], { detached: true, stdio: 'ignore' }).unref();
 }
 
-/** zip 중앙 디렉터리에서 { 이름: 내용 읽기 함수 } 를 만든다. */
-function zipEntries(buf) {
-  let eocd = buf.length - 22;
-  while (eocd >= 0 && buf.readUInt32LE(eocd) !== 0x06054b50) eocd--;
-  if (eocd < 0) return null;
-  const entries = {};
-  let p = buf.readUInt32LE(eocd + 16);
-  for (let i = buf.readUInt16LE(eocd + 10); i > 0; i--) {
-    const method = buf.readUInt16LE(p + 10), size = buf.readUInt32LE(p + 20);
-    const nameLen = buf.readUInt16LE(p + 28), extra = buf.readUInt16LE(p + 30), comment = buf.readUInt16LE(p + 32);
-    const local = buf.readUInt32LE(p + 42);
-    const name = buf.toString('utf8', p + 46, p + 46 + nameLen);
-    entries[name] = () => {
-      const start = local + 30 + buf.readUInt16LE(local + 26) + buf.readUInt16LE(local + 28);
-      const raw = buf.subarray(start, start + size);
-      return (method === 8 ? zlib.inflateRawSync(raw) : raw).toString('utf8');
-    };
-    p += 46 + nameLen + extra + comment;
-  }
-  return entries;
-}
-
 /** KS X 6101 §15(암호화), §16(전자서명). 편집하면 안 되는 hwpx 인지 본다. */
 function editBlocker(file) {
   if (!/\.hwpx$/i.test(file)) return null;
-  const z = zipEntries(fs.readFileSync(file));
+  const z = readZip(fs.readFileSync(file));
   if (!z) return 'zip 으로 읽히지 않는다(손상된 hwpx)';
-  if (z['META-INF/signatures.xml']) return '전자서명 문서다. 편집하면 서명이 무효가 된다(KS X 6101 §16)';
-  if (z['META-INF/manifest.xml']?.().includes('encryption-data')) return '암호화 문서다. 편집할 수 없다(KS X 6101 §15)';
+  const entry = (name) => z.find((e) => e.name === name);
+  if (entry('META-INF/signatures.xml')) return '전자서명 문서다. 편집하면 서명이 무효가 된다(KS X 6101 §16)';
+  if (entry('META-INF/manifest.xml')?.data.toString('utf8').includes('encryption-data')) return '암호화 문서다. 편집할 수 없다(KS X 6101 §15)';
   return null;
 }
 
@@ -159,7 +138,10 @@ switch (sub) {
     const target = args[0] ? path.resolve(args[0]) : nextVersion(s.source);
     if (fs.existsSync(target)) die(`이미 있는 파일은 덮어쓰지 않는다: ${target}`);
     const r = await cmd({ type: 'save' });
-    fs.writeFileSync(target, Buffer.from(r.base64, 'base64'));
+    const fix = fixHfFields(Buffer.from(r.base64, 'base64'), r.hfMarkers ?? []);
+    fs.writeFileSync(target, fix.buf);
+    if (fix.fixed) out(`머리말/꼬리말 쪽 번호 ${fix.fixed}개 보정`);
+    for (const why of fix.skipped) out(`⚠ 쪽 번호 보정 못 함: ${why}`);
     await cmd({ type: 'saved', fileName: path.basename(target) });
     out(`저장: ${target}`);
     break;

@@ -32,6 +32,20 @@ async function docText() {
   return String(text ?? '');
 }
 
+/** 머리말/꼬리말 문단별 모델 텍스트. 저장 단계 쪽 번호 보정(hwpx-zip.mjs)이 표식 위치를 찾는 데 쓴다. */
+async function headerFooterTexts() {
+  const [list] = await run([{ doc: 'getHeaderFooterList', a: [0, false, 0] }]);
+  const out = [];
+  for (const it of list?.items ?? []) {
+    const [info] = await run([{ doc: 'getHeaderFooter', a: [it.sectionIdx, it.isHeader, it.applyTo] }]);
+    const n = info?.paraCount ?? 0;
+    const ops = Array.from({ length: n }, (_, i) => ({ doc: 'getHeaderFooterParaInfo', a: [it.sectionIdx, it.isHeader, it.applyTo, i] }));
+    const paras = n ? (await run(ops)).map((r) => r?.text ?? '') : [];
+    out.push({ section: it.sectionIdx, isHeader: it.isHeader, applyTo: it.applyTo, paras });
+  }
+  return out;
+}
+
 async function stateKey() {
   const st = await studio.getDocumentState();
   return { st, key: `${st.changeSeq}:${st.documentSha256}` };
@@ -75,7 +89,10 @@ const handlers = {
     const { st } = await stateKey();
     return { ok: true, state: st, selection: await selection(), pageCount: await studio.pageCount() };
   },
-  async save() { return { ok: true, base64: toBase64(await studio.exportHwpx()) }; },
+  async save() {
+    const hfMarkers = await headerFooterTexts();
+    return { ok: true, base64: toBase64(await studio.exportHwpx()), hfMarkers };
+  },
   async saved(cmd) { return { ok: true, ...(await studio.notifySaved(cmd.fileName)) }; },
   async undo() { const r = await studio.commands.execute('edit:undo'); await snapshot('claude'); return { ok: true, result: r }; },
   async svg(cmd) { return { ok: true, svg: await studio.getPageSvg(cmd.page ?? 0) }; },
