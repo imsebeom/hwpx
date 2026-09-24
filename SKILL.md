@@ -35,6 +35,13 @@ ${CLAUDE_SKILL_DIR}/
 │   ├── writing_optimizer.py     # ★ 공공기관 보고서 글쓰기 자동 변환 (Workflow P, public-doc-to-hwpx 포팅)
 │   ├── add_equation.py          # ★ 한컴 네이티브 수식 개체 삽입 (본문·표 셀, 규칙 39)
 │   └── office/{unpack,pack}.py
+├── editor/                    # ★ 에디터 모드: rhwp 에디터로 사용자와 실시간 공동 편집 (references/editor-mode.md)
+│   ├── cli.mjs                # Claude 용 CLI — start / run / outline / state / changes / save / stop
+│   ├── setup.mjs              # 최초 1회 빌드 (rhwp v0.8.6 + claude 플러그인, Rust 있으면 패치 WASM)
+│   ├── app.py                 # 에디터 앱 창 (pywebview=WebView2, 한/글 단축키 전부)
+│   ├── server.mjs · host/     # 브리지 서버와 호스트 페이지
+│   ├── plugin/                # studio 플러그인, 한/글 단축키 층, 편집 도구 25종(lib/)
+│   └── tests/                 # 왕복 보존력, 쪽 번호, 실제 키 입력 시험
 ├── templates/
 │   ├── base/                  # 베이스 Skeleton
 │   ├── report/                # 보고서
@@ -54,6 +61,7 @@ ${CLAUDE_SKILL_DIR}/
     ├── gonmunseo-2025-writing-rules.md  # ★ 2025-01-08 개정 행정업무규정 룰셋 (수신·항목기호 등, jkf87 차용)
     ├── xml-internals.md       # 저수준 XML 구조
     ├── rhwp-benchmark.md      # rhwp 포팅 배경·표 수식·필드 API 사용법
+    ├── editor-mode.md         # ★ 에디터 모드 설명서 — 명령, 도구 25종, 요청→명령 사전, 한/글 단축키, 한계
     ├── python-hwpx-api.md     # python-hwpx API 시그니처 + 버전 매트릭스(2.9.1 설치 / 6.3.0 검증 / 7.0 대비)
     ├── equation-syntax.md     # ★ 한컴 수식 스크립트 문법 — 검증한 토큰과 함정 3종 (규칙 39)
     ├── gaejosik-munche.md     # ★ 개조식 실측 — 층별 길이·종결 분포 (교육청 공문 16건 494줄)
@@ -91,6 +99,7 @@ pip install python-hwpx lxml --break-system-packages
 
 ```
 사용자 요청
+ ├─ 이미 있는 문서를 고치는 일 → 먼저 "에디터로 보면서 작업할까요?" 묻는다 → 예: ★ 에디터 모드 (아래 절)
  ├─ "마크다운/텍스트/URL → HWPX" → 워크플로우 A (콘텐츠→HWPX)
  ├─ "양식에 내용 채워줘" → ★ 양식 채우기 3단계 (템플릿 제작 → 사용자 확인 → 채우기)
  │                          그 다음 워크플로우 B/F/H/L 중 선택
@@ -134,6 +143,16 @@ pip install python-hwpx lxml --break-system-packages
 > - 치환은 `str.replace()` 기반으로 XML 구조를 건드리지 않음
 
 ---
+
+## ★ 에디터 모드 (rhwp 실시간 공동 편집, 2026-09-25)
+
+사용자가 에디터 창으로 문서를 보면서 고치고, Claude 는 같은 문서를 다시 열지 않고 실시간으로 고친다. **전체 절차와 명령은 `references/editor-mode.md` 를 먼저 읽는다.**
+
+- 시작: `node "${CLAUDE_SKILL_DIR}/editor/cli.mjs" start <문서.hwpx>` (최초 1회 `node editor/setup.mjs`, 앱 창은 `pip install pywebview`)
+- 사용자가 말을 걸면 답하기 전에 `cli.mjs changes` 로 사용자가 에디터에서 고친 내역(좌표 diff, 커서, 선택 글자)부터 읽는다
+- 편집: `cli.mjs run` 에 JSON 배치 — 편집 도구 25종(`tool`) 우선, 없으면 WASM 직접(`doc`). 배치 하나가 undo 1스텝
+- 저장: `cli.mjs save` → 매번 새 판 `<이름>_<YYMMDD>_<NN>.hwpx`, 덮어쓰기 없음
+- 하지 않는 일: 새 문서 생성(A), 양식 복제·추출(F/H), 병합(I), 시험지(J), 첨삭 메모(N) — 저장·종료 후 기존 워크플로로
 
 ## 워크플로우 A: 콘텐츠 → HWPX (가장 중요!)
 
