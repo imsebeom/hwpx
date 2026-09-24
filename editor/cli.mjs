@@ -29,6 +29,7 @@ const STATE_DIR = process.env.HWPX_EDITOR_STATE || path.join(os.homedir(), '.cla
 const SESSION = path.join(STATE_DIR, 'session.json');
 const CHANGES = path.join(STATE_DIR, 'changes.jsonl');
 const SEEN = path.join(STATE_DIR, 'changes.seen');
+const APP_PID = path.join(STATE_DIR, 'app.pid');
 
 const out = (obj) => process.stdout.write((typeof obj === 'string' ? obj : JSON.stringify(obj, null, 2)) + '\n');
 const die = (msg) => { process.stderr.write(msg + '\n'); process.exit(1); };
@@ -62,8 +63,22 @@ function openAppWindow(url) {
   const py = process.platform === 'win32' ? 'python' : 'python3';
   const probe = spawnSync(py, ['-c', 'import webview'], { stdio: 'ignore', windowsHide: true });
   if (probe.status !== 0) return false;
-  spawn(py, [path.join(HERE, 'app.py'), url], { detached: true, stdio: 'ignore', env: { ...process.env, HWPX_EDITOR_STATE: STATE_DIR } }).unref();
+  const child = spawn(py, [path.join(HERE, 'app.py'), url], { detached: true, stdio: 'ignore', env: { ...process.env, HWPX_EDITOR_STATE: STATE_DIR } });
+  fs.writeFileSync(APP_PID, String(child.pid));
+  child.unref();
   return true;
+}
+
+/**
+ * 앞서 띄운 앱 창이 살아 있으면 그 pid. 서버만 내렸다 다시 띄우면 옛 창이 새 서버에 다시 붙으므로,
+ * 이것을 보지 않고 창을 또 열면 두 창이 명령을 나눠 받아 측정값이 뒤섞였다(2026-09-26 실측).
+ */
+function aliveAppPid() {
+  try {
+    const pid = Number(fs.readFileSync(APP_PID, 'utf8'));
+    process.kill(pid, 0);
+    return pid;
+  } catch { return null; }
 }
 
 function openBrowser(url) {
@@ -132,18 +147,22 @@ switch (sub) {
     fs.writeFileSync(CHANGES, '');
     fs.writeFileSync(SEEN, '0');
     await ensureServer();
-    const h = await health();
+    let h = await health();
+    if (!h.browser && aliveAppPid()) {                // 옛 앱 창이 새 서버에 다시 붙기를 기다린다
+      for (let i = 0; i < 20 && !h.browser; i++) { await sleep(500); h = await health(); }
+    }
     if (h.browser) await cmd({ type: 'open' });       // 이미 열린 탭이 있으면 그 탭에 새 문서를 연다
     else if (!args.includes('--no-browser')) {
       const url = `http://localhost:${PORT}/`;
       // 기본은 앱 창(한/글 단축키 전부). --browser 면 브라우저 탭(Ctrl+N 계열은 Ctrl+M 으로 대신).
       if (args.includes('--browser') || !openAppWindow(url)) openBrowser(url);
     }
-    for (let i = 0; i < 60; i++) {
+    // 스킬 파이프라인 산출물은 서버가 한글로 줄 배치를 계산해 보내므로(hancom_layout.py) 넉넉히 기다린다.
+    for (let i = 0; i < 180; i++) {
       if (readChanges().some((c) => c.source === 'open')) { out(`열림: ${file}\n에디터: http://localhost:${PORT}/`); process.exit(0); }
       await sleep(500);
     }
-    die('브라우저에서 문서가 열리지 않았다(30초). 탭을 확인한다.');
+    die('브라우저에서 문서가 열리지 않았다(90초). 탭을 확인한다.');
     break;
   }
   case 'run': {
@@ -188,8 +207,20 @@ switch (sub) {
   }
   case 'status': out((await health()) ?? '서버 꺼짐'); break;
   case 'stop': {
-    if (await health()) await fetch(`${BASE}/api/cmd`, { method: 'POST', body: JSON.stringify({ type: 'shutdown' }) });
-    out('서버 종료');
+    const h = await health();
+    let dirty = false;
+    if (h?.browser) {
+      try {
+        const r = await (await fetch(`${BASE}/api/cmd`, { method: 'POST', body: JSON.stringify({ type: 'state', timeoutMs: 5000 }) })).json();
+        dirty = Boolean(r.ok && r.state?.dirty);
+      } catch { /* 창이 응답하지 않으면 닫는다 */ }
+    }
+    const pid = aliveAppPid();
+    if (pid && dirty && !args.includes('--force')) die('에디터에 저장하지 않은 편집이 있다. save 로 저장하거나, 버리려면 stop --force');
+    if (h) await fetch(`${BASE}/api/cmd`, { method: 'POST', body: JSON.stringify({ type: 'shutdown' }) });
+    if (pid) { try { process.kill(pid); } catch { /* 이미 닫힘 */ } }
+    try { fs.unlinkSync(APP_PID); } catch { /* 없음 */ }
+    out(pid ? '서버 종료, 앱 창 닫음' : '서버 종료');
     break;
   }
   default: out(fs.readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').slice(2, 17).join('\n'));

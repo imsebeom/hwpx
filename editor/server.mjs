@@ -18,7 +18,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { stripDummyLinesegs } from './hwpx-zip.mjs';
+
+const execFileP = promisify(execFile);
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.HWPX_EDITOR_PORT || 7780);
@@ -72,6 +76,34 @@ const LATEST_TXT = path.join(STATE_DIR, 'latest.txt');
 const LATEST_MODEL = path.join(STATE_DIR, 'latest.model.json');
 const CHANGES = path.join(STATE_DIR, 'changes.jsonl');
 const SESSION = path.join(STATE_DIR, 'session.json');
+
+/**
+ * 에디터에 보낼 문서 바이트. 스킬 파이프라인 산출물(더미 줄 배치)이면 한글로 줄 배치와 표 높이를 계산해
+ * 옮겨 심은 판(hancom_layout.py)을 보낸다. 한글이 없거나 실패하면 더미만 걷어낸다(표가 겹칠 수 있다).
+ * 원본 파일은 어느 경우에도 건드리지 않는다. 결과는 원본의 크기와 수정 시각으로 캐시한다.
+ */
+const LAYOUT_CACHE = path.join(STATE_DIR, 'layout-cache.hwpx');
+const LAYOUT_KEY = path.join(STATE_DIR, 'layout-cache.json');
+async function editorBytes(src) {
+  const raw = fs.readFileSync(src);
+  if (!/\.hwpx$/i.test(src)) return raw;
+  const stripped = stripDummyLinesegs(raw);
+  if (!stripped.removed) return raw;
+  if (process.platform !== 'win32') return stripped.buf;
+  const st = fs.statSync(src);
+  const key = JSON.stringify({ src, size: st.size, mtimeMs: st.mtimeMs });
+  try { if (fs.readFileSync(LAYOUT_KEY, 'utf8') === key) return fs.readFileSync(LAYOUT_CACHE); } catch { /* 캐시 없음 */ }
+  try {
+    await execFileP('python', [path.join(HERE, 'hancom_layout.py'), src, LAYOUT_CACHE],
+      { timeout: 120000, windowsHide: true, env: { ...process.env, PYTHONIOENCODING: 'utf-8' } });
+    fs.writeFileSync(LAYOUT_KEY, key);
+    console.log(`한글 줄 배치 적용: ${path.basename(src)}`);
+    return fs.readFileSync(LAYOUT_CACHE);
+  } catch (e) {
+    console.error(`한글 줄 배치 실패, 더미만 걷어냄: ${String(e?.stderr || e?.message || e).trim().split('\n').pop()}`);
+    return stripped.buf;
+  }
+}
 
 function readSession() {
   try { return JSON.parse(fs.readFileSync(SESSION, 'utf8')); } catch { return {}; }
@@ -265,8 +297,7 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/doc') {       // 브라우저가 처음 열 문서를 받아 간다
       const s = readSession();
       if (!s.source || !fs.existsSync(s.source)) return sendJson(res, 404, { ok: false });
-      let buf = fs.readFileSync(s.source);
-      if (/\.hwpx$/i.test(s.source)) buf = stripDummyLinesegs(buf).buf;   // 원본 파일은 건드리지 않는다
+      const buf = await editorBytes(s.source);
       return sendJson(res, 200, { ok: true, fileName: path.basename(s.source), base64: buf.toString('base64') });
     }
     return serveStatic(req, res, p);
