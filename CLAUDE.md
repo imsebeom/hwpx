@@ -38,7 +38,7 @@
 - StreamDocs(standard.go.kr) 링크는 밖에서 열면 "문서를 열 수 없습니다" — 세션에 묶여 있다.
 
 ## 컨텍스트 앵커
-- intent: /hwpx 스킬에 rhwp 에디터 모드(Claude 와 사용자가 같은 문서를 실시간 공동 편집) 추가. 2026-09-25 한 세션에서 구현부터 한/글 단축키까지.
+- intent: /hwpx 스킬에 rhwp 에디터 모드(Claude 와 사용자가 같은 문서를 실시간 공동 편집)를 만들어 스킬에 통합하고 GitHub 에 올리기(2026-09-25 세션).
 - changes_made (2026-09-25, 커밋 405488e~019139e):
   - editor/ 전체: 플러그인(doc/m/run/tool op), 브리지 서버, 호스트 페이지, CLI, setup, 앱 창(app.py), EDITOR.md
   - 저장: 매번 새 판 `<이름>_<YYMMDD>_<NN>.hwpx`, 덮어쓰기 없음 / 전자서명·암호화 문서 거절 / run 문자열 NFC
@@ -46,11 +46,12 @@
   - 형제 프로젝트 hwpx에디터기반AI(커밋 866416b)에서 도구 25종, 스냅샷 보호, 개요, 검수, 채울 칸, 셀 좌표 diff, 셀 커서·선택 글자, goto, document-mutated 감지를 가져옴(plugin/lib, 고치지 않고 복사)
   - 한/글 단축키: 앱 창(pywebview=WebView2, 최대화)에서 Ctrl+N·Q·M 두 단계 키, 셀 안 Ctrl+A, Ctrl+Shift+C/R/T 등(plugin/hancom-keys.ts). 실제 키 입력으로 영문·한글 입력기 모두 통과(test/keys_app.py, keys_dialogs.py)
   - 설치: pip pywebview 6.2.1(pythonnet 3.1.0), rustup(~/.cargo, ~/.rustup)
+  - 스킬 통합: ~/.claude/skills/hwpx 의 editor/, references/editor-mode.md, SKILL.md(선택 단계 19줄). 커밋 807b576~319d2c6, imsebeom/hwpx·hwpx2 main 푸시(이전 세션 미푸시 커밋 6·8개 함께). 스킬 위치에서 개요·편집·새 판 저장 스모크, tests/test_text_scope.py OK
 - decisions: 위 "결정" 절. 추가로 — 에디터 모드는 실시간 편집만(A/F/H/I/J/N 워크플로는 저장·종료 후 기존 방식), 기본 창은 앱 창(브라우저 탭은 Ctrl+N/T/W 불가), 형제 프로젝트 코드는 복사만 하고 여기서 고치지 않는다
 - 함정(이번 세션): Node 24 rmSync/cpSync 한글 경로 크래시 / SendInput 에 스캔 코드가 없으면 e.code 빈 값 / 한글 입력기 조합은 preventDefault 로 안 멈춤(포커스 뺐다 돌려 버림) / 플러그인 host.automation 은 대화상자 명령을 안 엶(inputHandler.dispatcher) / 앱 창이 화면보다 크면 오른쪽 위 패널이 화면 밖 / 알캡처 등 전역 단축키 프로그램이 키를 먼저 가져감 / goto 직후 바로 치면 첫 글자가 먹힘
 - next_steps:
-  1. (완료 2026-09-25) 스킬 통합: 커밋 807b576~319d2c6, imsebeom/hwpx·hwpx2 main 푸시. 스킬 위치에서 개요·편집·새 판 저장 스모크 통과, tests/test_text_scope.py OK
-  2. 사용자가 실제 문서로 앱 창 시운전(`node ~/.claude/skills/hwpx/editor/cli.mjs start <문서>`), 불편 사항은 스킬 쪽에서 반영
-  3. 빌드 산출물(27MB)을 GitHub Release 첨부로 받게 할지 검토(다른 PC 에서 setup 이 rhwp 받기·빌드를 반복하지 않게)
-  4. 연결만 하고 안 눌러 본 단축키(미주, 수식, 글상자, Ctrl+J, 첨자 등) 실측
-  5. rhwp 에 쪽 번호 필드 저장 누락 결함 보고(이슈 초안 작성 후 사용자가 게시)
+  1. 사용자가 실제 문서로 앱 창 시운전(`node ~/.claude/skills/hwpx/editor/cli.mjs start <문서>`). 불편 사항은 **스킬 쪽(~/.claude/skills/hwpx/editor)에서** 고치고 hwpx·hwpx2 둘 다 푸시
+  2. 연결만 하고 안 눌러 본 단축키(Ctrl+N,E 미주, N,M 수식, N,B 글상자, Ctrl+J, Alt+Shift+P/S 첨자, Ctrl+Shift+Insert/Delete) 실측 — editor/tests/keys_dialogs.py 에 항목 추가
+  3. 빌드 산출물(27MB)을 GitHub Release 첨부로 받게 할지 검토(다른 PC 에서 setup 이 rhwp 받기·npm·Rust 빌드를 반복하지 않게)
+  4. rhwp(edwardkim/rhwp)에 결함 보고 초안: hwpx 저장기가 머리말/꼬리말 필드 표식(\u0015/\u0016)을 버린다(src/serializer/hwpx/section.rs 제어문자 무시 분기). 패치(editor/patches/hwpx-hf-autonum.rs)를 PR 로 낼지 사용자와 상의
+  5. 노션 🔏 프로젝트 항목이 없다 — 이 일을 노션에서 추적하려면 /프로젝트시작 으로 연결
