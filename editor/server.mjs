@@ -68,6 +68,7 @@ function enqueue(cmd, timeoutMs) {
 // ── 스냅샷과 수정 내역 ──────────────────────────────────
 const LATEST = path.join(STATE_DIR, 'latest.hwpx');
 const LATEST_TXT = path.join(STATE_DIR, 'latest.txt');
+const LATEST_MODEL = path.join(STATE_DIR, 'latest.model.json');
 const CHANGES = path.join(STATE_DIR, 'changes.jsonl');
 const SESSION = path.join(STATE_DIR, 'session.json');
 
@@ -82,7 +83,52 @@ function writeSession(patch) {
 
 /** 줄 단위 diff. 앞뒤 공통 부분을 걷어 내고 가운데만 LCS 로 맞춘다. */
 export function lineDiff(a, b) {
-  const A = a.split('\n'), B = b.split('\n');
+  return seqDiff(a.split('\n'), b.split('\n'));
+}
+
+/**
+ * 글 모델(플러그인 model(): 본문 문단 글, 셀 문단 글, 표 모양) 두 개의 차이를 좌표로.
+ * 반환: [{ op: '~'|'+'|'-', ref: 'p12'|'T1r0c1', before?, after? }] — 구역이 여럿이면 null(줄 diff 로)
+ */
+export function modelDiff(a, b) {
+  if (!a || !b || a.sections !== 1 || b.sections !== 1) return null;
+  const out = [];
+  // 지운 문단과 넣은 문단 가운데 글이 비슷한 것끼리(순서대로) "바뀜"으로 묶는다. 좌표는 새 문서 기준.
+  const raw = seqDiff(a.paras, b.paras);
+  const dels = raw.filter((d) => d.op === '-'), adds = raw.filter((d) => d.op === '+');
+  const used = new Set();
+  let from = 0;
+  for (const del of dels) {
+    const k = adds.findIndex((add, j) => j >= from && !used.has(j) && similar(del.text, add.text) >= 0.3);
+    if (k < 0) { out.push({ op: '-', ref: `p${del.line - 1}`, before: del.text }); continue; }
+    used.add(k);
+    from = k + 1;
+    out.push({ op: '~', ref: `p${adds[k].line - 1}`, before: del.text, after: adds[k].text });
+  }
+  adds.forEach((add, j) => { if (!used.has(j)) out.push({ op: '+', ref: `p${add.line - 1}`, after: add.text }); });
+  const cellRef = (k) => (k.endsWith('#0') ? k.slice(0, -2) : k);
+  for (const k of new Set([...Object.keys(a.cells), ...Object.keys(b.cells)])) {
+    if (a.cells[k] === b.cells[k]) continue;
+    if (!(k in a.cells)) out.push({ op: '+', ref: cellRef(k), after: b.cells[k] });
+    else if (!(k in b.cells)) out.push({ op: '-', ref: cellRef(k), before: a.cells[k] });
+    else out.push({ op: '~', ref: cellRef(k), before: a.cells[k], after: b.cells[k] });
+  }
+  if (a.shape.replace(/@\d+\.\d+/g, '') !== b.shape.replace(/@\d+\.\d+/g, '')) out.push({ op: '!', ref: '표', after: '표 모양(행, 열, 병합)이 바뀌었다' });
+  return out;
+}
+
+/** 두 글의 2글자 묶음 겹침(Dice 계수, 0~1). */
+function similar(x, y) {
+  if (x === y) return 1;
+  const grams = (s) => { const m = new Map(); for (let i = 0; i < s.length - 1; i++) { const g = s.slice(i, i + 2); m.set(g, (m.get(g) || 0) + 1); } return m; };
+  const gx = grams(x), gy = grams(y);
+  let both = 0, total = 0;
+  for (const [g, c] of gx) { both += Math.min(c, gy.get(g) || 0); total += c; }
+  for (const c of gy.values()) total += c;
+  return total ? (2 * both) / total : 0;
+}
+
+function seqDiff(A, B) {
   let p = 0;
   while (p < A.length && p < B.length && A[p] === B[p]) p++;
   let s = 0;
@@ -116,16 +162,22 @@ function saveSnapshot(body) {
   let prev = '';
   try { prev = fs.readFileSync(LATEST_TXT, 'utf8'); } catch { /* 첫 스냅샷 */ }
   fs.writeFileSync(LATEST_TXT, text);
+  let prevModel = null;
+  try { prevModel = JSON.parse(fs.readFileSync(LATEST_MODEL, 'utf8')); } catch { /* 첫 스냅샷 */ }
+  if (body.model) fs.writeFileSync(LATEST_MODEL, JSON.stringify(body.model));
   const entry = {
     ts: new Date().toISOString(),
     source: body.source,           // user | claude | open
     changeSeq: body.changeSeq,
-    selection: body.selection ?? null,
+    cursor: body.cursor ?? null,
   };
   if (body.source === 'open') {
     entry.note = '문서 열림';
   } else {
-    entry.diff = lineDiff(prev, text);
+    // 좌표 diff(p12, T1r0c1). 구역이 여럿이거나 모델이 없으면 줄 diff.
+    const md = modelDiff(prevModel, body.model);
+    entry.diff = md ?? lineDiff(prev, text);
+    if (md) entry.coords = true;
     if (!entry.diff.length) entry.formatOnly = true;   // 글자는 그대로, 서식이나 개체만 바뀜
   }
   fs.appendFileSync(CHANGES, JSON.stringify(entry) + '\n');

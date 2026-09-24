@@ -21,20 +21,39 @@ CLI 경로는 아래에서 `$E` 로 적는다: `node "<스킬>/editor/cli.mjs"`.
 
 ## 2. 대화 규칙
 
-- **사용자가 말을 걸면 답하기 전에 `$E changes` 부터 본다.** 사용자가 에디터에서 고친 내역이 줄 단위 diff 로 나오고, 커서가 있던 문단도 함께 나온다. "이거", "여기"는 그 커서 문단을 가리킬 가능성이 높다.
+- **사용자가 말을 걸면 답하기 전에 `$E changes` 부터 본다.** 사용자가 에디터에서 고친 내역이 좌표로 나온다(`~ p12 │ 전 → 후`, `~ T1r0c1 │ 전 → 후`, 표 모양이 바뀌면 `! 표`). 커서 자리(셀 안이면 셀 좌표)와 **선택한 글자**도 함께 나온다. "이거", "여기", "선택한 부분"은 그것을 가리킬 가능성이 높다. 지금 커서는 `$E state`.
 - 사용자가 에디터에서 고친 부분을 Claude가 되돌리거나 덮어쓰지 않는다. 겹치면 묻는다.
 - 수정한 뒤에는 "화면에 반영했다"고만 말하지 말고 무엇을 바꿨는지 한 줄로 적는다. 사용자는 Ctrl+Z 로 Claude의 배치 하나를 통째로 되돌릴 수 있다.
 
 ## 3. 편집 명령
 
-`$E run <ops.json>` 또는 `echo '<JSON>' | $E run -`. 배열 하나가 **트랜잭션 하나, undo 1스텝**이다.
-op 는 세 가지다.
+`$E run <ops.json>` 또는 `echo '<JSON>' | $E run -`. 배열 하나가 **트랜잭션 하나, undo 1스텝**이고, 하나라도 실패하면 배치 전체가 되돌려진다.
+op 는 네 가지다. **먼저 `tool` 을 쓰고, 도구에 없는 일만 `doc` 으로 내려간다.**
 
 | 모양 | 뜻 |
 |------|----|
+| `{"tool": "fill_by_label", "args": {"label": "담당 부서", "text": "과학부"}}` | 편집 도구 25종(`plugin/lib/doc-tools.js`, 형제 프로젝트 hwpx에디터기반AI 에서 가져옴). 도구마다 스냅샷을 떠서, 실패하거나 셀 안 표가 사라지면 되돌리고 쪽수가 바뀌면 결과에 `pages` 경고를 싣는다 |
 | `{"doc": "insertText", "a": [0, 14, 5, "글"]}` | WASM `HwpDocument` 메서드. 객체 인자는 JSON 문자열로 바뀌어 들어가고, JSON 반환은 파싱돼 나온다 |
 | `{"m": "PutFieldText", "a": ["기안자", "홍길동"]}` | 한컴 웹한글컨트롤 호환 메서드(`@rhwp/hwpctrl`, 484개 중 339개 구현) |
 | `{"run": "BreakPara"}` | HwpCtrl Run 액션 |
+
+### 편집 도구 25종 (좌표: 문단 `p12`, 표 `T1`(본문 표만 문서 순서로), 셀 `T1r2c1`, 행 `T1r0`, 열 `T1c0`)
+
+`$E outline` 이 이 좌표가 붙은 개요를 준다(스타일, 병합, 누름틀, 메모 위치, 머리말/꼬리말, 쪽수). 인자 전체는 `$E tools`.
+
+- 읽기: `read_document`(from_para, to_para), `search_text`(query) — 위치와 앞뒤 문맥
+- 문단: `replace_paragraph`(para, text, keep_bullet, keep_style), `insert_paragraphs`(after_para, texts[]), `delete_paragraphs`, `find_replace`(find, replace, **expected_count**, keep_width)
+- 표: `set_cell`, **`fill_by_label`**(label, text, direction, occurrence — 좌표를 몰라도 라벨 옆 칸을 채운다), 행과 열 넣기/지우기, `merge_cells`, `split_cell`, `table_props`(page_break, repeat_header), `table_formula`(=SUM(B2:B5)), `create_table`(after_para, rows[][]), `delete_table`
+- 서식: `format_text`(at, text?, bold, size_pt, color …), `format_paragraph`(align, line_spacing, keep_with_next, page_break_before …), `apply_style`, `set_list`(number | bullet | none)
+- 문서 요소: `set_header_footer`(글만), `add_footnote`, `set_field`(누름틀)
+
+도구에 들어 있는 안전장치: 글머리 기호 보존(keep_bullet), 마크다운 기호 제거, 빨간 작은 안내 문구 자리에 채우면 검은 본문 서식으로 돌리기, 셀 안 표가 든 셀 통째 교체 거부.
+⚠ `set_header_footer` 는 쪽 번호가 든 글을 거부한다(형제 프로젝트는 쪽 번호를 못 살렸다). 쪽 번호는 아래 `doc` 경로의 `applyHfTemplate`/`insertFieldInHf` 로 넣는다 — 이 스킬에서는 저장본에 살아남는다(5절).
+
+`$E inspect` 는 문서 종류(공문, 계획서, 보고서, 가정통신문)를 알아내 날짜, 시간, 금액, 개인정보 표기를 검수하고, `$E slots` 는 아직 안 채운 칸을 좌표로 준다. 양식을 채운 뒤에는 둘 다 돌린다.
+`$E goto T1r2c1` 은 사용자 화면의 커서를 그 자리로 옮기고 글자를 선택한다 — "여기를 고쳤다"를 보여 줄 때만 쓴다. ⚠ 이동 직후 키보드로 바로 치면 첫 글자가 먹히고 선택이 바뀌지 않았다(2026-09-25 실측). 사용자에게 "선택된 글자를 바꿔 치라"고 안내하지 않는다.
+
+### WASM 직접 호출과 HwpCtrl
 
 **위치는 추측하지 않는다. 먼저 읽는다.** 문단 번호는 0부터, 구역도 0부터다. 글자 오프셋은 문단 안 글자 수 기준이다.
 
@@ -83,7 +102,7 @@ autoSpaceKrNum verticalAlign englishBreakUnit koreanBreakUnit borderConnect bord
 | 책갈피 | `bookmark` | `addBookmark(s, p, offset, 이름)`, `getBookmarks()` | 적용 확인 |
 | 수식 | 부속서 I | `insertEquation(s, p, offset, "a over b", 1000, 0)` (글자 크기 HWPUNIT, 색 0) | 한컴 통과 |
 | 머리말/꼬리말 글 | `header`/`footer` | `createHeaderFooter(s, isHeader, 0)` → `insertTextInHeaderFooter(s, isHeader, 0, 0, offset, 글)` | 한컴 통과 |
-| **꼬리말 쪽 번호** | `pageNum` (§10.7.10) | **에디터 모드 불가.** `insertFieldInHf(...,1)` 은 화면에만 보이고 hwpx 저장 시 빠진다. `insertAutoNumberAtCursor` 는 본문 전용, hwpctrl `PageNumPos` 는 미구현 (rhwp 0.8.6) | 사용자에게 알리고 저장, 종료 후 기존 워크플로로 |
+| 머리말/꼬리말 쪽 번호, 총 쪽수 | `autoNum` PAGE, TOTAL_PAGE | 마당: `applyHfTemplate(s, isHeader, 0, 2)` (1 왼쪽, 2 가운데, 3 오른쪽 쪽 번호, 6~8 은 굵게+밑줄). 글 사이: `insertTextInHeaderFooter` 뒤 `insertFieldInHf(s, isHeader, 0, 문단, offset, 1)` (1 쪽 번호, 2 총 쪽수) | 한컴 통과("전체 4쪽", 가운데 "2"). rhwp 0.8.6 은 이 필드를 저장 시 버리지만 이 스킬은 되살린다 — Rust 가 있으면 패치 빌드한 WASM 이, 없으면 `save` 의 보정이. 파일 이름 필드(3)는 아직 저장되지 않는다 |
 
 표 위치 찾기: `searchText(표 안 글자, 0,0,0, true,false, true)` 의 `cellContext.parentPara`, `ctrlIdx` 가 `setTableProperties` 의 둘째, 셋째 인자다.
 
@@ -99,7 +118,6 @@ autoSpaceKrNum verticalAlign englishBreakUnit koreanBreakUnit borderConnect bord
 | 문서 병합 | I |
 | 시험지 생성 | J |
 | 첨삭 메모 삽입 | N |
-| 꼬리말 쪽 번호 | 템플릿 또는 한컴 |
 
 rhwp 저장본은 기존 스크립트가 그대로 받는다(왕복 보존력 실측: 22쪽 픽셀 차이 0%, 필드, 표, 그림 개수 동일).
 
@@ -114,6 +132,17 @@ rhwp 저장본은 기존 스크립트가 그대로 받는다(왕복 보존력 �
 - 끝나면 `$E stop`.
 
 ## 6. 한계 (0.8.6 기준 실측)
+
+형제 프로젝트 `Desktop/code/hwpx에디터기반AI`(OpenAI API 채팅형, 같은 rhwp 0.8.6)의 실측 중 여기 해당하는 것:
+
+- `getControls()` 는 **셀 안 표도 돌려준다**(list 2). 본문 표만 세려면 `c.list < 구역 수` 이고 `getTableDimensions` 가 성공하는 것만 센다.
+- 표가 든 문단 끝에서 `splitParagraph` 하면 **표가 새 문단으로 딸려 간다.** 표 뒤에 문단을 만들 때는 `insertParagraph(s, idx)`.
+- 0번 문단은 구역 정의(secd)를 담고 있다. 지우지 않는다.
+- `applyCharFormat` 의 끝 오프셋은 포함되지 않는다. 글자 크기는 1/100 pt(16pt = 1600).
+- SDK `getSelectionContext()` 는 커서가 **표 셀 안이면 target 이 null** 이다. `changes` 의 "커서 문단"이 비면 셀 안일 수 있다.
+- 한컴 자동 글머리표는 저장 후 한컴에서 기호가 안 보인다. 글머리표가 필요하면 기호를 글자로 넣는다. 자동 번호는 `ensureDefaultNumbering` 으로 정상.
+- 빈 문서(`createEmpty`)는 hwpx 내보내기가 실패한다. 새 문서는 템플릿 파일로 시작한다.
+
 
 - hwpctrl 의 `HAction.Execute` 는 파라미터셋 값을 아직 읽지 않고, `InsertCtrl("tbl")` 은 항상 5×5 다. 표와 서식은 `doc` 경로로 한다.
 - 수정 내역 diff 는 글자 기준이다. 서식만 바뀐 변경은 "서식이나 개체만 바뀜"으로만 기록된다.

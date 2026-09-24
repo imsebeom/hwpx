@@ -127,7 +127,11 @@ export function fixHfFields(buf, markers) {
     let newEl = el[0];
     paras.forEach((pXml, i) => {
       let out = pXml;
-      for (const t of markerTargets(m.paras[i]).reverse()) {
+      const targets = markerTargets(m.paras[i]);
+      // 패치 빌드 WASM 은 저장기가 이미 컨트롤을 냈다. 그 문단은 건드리지 않는다(쪽 번호 중복 방지).
+      const already = (pXml.match(/numType="(?:PAGE|TOTAL_PAGE)"/g) || []).length;
+      if (already >= targets.length) return;
+      for (const t of targets.reverse()) {
         const next = insertAt(out, t.at, autoNum(t.type));
         if (next) { out = next; fixed++; } else skipped.push(`${kind} 문단 ${i} 삽입 자리 못 찾음`);
       }

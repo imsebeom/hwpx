@@ -5,7 +5,11 @@
  *   node cli.mjs start <문서.hwpx>     서버를 띄우고 브라우저에 문서를 연다
  *   node cli.mjs run <ops.json | ->    JSON 명령 배열을 에디터에 적용 (한 트랜잭션, undo 1스텝)
  *   node cli.mjs text                  현재 본문 텍스트
- *   node cli.mjs state                 문서 상태와 사용자 커서 위치
+ *   node cli.mjs outline [시작 끝]      좌표(p12, T1r2c1)가 붙은 문서 개요
+ *   node cli.mjs state                 문서 상태와 사용자 커서(셀 좌표, 선택한 글자)
+ *   node cli.mjs goto <좌표>            사용자 화면의 커서를 그 문단이나 셀로 옮긴다
+ *   node cli.mjs inspect | slots       행정문서 표기 검수 / 아직 안 채운 칸
+ *   node cli.mjs tools                 편집 도구 26종 정의(이름, 설명, 인자)
  *   node cli.mjs changes [--all]       아직 안 읽은 사용자 수정 내역 (읽으면 읽음 처리)
  *   node cli.mjs save [출력.hwpx]      새 판으로 저장 (기본: <이름>_<YYMMDD>_<NN>.hwpx, 덮어쓰기 없음)
  *   node cli.mjs undo                  마지막 배치 되돌리기
@@ -85,12 +89,23 @@ function readChanges() {
   try { return fs.readFileSync(CHANGES, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)); } catch { return []; }
 }
 
+/** 커서 설명: 셀 안이면 셀 좌표, 본문이면 문단 좌표, 선택한 글자가 있으면 그 글자. */
+function describeCursor(cur) {
+  if (!cur) return '';
+  const at = cur.cell ? (cur.cell.ref ?? `표 셀(문단 p${cur.cell.para})`) : `p${cur.para}`;
+  const sel = cur.selectedText ? `, 선택: 「${cur.selectedText.slice(0, 60)}」` : '';
+  return ` (커서: ${at}${sel})`;
+}
+
 function formatChange(c) {
   const head = `[${c.ts.slice(11, 19)}] ${c.source === 'user' ? '사용자' : c.source === 'claude' ? 'Claude' : '열림'}`;
-  const sel = c.selection?.paragraph != null ? ` (커서: 문단 ${c.selection.paragraph + 1})` : '';
+  const cur = describeCursor(c.cursor);
   if (c.note) return `${head} ${c.note}`;
-  if (c.formatOnly) return `${head} 서식이나 개체만 바뀜(글자 변화 없음)${sel}`;
-  return [`${head}${sel}`, ...c.diff.map((d) => `  ${d.op}${String(d.line).padStart(4)} │ ${d.text}`)].join('\n');
+  if (c.formatOnly) return `${head} 서식이나 개체만 바뀜(글자 변화 없음)${cur}`;
+  const lines = c.coords
+    ? c.diff.map((d) => `  ${d.op} ${d.ref.padEnd(8)} │ ${d.op === '~' ? `${d.before} → ${d.after}` : (d.after ?? d.before)}`)
+    : c.diff.map((d) => `  ${d.op}${String(d.line).padStart(4)} │ ${d.text}`);
+  return [`${head}${cur}`, ...lines].join('\n');
 }
 
 const [, , sub, ...args] = process.argv;
@@ -123,7 +138,16 @@ switch (sub) {
     break;
   }
   case 'text': out((await cmd({ type: 'text' })).text); break;
-  case 'state': { const r = await cmd({ type: 'state' }); out({ state: r.state, selection: r.selection, pageCount: r.pageCount }); break; }
+  case 'state': { const r = await cmd({ type: 'state' }); out({ state: r.state, cursor: r.cursor, pageCount: r.pageCount }); break; }
+  case 'outline': {
+    const opts = args.length === 2 ? { from: Number(args[0]), to: Number(args[1]) } : {};
+    out((await cmd({ type: 'outline', opts })).text);
+    break;
+  }
+  case 'goto': out((await cmd({ type: 'goto', ref: args[0] })).result ? `이동: ${args[0]}` : `못 찾음: ${args[0]}`); break;
+  case 'inspect': { const r = await cmd({ type: 'inspect' }); out({ docType: r.docType, result: r.result }); break; }
+  case 'slots': out((await cmd({ type: 'slots' })).result); break;
+  case 'tools': out((await cmd({ type: 'tools' })).result); break;
   case 'undo': out((await cmd({ type: 'undo' })).result); break;
   case 'changes': {
     const all = readChanges();
@@ -152,5 +176,5 @@ switch (sub) {
     out('서버 종료');
     break;
   }
-  default: out(fs.readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').slice(2, 14).join('\n'));
+  default: out(fs.readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').slice(2, 17).join('\n'));
 }

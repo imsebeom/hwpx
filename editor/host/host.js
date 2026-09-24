@@ -25,7 +25,8 @@ function fromBase64(b64) {
   return out;
 }
 
-const run = (ops) => studio.plugins.invoke('claude', 'run', [ops]);
+const plugin = (method, ...args) => studio.plugins.invoke('claude', method, args);
+const run = (ops) => plugin('run', ops);
 
 async function docText() {
   const [text] = await run([{ m: 'GetTextFile', a: ['UNICODE', ''] }]);
@@ -46,25 +47,27 @@ async function headerFooterTexts() {
   return out;
 }
 
-async function stateKey() {
-  const st = await studio.getDocumentState();
-  return { st, key: `${st.changeSeq}:${st.documentSha256}` };
-}
+// 문서 변경 카운터(플러그인이 document-mutated 이벤트를 센다). 사용자 편집 감지에 쓴다.
+const mutationKey = () => plugin('mutations');
 
-async function selection() {
-  try {
-    const c = await studio.getSelectionContext();
-    return c.target ? { section: c.target.section, paragraph: c.target.paragraph, collapsed: c.collapsed, page: c.page } : { page: c.page, collapsed: c.collapsed };
-  } catch { return null; }
+async function cursor() {
+  try { return await plugin('cursor'); } catch { return null; }
 }
 
 async function snapshot(source) {
-  const { st, key } = await stateKey();
+  const key = await mutationKey();
   const bytes = await studio.exportHwpx();
-  const body = { source, changeSeq: st.changeSeq, text: await docText(), selection: await selection(), hwpxBase64: toBase64(bytes) };
+  const body = {
+    source,
+    changeSeq: key,
+    text: await docText(),
+    model: await plugin('model'),          // 본문 문단 글과 셀 문단 글(좌표 diff 용)
+    cursor: await cursor(),
+    hwpxBase64: toBase64(bytes),
+  };
   const r = await fetch('/api/snapshot', { method: 'POST', body: JSON.stringify(body) }).then((x) => x.json());
   lastKey = key;
-  log(`${source === 'user' ? '사용자 수정' : source === 'claude' ? 'Claude 수정' : '열림'} 기록 (${r.diffLines ?? 0}줄 변경)`);
+  log(`${source === 'user' ? '사용자 수정' : source === 'claude' ? 'Claude 수정' : '열림'} 기록 (${r.diffLines ?? 0}곳 변경)`);
 }
 
 async function openFromServer() {
@@ -86,9 +89,13 @@ const handlers = {
   },
   async text() { return { ok: true, text: await docText() }; },
   async state() {
-    const { st } = await stateKey();
-    return { ok: true, state: st, selection: await selection(), pageCount: await studio.pageCount() };
+    return { ok: true, state: await studio.getDocumentState(), cursor: await cursor(), pageCount: await studio.pageCount() };
   },
+  async outline(cmd) { return { ok: true, text: await plugin('outline', cmd.opts || {}) }; },
+  async inspect(cmd) { return { ok: true, docType: await plugin('docType'), result: await plugin('inspect', cmd.docType) }; },
+  async slots() { return { ok: true, result: await plugin('slots') }; },
+  async tools() { return { ok: true, result: await plugin('tools') }; },
+  async goto(cmd) { return { ok: true, result: await plugin('goto', cmd.ref) }; },
   async save() {
     const hfMarkers = await headerFooterTexts();
     return { ok: true, base64: toBase64(await studio.exportHwpx()), hfMarkers };
@@ -126,12 +133,12 @@ async function pollLoop() {
   }
 }
 
-// 사용자 편집 감지: 문서 상태가 바뀌고 1.5초 동안 더 안 바뀌면 한 번 기록한다.
+// 사용자 편집 감지: 변경 카운터가 바뀌고 1.5초 동안 더 안 바뀌면 한 번 기록한다.
 let pendingKey = null;
 setInterval(async () => {
   if (busy || lastKey === null) return;
   try {
-    const { key } = await stateKey();
+    const key = await mutationKey();
     if (key === lastKey) { pendingKey = null; return; }
     if (key !== pendingKey) { pendingKey = key; return; }   // 아직 입력 중
     pendingKey = null;

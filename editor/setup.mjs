@@ -10,6 +10,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
@@ -55,9 +56,33 @@ if (!fs.existsSync(path.join(STUDIO, 'package.json'))) {
   sh(`git -c advice.detachedHead=false clone --depth 1 --branch v${RHWP_VERSION} https://github.com/edwardkim/rhwp.git rhwp`, BUILD);
 }
 
-// 2. prebuilt WASM → ../pkg (studio 의 vite alias 가 여기를 본다)
+// 2. WASM → ../pkg (studio 의 vite alias 가 여기를 본다)
+//    Rust(cargo, wasm-pack)가 있으면 패치한 소스로 직접 빌드하고, 없으면 npm prebuilt 를 쓴다.
+//    prebuilt 에서는 머리말/꼬리말 쪽 번호가 저장 시 빠지지만 cli.mjs save 의 보정(hwpx-zip.mjs)이 살린다.
 const pkgDir = path.join(RHWP, 'pkg');
-if (!fs.existsSync(path.join(pkgDir, 'rhwp_bg.wasm'))) {
+const cargoBin = path.join(os.homedir(), '.cargo', 'bin');
+const hasRust = ['cargo', 'wasm-pack'].every((b) => fs.existsSync(path.join(cargoBin, `${b}${process.platform === 'win32' ? '.exe' : ''}`)));
+const RUST_PATCHES = [
+  {
+    file: 'src/serializer/hwpx/section.rs',
+    anchor: '            c if (c as u32) < 0x20 => { /* 기타 제어문자 무시 */ }',
+    insert: fs.readFileSync(path.join(HERE, 'patches', 'hwpx-hf-autonum.rs'), 'utf8'),
+  },
+];
+const builtMark = path.join(pkgDir, '.claude-patched');
+if (hasRust && !fs.existsSync(builtMark)) {
+  for (const p of RUST_PATCHES) {
+    const f = path.join(RHWP, p.file);
+    let src = fs.readFileSync(f, 'utf8');
+    if (src.includes('[claude-hwpx 패치]')) continue;
+    if (!src.includes(p.anchor)) throw new Error(`${p.file} 에서 패치 자리를 못 찾았다 — rhwp 버전이 바뀌었는지 확인`);
+    src = src.replace(p.anchor, p.insert + p.anchor);
+    fs.writeFileSync(f, src);
+  }
+  const env = { ...process.env, PATH: `${cargoBin}${path.delimiter}${process.env.PATH}` };
+  exec(path.join(cargoBin, 'wasm-pack'), ['build', '--target', 'web', '--release', '--locked', '--out-dir', 'pkg'], { cwd: RHWP, env });
+  fs.writeFileSync(builtMark, `rhwp ${RHWP_VERSION} + ${RUST_PATCHES.map((p) => p.file).join(', ')}\n`);
+} else if (!hasRust && !fs.existsSync(path.join(pkgDir, 'rhwp_bg.wasm'))) {
   fs.mkdirSync(pkgDir, { recursive: true });
   sh(`npm pack @rhwp/core@${RHWP_VERSION} --silent`, BUILD);
   sh(`tar -xzf rhwp-core-${RHWP_VERSION}.tgz`, BUILD);
@@ -70,15 +95,21 @@ if (!fs.existsSync(path.join(pkgDir, 'rhwp_bg.wasm'))) {
 
 // 3. claude 플러그인 복사와 allowlist 등록
 fs.copyFileSync(path.join(HERE, 'plugin', 'claude-plugin.ts'), path.join(STUDIO, 'src', 'plugin', 'claude-plugin.ts'));
+// 편집 도구 라이브러리(lib/SOURCE.md)도 같은 자리로. 플러그인이 './doc-tools.js' 로 부른다.
+for (const f of ['doc-tools.js', 'doc-rules.js', 'collab-ops.js']) {
+  fs.copyFileSync(path.join(HERE, 'plugin', 'lib', f), path.join(STUDIO, 'src', 'plugin', f));
+}
 const mainTs = path.join(STUDIO, 'src', 'main.ts');
 let main = fs.readFileSync(mainTs, 'utf8');
-const MARK = "if (id === 'claude')";
-if (!main.includes(MARK)) {
+// 커서 조회, 위치 이동에 inputHandler 가 필요한데 PluginHost 에는 없어서 클로저로 넘긴다.
+const REGISTER = "  if (id === 'claude') {\n    return (await import('@/plugin/claude-plugin')).createClaudePlugin(() => inputHandler) as StudioPlugin;\n  }\n";
+main = main.replace(/  if \(id === 'claude'\) \{\n.*\n  \}\n/, '');   // 옛 등록(claudePlugin 상수)을 걷어 낸다
+if (!main.includes(REGISTER)) {
   const anchor = "  if (import.meta.env.DEV && id === 'dev-probe') {";
   if (!main.includes(anchor)) throw new Error('main.ts 에서 플러그인 allowlist 자리를 못 찾았다 — rhwp 버전이 바뀌었는지 확인');
-  main = main.replace(anchor, `  ${MARK} {\n    return (await import('@/plugin/claude-plugin')).claudePlugin as StudioPlugin;\n  }\n${anchor}`);
-  fs.writeFileSync(mainTs, main);
+  main = main.replace(anchor, REGISTER + anchor);
 }
+fs.writeFileSync(mainTs, main);
 
 // 4. 빌드
 if (!fs.existsSync(path.join(STUDIO, 'node_modules'))) sh('npm ci --no-audit --no-fund', STUDIO);

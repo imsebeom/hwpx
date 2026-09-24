@@ -9,7 +9,10 @@
 - `editor/setup.mjs` — rhwp v0.8.6 받기, npm `@rhwp/core` prebuilt WASM 넣기, 플러그인 등록, 빌드 → `studio-dist/`, `sdk/`
 - `editor/server.mjs` — 의존성 없는 브리지(localhost:7780). 명령 큐, long-poll, 스냅샷, 줄 diff
 - `editor/host/` — 에디터를 띄우는 호스트 페이지. 1.5초 주기로 사용자 편집 감지
-- `editor/cli.mjs` — Claude 용 CLI(start, run, text, state, changes, save, undo, stop)
+- `editor/cli.mjs` — Claude 용 CLI(start, run, text, outline, state, goto, inspect, slots, tools, changes, save, undo, stop)
+- `editor/hwpx-zip.mjs` — 의존성 없는 zip 읽기/쓰기, 저장 단계 머리말/꼬리말 쪽 번호 보정
+- `editor/plugin/lib/` — 형제 프로젝트 hwpx에디터기반AI(커밋 866416b)의 doc-tools/doc-rules/collab-ops 를 고치지 않고 복사(SOURCE.md)
+- `editor/patches/hwpx-hf-autonum.rs` — rhwp hwpx 저장기 패치(쪽 번호 표식 → hp:autoNum). Rust 가 있으면 setup 이 적용해 WASM 을 직접 빌드
 - `editor/EDITOR.md` — Claude 용 사용 설명서(스킬 통합 시 references 로)
 - `test/roundtrip.mjs` — rhwp 로 열고 다시 저장하는 보존력 시험
 
@@ -38,4 +41,5 @@
 - intent: /hwpx 스킬에 rhwp 에디터 모드(Claude 와 사용자가 같은 문서를 실시간 공동 편집) 추가
 - changes_made: editor/ 전체 구현, 빌드, 라이브 편집 E2E, 왕복 보존력 시험, EDITOR.md
 - decisions: 위 "결정" 절
+- 2026-09-25 추가: 쪽 번호 ①저장 단계 보정 ②rhwp 패치 빌드(Rust 1.93.1, wasm-pack 0.15.0 을 ~/.cargo 에 설치, PATH 미변경) — 기준 빌드가 npm 공식과 바이트 동일, 패치 빌드도 문서 10건 바이트 동일(회귀 없음), 한컴에서 쪽 번호와 총 쪽수 확인. ②가 있으면 ①은 이미 컨트롤이 든 문단을 건너뛴다(중복 방지). 형제 프로젝트 도구 25종, 개요, 검수, 채울 칸, 셀 좌표 diff, 셀 커서와 선택 글자, goto, document-mutated 변경 감지를 가져옴(E2E 통과).
 - next_steps: (1) 사용자가 실제 문서로 에디터 모드 시운전(`node editor/cli.mjs start <문서>`), 불편 사항 반영 (2) 그 뒤 스킬로 옮기고 SKILL.md 에 선택 단계 추가, 기존 tests 통과 확인 (3) 표준 문서 링크의 용도 확인(사용자 답 대기)
