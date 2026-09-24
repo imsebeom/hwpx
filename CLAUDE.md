@@ -52,6 +52,17 @@
   - 도구: `~/.cache/rhwp-devel/cmp.mjs`(2쪽 글자 줄과 셀 상자), `allpages.mjs <pkg> <a> <b>`(전 쪽 글자 좌표 대조), `variants.py`, `winshot.py`(에디터 창을 앞으로 올리지 않고 PrintWindow 로 캡처 — 사용자 화면을 뺏지 않는다)
 
 ## 컨텍스트 앵커
+- **intent(09-26): 생각쓰기캠프 문항 3(`제출_문항3_이산화탄소_260924_01.hwpx`)을 에디터로 열었더니 ⑴ 문단이 한 줄로 눌리고 ⑵ 표가 아래 표와 겹쳤다(사용자 발견). 둘 다 스킬 쪽에서 고쳤다.**
+  - **changes_made**(스킬 커밋 a6413e6, 042a754 — hwpx, hwpx2 푸시):
+    ⓐ `hwpx-zip.mjs stripDummyLinesegs()` + `server.mjs /api/doc` — 더미 줄 배치를 걷고 보낸다
+    ⓑ `editor/hancom_layout.py` — 사본을 한글로 열어(쪽수를 읽어 조판을 끝낸 뒤) 저장하고, 줄 배치와 표 `sz height` 만 문단끼리, 표끼리 짝지어 원본에 옮겨 심는다.
+    `server.mjs` 가 더미가 있는 문서에만 쓰고 `layout-cache.hwpx` 로 캐시한다. 실패하면 ⓐ로 물러난다
+    ⓒ `cli.mjs` — 앱 창 pid 를 `app.pid` 에 기록. `start` 는 살아 있는 창을 다시 쓰고 `stop` 은 창을 닫는다(저장 안 한 편집이 있으면 멈춤, `--force`)
+    ⓓ `references/editor-mode.md` 1절에 창 하나 원칙과 한글 줄 배치 경로를 적었다
+  - **decisions**: ⓐ 칸 높이를 rhwp 측정값으로 맞추는 우회(`host.js fitRowHeights`)는 **버렸다** — rhwp 가 재는 높이가 그리는 높이보다 낮아 긴 칸이 여전히 모자랐고, 저장본에 부정확한 칸 높이가 들어간다
+    ⓑ 한글 재저장본을 통째로 쓰지 않는다(그림 BMP 부풀기) ⓒ 이 문제는 캠프 프로젝트에 기록하지 않는다(문항 내용 변화 없음, 사용자 확인)
+  - **검증**: 문항 3 한글 재저장본과 6쪽 3,478자 좌표 동일(`allpages.mjs`), 세 번 실행 md5 동일, 한글 잔여 프로세스 0, start→start→stop→start 에서 창 1→1→0→1, 실제 창 캡처(`winshot.py`)로 1~3쪽 겹침 없음
+  - **next_steps**: ① **에디터 저장본은 아직 시험하지 않았다** — 한글 줄 배치를 받은 문서를 `save` 해 한글에서 열어 볼 것(줄 배치와 표 높이가 한글 값이라 문제없을 것으로 보이나 실측 전) ② 한글 없는 환경(맥, 리눅스)에서는 표가 여전히 겹친다 — rhwp 에 「NO_LS 셀 문단 측정 줄 수가 렌더보다 하나 적다」로 결함 보고할지. 재현 파일은 `~/.cache/rhwp-devel/q3_src.hwpx` ③ 근본 대책으로 **스킬 파이프라인이 더미 대신 실제 줄 배치를 쓰게 할지**(polaris-dvc 호환 때문에 넣은 더미가 rhwp 호환을 깨뜨린다) ④ `~/.cache/rhwp-devel`(devel 빌드, 비교 도구)은 남겨 두었다
 - intent: /hwpx 스킬에 rhwp 에디터 모드(Claude 와 사용자가 같은 문서를 실시간 공동 편집)를 만들어 스킬에 통합하고 GitHub 에 올리기(2026-09-25 세션).
 - changes_made (2026-09-25, 커밋 405488e~019139e):
   - editor/ 전체: 플러그인(doc/m/run/tool op), 브리지 서버, 호스트 페이지, CLI, setup, 앱 창(app.py), EDITOR.md
