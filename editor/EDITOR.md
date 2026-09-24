@@ -56,7 +56,7 @@ op 는 세 가지다.
 | 문단 서식 | `applyParaFormat(sec, para, {alignment, lineSpacing, indent, marginLeft, spacingBefore, spacingAfter, keepWithNext, pageBreakBefore, ...})` |
 | 스타일 | `getStyleList()` → `applyStyle(sec, para, styleId)` |
 | 표 | `createTableEx({sectionIdx, paraIdx, charOffset, rowCount, colCount, treatAsChar})`, `insertTextInCell(sec, parentPara, controlIdx, cellIdx, cellPara, offset, text)`, `insertTableRow`, `mergeTableCells` |
-| 서식 있는 덩어리 | `pasteHtml(sec, para, offset, html)` — 제목, 목록, 표를 한 번에 |
+| 서식 있는 덩어리 | `pasteHtml(sec, para, offset, html)` — 첫 블록은 대상 문단에 이어 붙고, 목록은 글머리표 문단이 된다. 새 덩어리는 빈 문단을 만든 뒤 그 앞머리에 붙인다 |
 | 필드 | `{"m":"GetFieldList"}`, `{"m":"PutFieldText","a":[이름,값]}`, `setFieldValueByName(name, value)` |
 | 본문 전체 | `$E text` (표 셀 포함 UNICODE 텍스트) |
 
@@ -68,14 +68,29 @@ paraLevel numberingId widowOrphan keepWithNext keepLines pageBreakBefore fontLin
 autoSpaceKrNum verticalAlign englishBreakUnit koreanBreakUnit borderConnect borderIgnoreMargin tabAutoLeft tabAutoRight.
 (출처: rhwp `src/document_core/helpers.rs` 의 parse_char_shape_mods, parse_para_shape_mods. 실측 확인은 bold 만.)
 
-## 4. 저장
+## 4. 에디터 모드에서 하지 않는 일
+
+에디터 모드는 **실시간 편집만** 한다(사용자 결정, 2026-09-25). rhwp API 가 없는 아래 작업은 에디터에서 흉내 내지 않는다.
+요청이 오면 "에디터 모드에서는 안 되는 작업"이라고 알리고, 사용자 동의를 받아 `$E save` → `$E stop` 후 기존 워크플로로 처리한다.
+
+| 작업 | 기존 워크플로 |
+|------|---------------|
+| 새 문서를 템플릿으로 생성 | A (md2hwpx, build_hwpx) |
+| 양식 복제, 양식 부분 추출 | F, H |
+| 문서 병합 | I |
+| 시험지 생성 | J |
+| 첨삭 메모 삽입 | N |
+
+rhwp 저장본은 기존 스크립트가 그대로 받는다(왕복 보존력 실측: 22쪽 픽셀 차이 0%, 필드, 표, 그림 개수 동일).
+
+## 5. 저장
 
 - `$E save` → `<원본>_편집본.hwpx`. `$E save <경로>` 로 지정할 수 있다. **원본 덮어쓰기는 사용자 확인 후에만.**
 - 저장 전에도 `~/.claude/cache/hwpx-editor/latest.hwpx` 는 수정할 때마다 갱신된다(검증용 사본).
 - 저장본은 기존 검증 도구를 그대로 쓴다: `verify_hwpx.py --result`, `/pdf` 로 한컴 렌더 확인.
 - 끝나면 `$E stop`.
 
-## 5. 한계 (0.8.6 기준 실측)
+## 6. 한계 (0.8.6 기준 실측)
 
 - hwpctrl 의 `HAction.Execute` 는 파라미터셋 값을 아직 읽지 않고, `InsertCtrl("tbl")` 은 항상 5×5 다. 표와 서식은 `doc` 경로로 한다.
 - 수정 내역 diff 는 글자 기준이다. 서식만 바뀐 변경은 "서식이나 개체만 바뀜"으로만 기록된다.
