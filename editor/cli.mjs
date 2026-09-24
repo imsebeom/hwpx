@@ -2,14 +2,14 @@
 /**
  * Claude 가 쓰는 에디터 조작 CLI.
  *
- *   node cli.mjs start <문서.hwpx>     서버를 띄우고 브라우저에 문서를 연다
+ *   node cli.mjs start <문서.hwpx>     서버를 띄우고 에디터 앱 창(없으면 브라우저)에 연다 [--browser]
  *   node cli.mjs run <ops.json | ->    JSON 명령 배열을 에디터에 적용 (한 트랜잭션, undo 1스텝)
  *   node cli.mjs text                  현재 본문 텍스트
  *   node cli.mjs outline [시작 끝]      좌표(p12, T1r2c1)가 붙은 문서 개요
  *   node cli.mjs state                 문서 상태와 사용자 커서(셀 좌표, 선택한 글자)
  *   node cli.mjs goto <좌표>            사용자 화면의 커서를 그 문단이나 셀로 옮긴다
  *   node cli.mjs inspect | slots       행정문서 표기 검수 / 아직 안 채운 칸
- *   node cli.mjs tools                 편집 도구 26종 정의(이름, 설명, 인자)
+ *   node cli.mjs tools                 편집 도구 25종 정의(이름, 설명, 인자)
  *   node cli.mjs changes [--all]       아직 안 읽은 사용자 수정 내역 (읽으면 읽음 처리)
  *   node cli.mjs save [출력.hwpx]      새 판으로 저장 (기본: <이름>_<YYMMDD>_<NN>.hwpx, 덮어쓰기 없음)
  *   node cli.mjs undo                  마지막 배치 되돌리기
@@ -18,7 +18,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { readZip, fixHfFields } from './hwpx-zip.mjs';
 
@@ -52,6 +52,18 @@ async function ensureServer() {
   child.unref();
   for (let i = 0; i < 50; i++) { if (await health()) return; await sleep(200); }
   die('서버가 뜨지 않았다');
+}
+
+/**
+ * 에디터 앱 창(app.py, WebView2)을 연다. 한/글 단축키 Ctrl+N 계열이 되는 유일한 방법이다.
+ * 파이썬이나 pywebview 가 없으면 false 를 돌려주고, 호출자가 브라우저로 연다.
+ */
+function openAppWindow(url) {
+  const py = process.platform === 'win32' ? 'python' : 'python3';
+  const probe = spawnSync(py, ['-c', 'import webview'], { stdio: 'ignore', windowsHide: true });
+  if (probe.status !== 0) return false;
+  spawn(py, [path.join(HERE, 'app.py'), url], { detached: true, stdio: 'ignore', env: { ...process.env, HWPX_EDITOR_STATE: STATE_DIR } }).unref();
+  return true;
 }
 
 function openBrowser(url) {
@@ -122,7 +134,11 @@ switch (sub) {
     await ensureServer();
     const h = await health();
     if (h.browser) await cmd({ type: 'open' });       // 이미 열린 탭이 있으면 그 탭에 새 문서를 연다
-    else if (!args.includes('--no-browser')) openBrowser(`http://localhost:${PORT}/`);
+    else if (!args.includes('--no-browser')) {
+      const url = `http://localhost:${PORT}/`;
+      // 기본은 앱 창(한/글 단축키 전부). --browser 면 브라우저 탭(Ctrl+N 계열은 Ctrl+M 으로 대신).
+      if (args.includes('--browser') || !openAppWindow(url)) openBrowser(url);
+    }
     for (let i = 0; i < 60; i++) {
       if (readChanges().some((c) => c.source === 'open')) { out(`열림: ${file}\n에디터: http://localhost:${PORT}/`); process.exit(0); }
       await sleep(500);

@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 /**
  * rhwp-studio 를 claude 플러그인을 넣어 빌드하고 studio-dist/, sdk/ 를 만든다.
- * Rust 툴체인은 필요 없다 — WASM 은 같은 버전의 npm @rhwp/core prebuilt 를 쓴다.
+ * Rust(~/.cargo 의 cargo, wasm-pack)가 있으면 patches/ 를 적용해 WASM 을 직접 빌드하고, 없으면 같은 버전의
+ * npm @rhwp/core prebuilt 를 쓴다(이때 머리말/꼬리말 쪽 번호는 cli save 의 보정이 살린다).
+ * 에디터 앱 창(app.py)은 파이썬 pywebview 가 필요하다: pip install pywebview
  *
  *   node setup.mjs            (이미 받은 소스가 있으면 재사용)
  *   node setup.mjs --clean    (.build 를 지우고 처음부터)
@@ -94,7 +96,7 @@ if (hasRust && !fs.existsSync(builtMark)) {
 }
 
 // 3. claude 플러그인 복사와 allowlist 등록
-fs.copyFileSync(path.join(HERE, 'plugin', 'claude-plugin.ts'), path.join(STUDIO, 'src', 'plugin', 'claude-plugin.ts'));
+for (const f of ['claude-plugin.ts', 'hancom-keys.ts']) fs.copyFileSync(path.join(HERE, 'plugin', f), path.join(STUDIO, 'src', 'plugin', f));
 // 편집 도구 라이브러리(lib/SOURCE.md)도 같은 자리로. 플러그인이 './doc-tools.js' 로 부른다.
 for (const f of ['doc-tools.js', 'doc-rules.js', 'collab-ops.js']) {
   fs.copyFileSync(path.join(HERE, 'plugin', 'lib', f), path.join(STUDIO, 'src', 'plugin', f));

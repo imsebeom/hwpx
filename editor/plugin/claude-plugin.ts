@@ -17,6 +17,7 @@ import { createAdoptDocument, isMutating } from '../../../npm/hwpctrl-ocx/src/ad
 import { TOOLS, listTables, outline, resolveTarget, runTool } from './doc-tools.js';
 import { detectDocType, findSlots, inspect } from './doc-rules.js';
 import { modelOf } from './collab-ops.js';
+import { installHancomKeys } from './hancom-keys';
 
 // 이름이 이렇게 시작하는 WASM 메서드는 문서를 바꾸지 않는다고 본다.
 const READ_DOC = /^(get|search|export|render|is|has|list|find|measure|hitTest|pageCount)/;
@@ -52,6 +53,9 @@ export function createClaudePlugin(getInputHandler) {
       let mutations = 0;
       host.events.on('document-mutated', () => { mutations += 1; });
       host.onDocumentSwap(() => { mutations += 1; });
+
+      // 한컴 한/글 기본 단축키(Ctrl+N 계열, 셀 안 Ctrl+A 등)
+      installHancomKeys(host, getInputHandler);
 
       const mutating = (op) => {
         if (op.tool) return !READ_TOOLS.has(op.tool);

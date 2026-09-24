@@ -42,4 +42,5 @@
 - changes_made: editor/ 전체 구현, 빌드, 라이브 편집 E2E, 왕복 보존력 시험, EDITOR.md
 - decisions: 위 "결정" 절
 - 2026-09-25 추가: 쪽 번호 ①저장 단계 보정 ②rhwp 패치 빌드(Rust 1.93.1, wasm-pack 0.15.0 을 ~/.cargo 에 설치, PATH 미변경) — 기준 빌드가 npm 공식과 바이트 동일, 패치 빌드도 문서 10건 바이트 동일(회귀 없음), 한컴에서 쪽 번호와 총 쪽수 확인. ②가 있으면 ①은 이미 컨트롤이 든 문단을 건너뛴다(중복 방지). 형제 프로젝트 도구 25종, 개요, 검수, 채울 칸, 셀 좌표 diff, 셀 커서와 선택 글자, goto, document-mutated 변경 감지를 가져옴(E2E 통과).
+- 2026-09-25 한/글 단축키: 브라우저 탭은 Ctrl+N/T/W 를 막으므로 에디터 앱 창(app.py, pywebview=WebView2, 최대화)을 기본으로. plugin/hancom-keys.ts 가 Ctrl+N·Q·M 두 단계 키, 셀 안 Ctrl+A, Ctrl+Shift+C/R/T 등을 한컴 값으로. 실제 키 입력(SendInput+스캔 코드) 실측 test/keys_app.py·keys_dialogs.py 전부 통과(영문, 한글 입력기). 함정: SendInput 에 스캔 코드가 없으면 e.code 가 빈 값, 한글 입력기 조합은 preventDefault 로 안 멈춤(포커스 뺐다 돌려 버림), 플러그인 host.automation 은 대화상자 명령을 안 엶(inputHandler.dispatcher 사용), 전역 단축키 프로그램(알캡처)은 키를 먼저 가져감.
 - next_steps: (1) 사용자가 실제 문서로 에디터 모드 시운전(`node editor/cli.mjs start <문서>`), 불편 사항 반영 (2) 그 뒤 스킬로 옮기고 SKILL.md 에 선택 단계 추가, 기존 tests 통과 확인 (3) 표준 문서 링크의 용도 확인(사용자 답 대기)
