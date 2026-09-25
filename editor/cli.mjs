@@ -14,19 +14,53 @@
  *   node cli.mjs save [출력.hwpx]      새 판으로 저장 (기본: <이름>_<YYMMDD>_<NN>.hwpx, 덮어쓰기 없음)
  *   node cli.mjs undo                  마지막 배치 되돌리기
  *   node cli.mjs log [N | --all]       작업 기록(시작, 불러옴, 편집, 화면 저장 포함 저장, 종료, 오류). 비우지 않고 쌓인다
+ *   node cli.mjs list                  떠 있는 에디터 전부(세션마다 하나. * 는 이 세션의 것)
  *   node cli.mjs status | stop
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import net from 'node:net';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { readZip, fixHfFields } from './hwpx-zip.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const PORT = Number(process.env.HWPX_EDITOR_PORT || 7780);
-const BASE = `http://127.0.0.1:${PORT}`;
-const STATE_DIR = process.env.HWPX_EDITOR_STATE || path.join(os.homedir(), '.claude', 'cache', 'hwpx-editor');
+
+/**
+ * 에디터는 세션마다 하나다(2026-09-25 — 공용 하나였을 때 두 세션이 서로의 문서를 덮어썼다).
+ * 인스턴스 이름: HWPX_EDITOR_INSTANCE → Claude Code 세션 ID 앞 8자 → default.
+ * 상태 폴더는 ROOT/<이름>/, 포트는 7780 부터 빈 것을 골라 그 폴더의 port 파일에 적는다.
+ * 옛 공용 에디터(ROOT 바로 아래 상태, 포트 7780)가 떠 있고 이 세션의 에디터가 없으면 그것을 계속 쓴다(작업 중인 세션을 끊지 않는다).
+ */
+const ROOT = path.join(os.homedir(), '.claude', 'cache', 'hwpx-editor');
+const INSTANCE = process.env.HWPX_EDITOR_INSTANCE || (process.env.CLAUDE_CODE_SESSION_ID || '').slice(0, 8) || 'default';
+const probe = async (port) => { try { return await (await fetch(`http://127.0.0.1:${port}/api/health`, { signal: AbortSignal.timeout(1500) })).json(); } catch { return null; } };
+const readPort = (dir) => { try { return Number(fs.readFileSync(path.join(dir, 'port'), 'utf8')) || null; } catch { return null; } };
+let STATE_DIR = process.env.HWPX_EDITOR_STATE || path.join(ROOT, INSTANCE);
+let PORT = Number(process.env.HWPX_EDITOR_PORT) || readPort(STATE_DIR);
+if (!PORT && !process.env.HWPX_EDITOR_STATE && process.argv[2] !== 'start' && process.argv[2] !== 'list') {
+  const legacy = await probe(7780);
+  if (legacy && path.resolve(legacy.stateDir || '') === path.resolve(ROOT)) { STATE_DIR = ROOT; PORT = 7780; }
+}
+PORT ||= 7780;
+let BASE = `http://127.0.0.1:${PORT}`;
+fs.mkdirSync(STATE_DIR, { recursive: true });
+
+/** start 가 쓸 포트: 이 인스턴스 서버가 살아 있으면 그 포트, 아니면 7780 부터 비어 있는 포트. */
+async function allocatePort() {
+  const mine = readPort(STATE_DIR);
+  if (mine && (await probe(mine))) return mine;
+  for (let p = 7780; p < 7880; p++) {
+    if (await probe(p)) continue;
+    const free = await new Promise((res) => {
+      const s = net.createServer().once('error', () => res(false)).once('listening', () => s.close(() => res(true)));
+      s.listen(p, '127.0.0.1');
+    });
+    if (free) return p;
+  }
+  throw new Error('빈 포트가 없다(7780~7879)');
+}
 const SESSION = path.join(STATE_DIR, 'session.json');
 const CHANGES = path.join(STATE_DIR, 'changes.jsonl');
 const SEEN = path.join(STATE_DIR, 'changes.seen');
@@ -74,8 +108,12 @@ async function cmd(body) {
 async function ensureServer() {
   if (await health()) return;
   if (!fs.existsSync(path.join(HERE, 'studio-dist', 'index.html'))) die('studio-dist 가 없다. 먼저 node setup.mjs 로 빌드한다.');
-  const child = spawn(process.execPath, [path.join(HERE, 'server.mjs')], { detached: true, stdio: 'ignore', windowsHide: true });
+  const child = spawn(process.execPath, [path.join(HERE, 'server.mjs')], {
+    detached: true, stdio: 'ignore', windowsHide: true,
+    env: { ...process.env, HWPX_EDITOR_PORT: String(PORT), HWPX_EDITOR_STATE: STATE_DIR },
+  });
   child.unref();
+  fs.writeFileSync(path.join(STATE_DIR, 'port'), String(PORT));
   for (let i = 0; i < 50; i++) { if (await health()) return; await sleep(200); }
   die('서버가 뜨지 않았다');
 }
@@ -84,11 +122,13 @@ async function ensureServer() {
  * 에디터 앱 창(app.py, WebView2)을 연다. 한/글 단축키 Ctrl+N 계열이 되는 유일한 방법이다.
  * 파이썬이나 pywebview 가 없으면 false 를 돌려주고, 호출자가 브라우저로 연다.
  */
-function openAppWindow(url) {
+function openAppWindow(url, docName) {
   const py = process.platform === 'win32' ? 'python' : 'python3';
-  const probe = spawnSync(py, ['-c', 'import webview'], { stdio: 'ignore', windowsHide: true });
-  if (probe.status !== 0) return false;
-  const child = spawn(py, [path.join(HERE, 'app.py'), url], { detached: true, stdio: 'ignore', env: { ...process.env, HWPX_EDITOR_STATE: STATE_DIR } });
+  const check = spawnSync(py, ['-c', 'import webview'], { stdio: 'ignore', windowsHide: true });
+  if (check.status !== 0) return false;
+  // 창이 여럿일 수 있으니 제목에 문서 이름과 인스턴스를 넣어 가른다
+  const title = `HWPX 에디터 · ${docName} · ${path.basename(STATE_DIR)}`;
+  const child = spawn(py, [path.join(HERE, 'app.py'), url, title], { detached: true, stdio: 'ignore', env: { ...process.env, HWPX_EDITOR_STATE: STATE_DIR } });
   fs.writeFileSync(APP_PID, String(child.pid));
   child.unref();
   return true;
@@ -171,8 +211,9 @@ switch (sub) {
     fs.writeFileSync(SESSION, JSON.stringify({ source: file, startedAt: new Date().toISOString() }, null, 2));
     fs.writeFileSync(CHANGES, '');
     fs.writeFileSync(SEEN, '0');
+    if (!process.env.HWPX_EDITOR_PORT) { PORT = await allocatePort(); BASE = `http://127.0.0.1:${PORT}`; }
     await ensureServer();
-    await postLog('start', { file });
+    await postLog('start', { file, instance: path.basename(STATE_DIR), port: PORT });
     let h = await health();
     if (!h.browser && aliveAppPid()) {                // 옛 앱 창이 새 서버에 다시 붙기를 기다린다
       for (let i = 0; i < 20 && !h.browser; i++) { await sleep(500); h = await health(); }
@@ -181,7 +222,7 @@ switch (sub) {
     else if (!args.includes('--no-browser')) {
       const url = `http://localhost:${PORT}/`;
       // 기본은 앱 창(한/글 단축키 전부). --browser 면 브라우저 탭(Ctrl+N 계열은 Ctrl+M 으로 대신).
-      if (args.includes('--browser') || !openAppWindow(url)) openBrowser(url);
+      if (args.includes('--browser') || !openAppWindow(url, path.basename(file))) openBrowser(url);
     }
     // 스킬 파이프라인 산출물은 서버가 한글로 줄 배치를 계산해 보내므로(hancom_layout.py) 넉넉히 기다린다.
     for (let i = 0; i < 180; i++) {
@@ -240,6 +281,20 @@ switch (sub) {
     break;
   }
   case 'status': out((await health()) ?? '서버 꺼짐'); break;
+  case 'list': {                                    // 떠 있는 에디터 전부(세션마다 하나). * 는 이 세션의 것
+    const dirs = [ROOT, ...fs.readdirSync(ROOT, { withFileTypes: true }).filter((d) => d.isDirectory() && d.name !== 'webview').map((d) => path.join(ROOT, d.name))];
+    const rows = [];
+    for (const dir of dirs) {
+      const port = dir === ROOT ? 7780 : readPort(dir);
+      if (!port) continue;
+      const h = await probe(port);
+      if (!h || path.resolve(h.stateDir || '') !== path.resolve(dir)) continue;
+      const doc = h.session?.source ? path.basename(h.session.source) : '(문서 없음)';
+      rows.push(`${dir === STATE_DIR ? '*' : ' '} ${path.basename(dir).padEnd(10)} 포트 ${port}  창 ${h.browser ? '열림' : '없음'}  ${doc}`);
+    }
+    out(rows.length ? rows.join('\n') : '떠 있는 에디터 없음');
+    break;
+  }
   case 'stop': {
     const h = await health();
     let dirty = false;
@@ -254,6 +309,7 @@ switch (sub) {
     if (h) await fetch(`${BASE}/api/cmd`, { method: 'POST', body: JSON.stringify({ type: 'shutdown' }) });
     if (pid) { try { process.kill(pid); } catch { /* 이미 닫힘 */ } }
     try { fs.unlinkSync(APP_PID); } catch { /* 없음 */ }
+    if (STATE_DIR !== ROOT) { try { fs.unlinkSync(path.join(STATE_DIR, 'port')); } catch { /* 없음 */ } }
     out(pid ? '서버 종료, 앱 창 닫음' : '서버 종료');
     break;
   }

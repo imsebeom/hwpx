@@ -20,7 +20,7 @@ import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { stripDummyLinesegs } from './hwpx-zip.mjs';
+import { readZip, stripDummyLinesegs } from './hwpx-zip.mjs';
 import { rhwpLayout } from './rhwp_layout.mjs';
 
 const execFileP = promisify(execFile);
@@ -95,13 +95,28 @@ export function logEvent(ev, data = {}) {
  * 옮겨 심은 판(hancom_layout.py)을 보낸다. 한글이 없거나 실패하면 더미만 걷어낸다(표가 겹칠 수 있다).
  * 원본 파일은 어느 경우에도 건드리지 않는다. 결과는 원본의 크기와 수정 시각으로 캐시한다.
  */
+/** 줄 배치(linesegarray)가 없는 문단이 있고 글자처럼 취급하는 표가 있는가. */
+function lacksLinesegsWithTacTable(buf) {
+  const entries = readZip(buf) || [];
+  for (const e of entries) {
+    if (!/^Contents\/section\d+\.xml$/.test(e.name)) continue;
+    const xml = e.data.toString('utf8');
+    const paras = (xml.match(/<hp:p\b/g) || []).length;
+    const segs = (xml.match(/<hp:linesegarray\b/g) || []).length;
+    if (segs < paras && /<hp:tbl\b[^>]*>\s*<hp:sz\b[^>]*\/>\s*<hp:pos\b[^>]*treatAsChar="1"/.test(xml)) return true;
+  }
+  return false;
+}
+
 const LAYOUT_CACHE = path.join(STATE_DIR, 'layout-cache.hwpx');
 const LAYOUT_KEY = path.join(STATE_DIR, 'layout-cache.json');
 async function editorBytes(src) {
   const raw = fs.readFileSync(src);
   if (!/\.hwpx$/i.test(src)) { logEvent('load', { layout: 'raw' }); return raw; }
   const stripped = stripDummyLinesegs(raw);
-  if (!stripped.removed) { logEvent('load', { layout: 'stored' }); return raw; }
+  // 더미가 없어도 줄 배치가 빠진 문단과 글자처럼 취급하는 표가 함께 있으면 같은 결함(rhwp#7419)에 걸린다 —
+  // 양식 수정 도구(hwpx_modifier, hwpx_form_filler)는 고친 칸의 줄 배치를 지우고, 줄 배치 없이 저장하는 생성기도 있다.
+  if (!stripped.removed && !lacksLinesegsWithTacTable(raw)) { logEvent('load', { layout: 'stored' }); return raw; }
   // 한글이 없으면(다른 OS, 한글 미설치, 실패) rhwp 로 표 높이를 잰다(rhwp_layout.mjs). 그것도 안 되면 더미만 걷는다.
   const withoutHancom = async (why) => {
     try {
