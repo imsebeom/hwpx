@@ -19,6 +19,7 @@ import { detectDocType, findSlots, inspect } from './doc-rules.js';
 import { modelOf } from './collab-ops.js';
 import { installHancomKeys } from './hancom-keys';
 import { installEditLog } from './edit-log';
+import { TableCreateDialog } from '@/ui/table-create-dialog';
 
 // 이름이 이렇게 시작하는 WASM 메서드는 문서를 바꾸지 않는다고 본다.
 const READ_DOC = /^(get|search|export|render|is|has|list|find|measure|hitTest|pageCount)/;
@@ -198,6 +199,76 @@ function installTableClickSelect(host, getInputHandler) {
   }
 }
 
+/**
+ * 표 안에 표 만들기(한/글 「표 안에서 Ctrl+N,T」). rhwp 의 table:create 는 셀 안에서 막혀 있고
+ * (canExecute !inTable), 셀 안에 표를 만드는 엔진 API 도 없다. HTML 붙여넣기는 표를 탭 글로 펴 버린다.
+ * 엔진이 셀에 표를 붙이는 것(내부 클립보드)은 지원하므로 한 스냅샷 안에서
+ * ① 문서 끝에 임시 표를 셀 안쪽 폭에 맞춰 만들고 ② 내부 클립보드로 복사하고 ③ 임시 표와 그것이 더한 빈 문단을 지우고
+ * ④ 커서 자리에 붙인다. 되돌리기 한 번으로 통째 취소된다. 내부 클립보드는 이 표로 바뀐다.
+ */
+function installNestedTableCreate(getInputHandler) {
+  const createInCell = (ih, pos, rows, cols, options) => {
+    ih.executeOperation({
+      kind: 'snapshot',
+      operationType: 'createTable',
+      operation: (wasm) => {
+        const doc = wasm.doc;
+        const sec = pos.sectionIndex;
+        const path = pos.cellPath?.length
+          ? pos.cellPath
+          : [{ controlIndex: pos.controlIndex, cellIndex: pos.cellIndex, cellParaIndex: pos.cellParaIndex ?? 0 }];
+        // 셀 안쪽 폭(바깥 셀만 잰다. 표 속 표의 셀이면 엔진 기본 폭)
+        let colWidths;
+        if (path.length === 1) {
+          const cp = JSON.parse(doc.getCellProperties(sec, pos.parentParaIndex, pos.controlIndex, pos.cellIndex));
+          const inner = cp.width - cp.paddingLeft - cp.paddingRight - 283 * 2;
+          if (inner > cols * 400) colWidths = Array(cols).fill(Math.floor(inner / cols));
+        }
+        const n = doc.getParagraphCount(sec);
+        const last = n - 1;
+        const res = JSON.parse(doc.createTableEx(JSON.stringify({
+          ...(options ?? {}), sectionIdx: sec, paraIdx: last, charOffset: doc.getParagraphLength(sec, last),
+          rowCount: rows, colCount: cols, ...(colWidths ? { colWidths } : {}),
+        })));
+        if (!res.ok) throw new Error('임시 표를 만들지 못했다');
+        const added = doc.getParagraphCount(sec) - n;
+        doc.copyControl(sec, res.paraIdx, '[]', res.controlIdx);
+        doc.deleteTableControl(sec, res.paraIdx, res.controlIdx);
+        for (let p = res.paraIdx + added - 1; p >= res.paraIdx && p > last; p--) {
+          if (doc.getParagraphLength(sec, p) === 0) doc.deleteParagraph(sec, p);
+        }
+        if (path.length > 1) doc.pasteInternalInCellByPath(sec, pos.parentParaIndex, JSON.stringify(path), pos.charOffset);
+        else doc.pasteInternalInCell(sec, pos.parentParaIndex, pos.controlIndex, pos.cellIndex, pos.cellParaIndex ?? 0, pos.charOffset);
+        return { ...pos };
+      },
+    });
+  };
+  const patch = () => {
+    const ih = getInputHandler();
+    const def = ih?.dispatcher?.registry?.get?.('table:create');
+    if (!def) return false;
+    if (def.__nested) return true;
+    const origExec = def.execute;
+    def.canExecute = (ctx) => ctx.hasDocument;
+    def.execute = (services, params) => {
+      const ih2 = services.getInputHandler();
+      const pos = ih2?.getCursorPosition?.();
+      if (!pos || pos.parentParaIndex === undefined || pos.isTextBox) return origExec.call(def, services, params);
+      const dialog = new TableCreateDialog();
+      dialog.onApply = (rows, cols, options) => {
+        try { createInCell(ih2, pos, rows, cols, options); } catch (e) { console.warn('[claude] 표 안에 표 만들기 실패:', e); }
+        ih2.textarea?.focus();
+      };
+      dialog.show(params?.anchorEl);
+    };
+    def.__nested = true;
+    return true;
+  };
+  if (!patch()) {
+    const t = setInterval(() => { if (patch()) clearInterval(t); }, 200);
+  }
+}
+
 export function createClaudePlugin(getInputHandler) {
   return {
     id: 'claude',
@@ -223,6 +294,7 @@ export function createClaudePlugin(getInputHandler) {
       installMergedCellRange(host, getInputHandler);
       installCellPathFill(getInputHandler);
       installTableClickSelect(host, getInputHandler);
+      installNestedTableCreate(getInputHandler);
       installEditLog(host, getInputHandler);   // 사용자 편집을 하나하나 /api/ops 로(`$E changes`)
       // 진단용: 디버그 포트로 붙었을 때 입력 처리기를 볼 수 있게(tests/cdp_eval.mjs 의 S.__claudeIH())
       (window as any).__claudeIH = getInputHandler;
