@@ -11,6 +11,9 @@ HWPX(한컴오피스 한글 개방형 문서) 생성, 편집, 병합을 위한 C
 |------|-----------------|----------|------------------|
 | 기반 fork | [jkf87/hwpx-skill](https://github.com/jkf87/hwpx-skill) | 원본 라이선스 | 최초 기반. ZIP-level 치환 워크플로우, 템플릿 구조, 기본 빌드 패턴 |
 | 알고리즘 포팅 | [edwardkim/rhwp](https://github.com/edwardkim/rhwp) | MIT (© 2025-2026 Edward Kim) | 표 계산식 엔진, 네임스페이스 헬퍼, UTF-16 오프셋, zip bomb 방어, 필드 API 포팅 (2026-04-18) |
+| 에디터 엔진 | [edwardkim/rhwp](https://github.com/edwardkim/rhwp) v0.8.6 (rhwp-studio + WASM) | MIT (© 2025-2026 Edward Kim) | 에디터 모드의 화면과 조판 엔진. `editor/setup.mjs` 가 태그 판을 받아 로컬에서 빌드하며 저장소에는 넣지 않는다. `editor/patches/*.rs` 는 rhwp 소스를 고친 조각이다 (2026-09-25) |
+| 편집 도구 | 형제 프로젝트 hwpx에디터기반AI | 자체 | `editor/plugin/lib/` 편집 도구 25종, 스냅샷 보호, 문서 개요, 행정문서 검수 (고치지 않고 복사, `SOURCE.md`) |
+| 앱 창 | [pywebview](https://github.com/r0x0r/pywebview) | BSD-3-Clause | 에디터 앱 창(WebView2). 한/글 단축키(Ctrl+N 계열)를 받기 위해 브라우저 탭 대신 쓴다 |
 | 외부 검증 도구 | [PolarisOffice/polaris_dvc](https://github.com/PolarisOffice/polaris_dvc) | Apache-2.0 | `bin/polaris-dvc.exe` (v0.1.0 prebuilt) — `verify_hwpx --strict` 의 JID 위반 검출 백엔드 (2026-04-26) |
 | 스크립트 이식 | [airmang/hwpx-skill](https://github.com/airmang/hwpx-skill) | Apache-2.0 (© 2026 airmang) | `scripts/zip_replace_all.py` ZIP-level 전역 치환 + temp 안전 처리 + `mimetype ZIP_STORED` 보존 (2026-05-05). lineSegArray 더미 주입은 자체 보강 |
 | 알고리즘 재구현 | [Canine89/hwpxskill](https://github.com/Canine89/hwpxskill) | 라이선스 미지정 | `scripts/page_guard.py` 레퍼런스 대비 페이지 드리프트 가드 (메트릭 비교 알고리즘 참조 후 다중 섹션·`xpath_local`·zip bomb 상한 추가하여 독립 재구현) (2026-05-05) |
@@ -39,6 +42,8 @@ rhwp 포팅 상세는 [`references/rhwp-benchmark.md`](references/rhwp-benchmark
 | `templates/report/header.xml` | 모든 paraPr의 `borderFillIDRef`를 `"1"`로 변경 (문단 가로선 제거). `diagonal type="SOLID"` → `"NONE"` |
 | `zip_replace_all.py`, `clone_form.py` (2026-09-15) | 텍스트 치환 범위를 **`<hp:t>` 안의 글자만**으로 바꿈(`hwpx_helpers.replace_in_text_nodes`). XML 전체 치환은 `--raw` 로만. AI가 만든 편집 스크립트가 「7→4」 같은 짧은 키로 XML 전체를 치환해 쪽 높이·여백·셀 주소가 깨지고 한글이 멈춘 사고에서 |
 | `validate.py` (2026-09-15) | XML 유효성에 더해 **쪽 크기 상식 검사**(pagePr 10,000~300,000 HWPUNIT)와 **표 격자 검사**(cellAddr 중복·빈 칸)를 넣음. 위 사고 파일이 유효성만으로는 「정상」이었다 |
+| `fix_namespaces.py` (2026-09-25) | 명령줄로 실행하면 마지막에 **한글(COM)이 계산한 실제 줄 배치와 표 높이**를 넣는다(`scripts/hancom_layout.py`). 빌더가 넣는 한 줄짜리 더미 줄 배치는 한글만 무시하고 rhwp 같은 다른 구현체는 그대로 믿어 문단이 한 줄로 눌리거나 표가 겹쳤다. 한글이 없으면 경고만 내고 그대로 둔다. `--no-layout` 또는 `HWPX_NO_LAYOUT=1` 로 끈다 |
+| `scripts/hancom_layout.py` (신규, 2026-09-25) | 사본을 한글로 열어 쪽수를 읽어 조판을 끝낸 뒤 저장하고, 줄 배치는 문단끼리, 표 `hp:sz height` 는 표끼리 짝지어 원본에 옮겨 심는다(한글 재저장본을 통째로 쓰면 그림이 BMP 로 부푼다). 한글 호출 잠금과 RPC 오류 재시도 포함 |
 
 ### 추가된 워크플로우
 
@@ -68,7 +73,13 @@ git clone https://github.com/imsebeom/hwpx.git ~/.claude/skills/hwpx
 
 # 의존성
 pip install lxml Pillow
+
+# 에디터 모드를 쓸 때만 (Node 22+ 필요, 최초 1회 수 분)
+pip install pywebview                      # 앱 창(없으면 브라우저 탭으로 연다)
+node ~/.claude/skills/hwpx/editor/setup.mjs   # rhwp v0.8.6 받기 → 패치 → 빌드 → editor/studio-dist/
 ```
+
+Rust(`~/.cargo` 의 cargo, wasm-pack)가 있으면 `editor/patches/` 를 넣어 WASM 을 직접 빌드하고, 없으면 npm 의 공식 WASM 을 쓴다(그때는 아래 「에디터 모드」의 엔진 패치가 빠진다).
 
 ## 워크플로우 요약
 
@@ -89,6 +100,30 @@ pip install lxml Pillow
 | M | 스타일 필터 텍스트 치환 (글자 색·밑줄·charPrIDRef·limit) | style_filter_replace.py (python-hwpx 2.x) |
 | N | 자동 첨삭 메모 batch 삽입 (학생 작품 평가 자동화) | add_review_memo.py (python-hwpx 2.x) |
 | O | 레퍼런스 99% 복원 + 쪽수 드리프트 가드 | page_guard.py (Canine89 알고리즘 재구현) |
+| 에디터 모드 | 사용자가 에디터 창으로 보며 고치고 Claude 가 같은 문서를 실시간으로 고친다 | `editor/cli.mjs` (설명서 `references/editor-mode.md`) |
+
+## 에디터 모드 (2026-09-25)
+
+rhwp-studio 를 로컬에서 띄워, 사용자는 에디터 창에서 보며 고치고 Claude 는 같은 문서를 다시 열지 않고 실시간으로 고친다. 명령과 도구 전체는 [`references/editor-mode.md`](references/editor-mode.md).
+
+```bash
+E="node ~/.claude/skills/hwpx/editor/cli.mjs"
+$E start 문서.hwpx        # 앱 창으로 연다
+$E changes               # 사용자가 에디터에서 고친 내역(좌표 diff, 커서, 선택 글자)
+$E run ops.json          # 편집 도구 25종 또는 WASM 직접 호출. 배치 하나가 undo 한 번
+$E save                  # 새 판 <이름>_<YYMMDD>_<NN>.hwpx 로 저장(덮어쓰지 않음)
+$E log                   # 작업 기록(시작, 불러옴, 편집, 화면 저장 포함 저장, 종료, 오류)
+$E list                  # 떠 있는 에디터 전부
+$E stop
+```
+
+| 기능 | 내용 |
+|------|------|
+| 실시간 공동 편집 | Claude 의 수정이 화면에 바로 반영되고, 사용자 편집은 좌표로 읽힌다. 한/글 단축키(Ctrl+N,T 표 등)는 앱 창에서 모두 된다 |
+| 세션마다 에디터 하나 | 상태 폴더 `~/.claude/cache/hwpx-editor/<세션 ID 앞 8자>/`, 포트 7780 부터 빈 것. 여러 Claude 세션이 동시에 써도 서로의 문서를 덮어쓰지 않는다. `HWPX_EDITOR_INSTANCE` 로 이름을 줄 수 있다 |
+| 작업 기록 | `editor-log.jsonl` 에 비우지 않고 쌓인다. 에디터 화면에서 저장한 것도 파일 이름과 크기로 남는다(브라우저가 전체 경로를 주지 않는다) |
+| 열 때 조판 보정 | 더미 줄 배치나 줄 배치가 빠진 문서는 한글로 줄 배치와 표 높이를 계산해 연다. 한글이 없으면 rhwp 로 표 높이를 재서 적는다(`editor/rhwp_layout.mjs`). 원본 파일은 건드리지 않는다 |
+| 엔진 패치 | `editor/patches/tac-no-ls-*.rs` — 줄 배치 없는 글자처럼 취급 표가 적힌 높이로 눌려 아래 표와 겹치는 rhwp 결함([#7419](https://github.com/edwardkim/rhwp/issues/7419))의 수정 두 가지. 같은 수정을 [PR #7433](https://github.com/edwardkim/rhwp/pull/7433) 으로 보냈다. 받아들여지면 이 패치를 걷고 rhwp 판을 올린다 |
 
 ## airmang/hwpx-skill 이식 + python-hwpx 2.x 활용 (2026-05-05)
 
