@@ -78,6 +78,15 @@ function installMergedCellRange(host, getInputHandler) {
   if (!patch()) {
     const t = setInterval(() => { if (patch()) clearInterval(t); }, 200);
   }
+
+  // 셀 블록에 줄 간격, 글자 크기 같은 서식을 넣어 셀 높이가 바뀌어도 선택 음영이 옛 자리에 남았다.
+  // rhwp 는 document-changed 때 그림, 표 선택 표시만 다시 그리고 셀 선택은 빠뜨린다. 다음 프레임에 다시 그린다.
+  host.events.on('document-changed', () => {
+    requestAnimationFrame(() => {
+      const ih = getInputHandler();
+      if (ih?.cursor?.isInCellSelectionMode?.()) ih.updateCellSelection?.();
+    });
+  });
 }
 
 export function createClaudePlugin(getInputHandler) {
