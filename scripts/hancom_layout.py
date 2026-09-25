@@ -6,7 +6,7 @@
 왜: 스킬이 XML 을 직접 조립하면 줄 배치를 계산할 수 없어 한 줄짜리 더미(hwpx_helpers.LINESEG_DUMMY)를 넣고
 칸 높이를 한 줄 기준으로 적는다. 한글은 열 때 다시 조판하지만 rhwp 같은 다른 구현체는 더미를 믿어 문단을
 한 줄로 누르고, 더미를 걷어도 글자처럼 취급하는 표의 행을 늘리지 못해 아래 표와 겹친다(rhwp 결함).
-한글이 계산한 줄 배치와 표 높이를 넣으면 rhwp 가 한글 재저장본과 글자 좌표까지 같게 그린다(2026-09-26 실측).
+한글이 계산한 줄 배치와 표 높이를 넣으면 rhwp 가 한글 재저장본과 글자 좌표까지 같게 그린다(2026-09-25 실측).
 한글 재저장본을 통째로 쓰지 않는 것은 그림을 BMP 로 다시 넣어 파일이 부풀기 때문이다.
 
 fix_namespaces.py 가 마지막 단계에서 부른다. 한글이 없거나 실패하면 LayoutError 를 내고 파일은 그대로 둔다.
@@ -61,7 +61,7 @@ def hancom_resave(src, dst):
     src, dst = os.path.abspath(src), os.path.abspath(dst)
     _acquire_lock()
     try:
-        # 앞 작업이 닫는 중인 한글에 붙으면 띄우기나 작업 도중에 RPC 오류가 난다(2026-09-26 동시 실행 실측).
+        # 앞 작업이 닫는 중인 한글에 붙으면 띄우기나 작업 도중에 RPC 오류가 난다(2026-09-25 동시 실행 실측).
         # 띄우기부터 저장까지를 통째로 다시 시도한다.
         last = None
         for _ in range(3):
@@ -88,7 +88,7 @@ def _resave_once(w, src, dst):
         hwp.RegisterModule("FilePathCheckDLL", "FilePathCheckerModule")
         if not hwp.Open(src, "HWPX", "forceopen:true"):
             raise LayoutError("한글이 문서를 열지 못했다")
-        # 쪽수를 물어야 끝까지 조판한다. 묻지 않고 저장하면 원래 줄 배치를 그대로 쓴다(2026-09-26 실측).
+        # 쪽수를 물어야 끝까지 조판한다. 묻지 않고 저장하면 원래 줄 배치를 그대로 쓴다(2026-09-25 실측).
         if hwp.PageCount < 1:
             raise LayoutError("한글이 쪽을 만들지 못했다")
         if not hwp.SaveAs(dst, "HWPX", "") or not os.path.exists(dst):
