@@ -21,6 +21,7 @@ import { fileURLToPath } from 'node:url';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { stripDummyLinesegs } from './hwpx-zip.mjs';
+import { rhwpLayout } from './rhwp_layout.mjs';
 
 const execFileP = promisify(execFile);
 
@@ -101,7 +102,18 @@ async function editorBytes(src) {
   if (!/\.hwpx$/i.test(src)) { logEvent('load', { layout: 'raw' }); return raw; }
   const stripped = stripDummyLinesegs(raw);
   if (!stripped.removed) { logEvent('load', { layout: 'stored' }); return raw; }
-  if (process.platform !== 'win32') { logEvent('load', { layout: 'strip', dummy: stripped.removed }); return stripped.buf; }
+  // 한글이 없으면(다른 OS, 한글 미설치, 실패) rhwp 로 표 높이를 잰다(rhwp_layout.mjs). 그것도 안 되면 더미만 걷는다.
+  const withoutHancom = async (why) => {
+    try {
+      const r = await rhwpLayout(raw);
+      logEvent('load', { layout: 'rhwp', dummy: stripped.removed, tables: r.tables, ...(why ? { note: why } : {}) });
+      return r.buf;
+    } catch (e) {
+      logEvent('load', { layout: 'strip', dummy: stripped.removed, error: `${why ? why + ' / ' : ''}rhwp 보정 실패: ${e?.message ?? e}` });
+      return stripped.buf;
+    }
+  };
+  if (process.platform !== 'win32' || process.env.HWPX_EDITOR_NO_HANCOM === '1') return withoutHancom();
   const st = fs.statSync(src);
   const key = JSON.stringify({ src, size: st.size, mtimeMs: st.mtimeMs });
   try {
@@ -116,9 +128,8 @@ async function editorBytes(src) {
     return fs.readFileSync(LAYOUT_CACHE);
   } catch (e) {
     const why = String(e?.stderr || e?.message || e).trim().split('\n').pop();
-    console.error(`한글 줄 배치 실패, 더미만 걷어냄: ${why}`);
-    logEvent('load', { layout: 'strip', dummy: stripped.removed, error: why });
-    return stripped.buf;
+    console.error(`한글 줄 배치 실패, rhwp 보정으로: ${why}`);
+    return withoutHancom(`한글 실패: ${why}`);
   }
 }
 

@@ -47,13 +47,13 @@ async function postLog(ev, data = {}) {
 
 const LOG = path.join(STATE_DIR, 'editor-log.jsonl');
 const kb = (n) => (n == null ? '' : n < 1024 ? `${n}B` : `${(n / 1024).toFixed(1)}KB`);
-const LAYOUT = { hancom: '한글 줄 배치 적용', 'hancom-cache': '한글 줄 배치(캐시)', strip: '더미 줄 배치만 걷음 — 표가 겹칠 수 있다', stored: '저장된 줄 배치 그대로', raw: 'hwp 그대로' };
+const LAYOUT = { hancom: '한글 줄 배치 적용', 'hancom-cache': '한글 줄 배치(캐시)', rhwp: 'rhwp 표 높이 보정(한글 없음)', strip: '더미 줄 배치만 걷음 — 표가 겹칠 수 있다', stored: '저장된 줄 배치 그대로', raw: 'hwp 그대로' };
 function formatLog(e) {
   const t = new Date(e.ts).toLocaleString('sv-SE').slice(5, 16);
   const who = e.by === 'user' ? '사용자' : e.by === 'claude' ? 'Claude' : '';
   switch (e.ev) {
     case 'start': return `${t}  시작      ${e.file}`;
-    case 'load': return `${t}  불러옴    ${e.doc} — ${LAYOUT[e.layout] ?? e.layout}${e.error ? ` (${e.error})` : ''}`;
+    case 'load': return `${t}  불러옴    ${e.doc} — ${LAYOUT[e.layout] ?? e.layout}${e.tables ? ` ${e.tables}개` : ''}${e.note ? ` (${e.note})` : ''}${e.error ? ` (${e.error})` : ''}`;
     case 'open': return `${t}  열림      ${e.doc} ${kb(e.bytes)}`;
     case 'edit': return `${t}  ${who} 편집 ${e.formatOnly ? '서식이나 개체만' : `${e.count}곳 ${e.refs.join(' ')}${e.count > e.refs.length ? ' …' : ''}`}${e.at ? ` (커서 ${e.at})` : ''}`;
     case 'save': return `${t}  ${who} 저장 ${e.path ?? e.name} ${kb(e.bytes)}${e.via ? ` (${e.via})` : ''}`;

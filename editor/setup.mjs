@@ -127,6 +127,10 @@ rmrf(dist);
 copyDir(path.join(STUDIO, 'dist'), dist);
 // 서비스 워커는 옛 빌드를 캐시해 재빌드가 안 보이게 만든다. 로컬 브리지에는 필요 없다.
 for (const f of fs.readdirSync(dist)) if (/^(sw|workbox-.*|registerSW)\.js$/.test(f)) fs.writeFileSync(path.join(dist, f), '');
+// 서버가 Node 에서 같은 WASM 을 돌리도록(rhwp_layout.mjs, 한글이 없을 때 표 높이 보정) 짝이 맞는 JS 와 WASM 을 둔다.
+// studio-dist/rhwp.js 는 번들과 짝이 다르다 — 쓰면 "function import requires a callable" 로 초기화가 실패한다.
+fs.mkdirSync(path.join(dist, 'node'), { recursive: true });
+for (const f of ['rhwp.js', 'rhwp_bg.wasm']) fs.copyFileSync(path.join(pkgDir, f), path.join(dist, 'node', f));
 
 const sdk = path.join(HERE, 'sdk');
 fs.mkdirSync(sdk, { recursive: true });
