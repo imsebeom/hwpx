@@ -68,7 +68,7 @@
     🔴 **동시 실행에서 두 가지 RPC 오류를 밟았다** — 띄우기 단계(「원격 프로시저를 호출하지 못했」)와 `Quit` 단계(「RPC 서버를 사용할 수 없」). 닫히는 중인 한글에 붙은 것이다. 재시도 뒤 4건 동시 × 3회 전부 성공
     SKILL.md 규칙 42 신설. md2hwpx 산출물의 **polaris JID 11041 2건은 변경 전부터 있던 것**(범위 밖, 미조사)
   - **rhwp 결함 보고 준비** — 최소 재현 `~/.cache/rhwp-devel/repro/repro_nols_tac.hwpx`(md2hwpx 표 둘, `treatAsChar="1"`, 줄 배치 없음). 🔑 **`treatAsChar="0"` 이면 재현되지 않는다** — 원인 조건은 「글자처럼 취급하는 표 + NO_LS 셀 문단」이다.
-    본문 `repro/issue_body.md`(재현 파일 base64 포함, md5 대조 통과). 기존 #7416 은 더미 사다리를 믿는 축이라 겹치지 않는다. **gh 미로그인이라 게시 대기**
+    본문 `repro/issue_body.md`(재현 파일 base64 포함, md5 대조 통과). 기존 #7416 은 더미 사다리를 믿는 축이라 겹치지 않는다. **게시함: https://github.com/edwardkim/rhwp/issues/7419**(imsebeom). gh 로그인은 안 된 상태라 git 자격 증명 관리자의 토큰을 그 명령에만 넘겨 올렸다(`git credential fill` → `GH_TOKEN`)
   - **next_steps**: ① **에디터 저장본은 아직 시험하지 않았다** — 한글 줄 배치를 받은 문서를 `save` 해 한글에서 열어 볼 것(줄 배치와 표 높이가 한글 값이라 문제없을 것으로 보이나 실측 전) ② 한글 없는 환경(맥, 리눅스)에서는 표가 여전히 겹친다 — rhwp 에 「NO_LS 셀 문단 측정 줄 수가 렌더보다 하나 적다」로 결함 보고할지. 재현 파일은 `~/.cache/rhwp-devel/q3_src.hwpx` ③ 근본 대책으로 **스킬 파이프라인이 더미 대신 실제 줄 배치를 쓰게 할지**(polaris-dvc 호환 때문에 넣은 더미가 rhwp 호환을 깨뜨린다) ④ `~/.cache/rhwp-devel`(devel 빌드, 비교 도구)은 남겨 두었다
 - intent: /hwpx 스킬에 rhwp 에디터 모드(Claude 와 사용자가 같은 문서를 실시간 공동 편집)를 만들어 스킬에 통합하고 GitHub 에 올리기(2026-09-25 세션).
 - changes_made (2026-09-25, 커밋 405488e~019139e):
