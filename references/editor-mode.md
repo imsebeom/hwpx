@@ -207,6 +207,8 @@ rhwp 에 기능이 없어 **안 되는 한컴 키**: Ctrl+N,P(쪽 번호 매기�
 
 - **문단 모양 대화상자에서 아무것도 안 바꾸고 설정을 누르면 문단에 네 변 실선 상자가 생겼다**(2026-09-25 수정). 두 결함이 겹쳤다 — ① 배경 없는 문단의 `patternType` 이 0 으로 읽히는데 대화상자 무늬 선택지에 0 이 없어(없음 = -1) 「배경이 바뀌었다」고 보고 `fillType` 을 보낸다 ② 엔진은 `fillType` 이 오면 문단의 BorderFill 을 **기본값(네 변 실선)에서** 새로 만든다. 패치 `patches/para-bf-base-*.rs` 가 본문, 셀 문단 모두 **그 문단의 지금 BorderFill 에서** 시작하게 한다(요청에 borderFillId 가 없을 때). ①은 그대로라 편집 기록에 `patternType 0 → -1` 이 찍히지만 문서에는 해가 없다. 각주, 머리말/꼬리말 문단은 패치하지 않았다.
 - **표 오른쪽(아래) 끝까지 셀을 합치면 없던 오른쪽(아래) 선이 생겼다**(2026-09-25 수정). rhwp 는 합친 셀에 주 셀(왼쪽 위)의 BorderFill 을 그대로 쓴다. 패치 `patches/merge-edge-*.rs` 가 한/글처럼 오른쪽 선은 오른쪽 가장자리 셀, 아래 선은 아래 가장자리 셀에서 가져온다. 실측: 문항 3 정보표 r9c0~r12c5 합치기 → 오른쪽 선 실선(1) 대신 없음(0), 왼쪽, 위, 아래는 그대로.
+- **셀 안에서 Alt+C 모양 붙이기, 글자 모양, 문단 모양 대화상자의 설정이 알림 없이 실패했다**(2026-09-25 수정). 키보드로 만든 셀 안 선택(Home, Shift+End)은 위치에 `cellPath` 가 없는데 서식 명령은 `cellPath` 로만 셀 경로를 만들어 「경로가 비어있습니다」로 던졌다. 플러그인(`installCellPathFill`)이 커서의 `getSelectionOrdered` 에서 빈 `cellPath` 를 평평한 좌표로 채운다(rhwp `cellAxisPath` 규칙, 1단에서는 실제 경로와 같다). 모양 복사는 두 단계다 — 첫 Alt+C 는 커서 자리 모양을 기억만 하고(화면 변화 없음), 블록을 잡고 다시 Alt+C 하면 붙인다. 편집 기록은 서식 호출이 던지면 `글자 모양 실패(오류)` 로 남긴다.
+- **진단**: 앱 창을 `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9333` 로 띄우면 `node editor/tests/cdp_eval.mjs 9333 "<식>"` 에서 `S.__claudeIH()` 로 입력 처리기(커서, 기록, formatCopyState 등)를 볼 수 있다. 조용히 실패하는 기능은 이것으로 해당 함수를 직접 불러 오류 문구를 받는다.
 - `getControls()` 는 **셀 안 표도 돌려준다**(list 2). 본문 표만 세려면 `c.list < 구역 수` 이고 `getTableDimensions` 가 성공하는 것만 센다.
 - 표가 든 문단 끝에서 `splitParagraph` 하면 **표가 새 문단으로 딸려 간다.** 표 뒤에 문단을 만들 때는 `insertParagraph(s, idx)`.
 - 0번 문단은 구역 정의(secd)를 담고 있다. 지우지 않는다.

@@ -90,6 +90,34 @@ function installMergedCellRange(host, getInputHandler) {
   });
 }
 
+/**
+ * 키보드로 만든 셀 안 선택(Home, Shift+End 등)은 위치에 cellPath 가 없고 평평한 좌표(controlIndex, cellIndex,
+ * cellParaIndex)만 있다. 서식 명령(ApplyCharFormatCommand, 셀 문단 서식)은 cellPath 로만 경로를 만들어
+ * 「경로가 비어있습니다」로 던졌다 — Alt+C 모양 붙이기, 글자 모양, 문단 모양 대화상자의 설정이 셀 안에서
+ * 알림 없이 실패했다(2026-09-25 실측). rhwp 의 cellAxisPath 와 같은 규칙으로 1단 경로를 채운다
+ * (평평한 좌표가 cellPath[0] 에서 오므로 1단에서는 실제 경로와 같다).
+ */
+function installCellPathFill(getInputHandler) {
+  const fill = (p) => (p && p.parentParaIndex != null && p.cellIndex != null && !(p.cellPath?.length)
+    ? { ...p, cellPath: [{ controlIndex: p.controlIndex, cellIndex: p.cellIndex, cellParaIndex: p.cellParaIndex ?? 0 }] }
+    : p);
+  const patch = () => {
+    const cursor = getInputHandler()?.cursor;
+    if (!cursor) return false;
+    if (cursor.__cellPathFill) return true;
+    const orig = cursor.getSelectionOrdered.bind(cursor);
+    cursor.getSelectionOrdered = () => {
+      const sel = orig();
+      return sel ? { start: fill(sel.start), end: fill(sel.end) } : sel;
+    };
+    cursor.__cellPathFill = true;
+    return true;
+  };
+  if (!patch()) {
+    const t = setInterval(() => { if (patch()) clearInterval(t); }, 200);
+  }
+}
+
 export function createClaudePlugin(getInputHandler) {
   return {
     id: 'claude',
@@ -113,7 +141,10 @@ export function createClaudePlugin(getInputHandler) {
       // 한컴 한/글 기본 단축키(Ctrl+N 계열, 셀 안 Ctrl+A 등)
       installHancomKeys(host, getInputHandler);
       installMergedCellRange(host, getInputHandler);
+      installCellPathFill(getInputHandler);
       installEditLog(host, getInputHandler);   // 사용자 편집을 하나하나 /api/ops 로(`$E changes`)
+      // 진단용: 디버그 포트로 붙었을 때 입력 처리기를 볼 수 있게(tests/cdp_eval.mjs 의 S.__claudeIH())
+      (window as any).__claudeIH = getInputHandler;
 
       const mutating = (op) => {
         if (op.tool) return !READ_TOOLS.has(op.tool);

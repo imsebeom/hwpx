@@ -178,6 +178,11 @@ export function installEditLog(host, getInputHandler) {
         formatCtx = { kind, props: diff, at: whereNow(), logged: false };
         try {
           return orig(...args);
+        } catch (err) {
+          // 실패한 서식은 「예약」으로 보이면 안 된다(Alt+C 가 셀 안에서 알림 없이 던지던 것을 이렇게 놓쳤다)
+          formatCtx.logged = true;
+          push({ t: Date.now(), act: 'fail', type: kind, label: `${kind === 'applyCharFormat' ? '글자 모양' : '문단 모양'} 실패(${String(err?.message ?? err).slice(0, 80)})`, src: 'user', at: formatCtx.at, props: formatCtx.props });
+          throw err;
         } finally {
           const ctx = formatCtx;
           formatCtx = null;
