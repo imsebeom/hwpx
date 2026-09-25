@@ -20,6 +20,7 @@ import { modelOf } from './collab-ops.js';
 import { installHancomKeys } from './hancom-keys';
 import { installEditLog } from './edit-log';
 import { TableCreateDialog } from '@/ui/table-create-dialog';
+import { installKCommands } from './k-commands';
 
 // 이름이 이렇게 시작하는 WASM 메서드는 문서를 바꾸지 않는다고 본다.
 const READ_DOC = /^(get|search|export|render|is|has|list|find|measure|hitTest|pageCount)/;
@@ -269,6 +270,67 @@ function installNestedTableCreate(getInputHandler) {
   }
 }
 
+/**
+ * 도구 모음 단추 셋을 한/글처럼(2026-09-26).
+ *  - 하이퍼링크: rhwp 의 단추에 data-cmd 가 없어 눌러도 아무 일이 없었다 → insert:hyperlink(k-commands.ts)
+ *  - 수준▲▼: rhwp 는 「개요 N」 스타일 문단만 바꿨다 → 문단 번호, 글머리표 문단은 수준(paraLevel 0~9)을 바꾼다
+ *  - 개체 속성: 그림, 표를 개체로 골랐을 때만 됐다 → 표 셀 안이면 표/셀 속성을 연다
+ */
+function installToolbarFixes(getInputHandler) {
+  let wired = false;
+  const wire = () => {
+    const btn = [...document.querySelectorAll('.tb-btn')].find((b) => b.title === '하이퍼링크' && !b.dataset.cmd);
+    if (!btn) return;
+    btn.dataset.cmd = 'insert:hyperlink';
+    const go = (e) => { e.preventDefault(); getInputHandler()?.dispatcher?.dispatch('insert:hyperlink', { anchorEl: btn }); };
+    btn.addEventListener('mousedown', go);
+    btn.addEventListener('click', (e) => { if (e.detail === 0) go(e); });
+    wired = true;
+  };
+  const patch = () => {
+    const ih = getInputHandler();
+    const reg = ih?.dispatcher?.registry;
+    if (!reg || !ih.changeOutlineLevel) return false;
+    if (!wired) wire();
+    if (ih.__toolbarFix) return true;
+    const origLevel = ih.changeOutlineLevel.bind(ih);
+    ih.changeOutlineLevel = (delta) => {
+      const pos = ih.getCursorPosition();
+      let style = null;
+      try {
+        style = pos.parentParaIndex !== undefined
+          ? ih.wasm.getCellStyleAt(pos.sectionIndex, pos.parentParaIndex, pos.controlIndex, pos.cellIndex, pos.cellParaIndex)
+          : ih.wasm.getStyleAt(pos.sectionIndex, pos.paragraphIndex);
+      } catch { /* 스타일을 못 읽으면 아래 문단 수준으로 */ }
+      if (style && /^개요\s*\d$/.test(style.name)) return origLevel(delta);
+      const pp = ih.getParaProperties?.();
+      if (!pp || !pp.headType || pp.headType === 'None') return undefined;   // 한/글도 번호 없는 문단은 그대로
+      const level = Math.max(0, Math.min(9, (pp.paraLevel ?? 0) + delta));
+      if (level !== (pp.paraLevel ?? 0)) ih.applyParaFormat({ paraLevel: level });
+      return undefined;
+    };
+    const props = reg.get('format:object-properties');
+    if (props && !props.__cellProps) {
+      const origCan = props.canExecute;
+      const origExec = props.execute;
+      props.canExecute = (ctx) => origCan(ctx) || ctx.inTable;
+      props.execute = (services, params) => {
+        const h = services.getInputHandler();
+        if (!h?.isInPictureObjectSelection?.() && !h?.isInTableObjectSelection?.() && h?.getCursorPosition?.().parentParaIndex !== undefined) {
+          return h.dispatcher.dispatch('table:cell-props');
+        }
+        return origExec.call(props, services, params);
+      };
+      props.__cellProps = true;
+    }
+    ih.__toolbarFix = true;
+    return true;
+  };
+  if (!patch()) {
+    const t = setInterval(() => { if (patch()) clearInterval(t); }, 200);
+  }
+}
+
 export function createClaudePlugin(getInputHandler) {
   return {
     id: 'claude',
@@ -295,6 +357,8 @@ export function createClaudePlugin(getInputHandler) {
       installCellPathFill(getInputHandler);
       installTableClickSelect(host, getInputHandler);
       installNestedTableCreate(getInputHandler);
+      installKCommands(host, getInputHandler);
+      installToolbarFixes(getInputHandler);
       installEditLog(host, getInputHandler);   // 사용자 편집을 하나하나 /api/ops 로(`$E changes`)
       // 진단용: 디버그 포트로 붙었을 때 입력 처리기를 볼 수 있게(tests/cdp_eval.mjs 의 S.__claudeIH())
       (window as any).__claudeIH = getInputHandler;

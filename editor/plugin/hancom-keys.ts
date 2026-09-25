@@ -50,12 +50,16 @@ const CHORD_N = {
   d: null, // 호환 문서
 };
 
-// Ctrl+K,? (입력 도우미). rhwp 에 있는 것만. 하이퍼링크(H), 상호 참조(R), 날짜/시간(D, C, F)은 기능이 없다(null).
+// Ctrl+K,? (입력 도우미). H, R, D, C, F 는 rhwp 에 없어 k-commands.ts 가 명령을 더한다.
 const CHORD_K = {
   n: 'format:para-num-shape',
   b: 'insert:bookmark',
   e: 'insert:field',
-  h: null, r: null, d: null, c: null, f: null,
+  h: 'insert:hyperlink',
+  r: 'insert:cross-ref',
+  d: 'insert:date-string',
+  c: 'insert:date-code',
+  f: 'insert:date-format',
 };
 
 // Ctrl+Q,? (찾기)

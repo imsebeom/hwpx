@@ -98,6 +98,24 @@ const RUST_PATCHES = [
     insert: fs.readFileSync(path.join(HERE, 'patches', `${f}.rs`), 'utf8').replace(/\r\n/g, '\n'),
     done: `[claude-hwpx ${id}]`,
   })),
+  // Ctrl+K,H/R/C — 표시 글을 감싼 필드(하이퍼링크, 상호 참조, 문서 요약) 넣기(patches/field-ex-*.rs)
+  ...[['field-ex', 'src/document_core/queries/field_query.rs', 'fn insert_click_here_field_in_para(', 'field-ex-helper'],
+    ['field-ex-method', 'src/document_core/queries/field_query.rs', '    /// getFieldList: 모든 필드를 JSON 배열로 반환', 'field-ex-method'],
+    ['field-ex-wasm', 'src/wasm_api.rs', '    /// 현재 본문 위치에 ClickHere 누름틀 필드를 삽입한다.', 'field-ex-wasm']].map(([id, file, anchor, f]) => ({
+    id, file, anchor,
+    insert: fs.readFileSync(path.join(HERE, 'patches', `${f}.rs`), 'utf8').replace(/\r\n/g, '\n'),
+    done: `[claude-hwpx ${id}]`,
+  })),
+  // 빈 머리말/꼬리말이 다시 열고 저장하면 문단 없는 subList 가 되어 한/글이 죽던 것(patches/hf-empty-para.rs)
+  (() => {
+    const [find, replace] = fs.readFileSync(path.join(HERE, 'patches', 'hf-empty-para.rs'), 'utf8').replace(/\r\n/g, '\n').split('\n// ==== replace ====\n');
+    return { id: 'hf-empty-para', file: 'src/serializer/hwpx/section.rs', find: find.replace(/^\/\/ ==== find ====\n/, ''), replace, done: '[claude-hwpx hf-empty-para]' };
+  })(),
+  // 하이퍼링크, 날짜 필드 끝에 친 글이 필드 안으로 빨려 들던 것(patches/field-closed-edges.rs)
+  (() => {
+    const [find, replace] = fs.readFileSync(path.join(HERE, 'patches', 'field-closed-edges.rs'), 'utf8').replace(/\r\n/g, '\n').split('\n// ==== replace ====\n');
+    return { id: 'field-closed-edges', file: 'src/model/paragraph.rs', find: find.replace(/^\/\/ ==== find ====\n/, ''), replace, done: '[claude-hwpx field-closed-edges]' };
+  })(),
   (() => {
     const [find, replace] = fs.readFileSync(path.join(HERE, 'patches', 'merge-edge-before.rs'), 'utf8').replace(/\r\n/g, '\n').split('\n// ==== replace ====\n');
     return { id: 'merge-edge-before', file: 'src/document_core/commands/table_ops.rs', find: find.replace(/^\/\/ ==== find ====\n/, ''), replace, done: '[claude-hwpx merge-edge-before]' };
@@ -131,7 +149,7 @@ if (hasRust && RUST_PATCHES.some((p) => !builtIds.includes(p.id))) {
 }
 
 // 3. claude 플러그인 복사와 allowlist 등록
-for (const f of ['claude-plugin.ts', 'hancom-keys.ts', 'edit-log.ts']) fs.copyFileSync(path.join(HERE, 'plugin', f), path.join(STUDIO, 'src', 'plugin', f));
+for (const f of ['claude-plugin.ts', 'hancom-keys.ts', 'edit-log.ts', 'k-commands.ts']) fs.copyFileSync(path.join(HERE, 'plugin', f), path.join(STUDIO, 'src', 'plugin', f));
 // 편집 도구 라이브러리(lib/SOURCE.md)도 같은 자리로. 플러그인이 './doc-tools.js' 로 부른다.
 for (const f of ['doc-tools.js', 'doc-rules.js', 'collab-ops.js']) {
   fs.copyFileSync(path.join(HERE, 'plugin', 'lib', f), path.join(STUDIO, 'src', 'plugin', f));

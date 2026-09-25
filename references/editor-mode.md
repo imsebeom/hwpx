@@ -176,6 +176,7 @@ rhwp 는 브라우저 예약키를 피하려고 한컴 키 일부를 옮겨 두�
 | Ctrl+M,K/R/B/D/G/Y/C/W | 글자 색 검정/빨강/파랑/자주/초록/노랑/청록/흰색 (한컴 값, #993366 등) | 빨강 통과 |
 | Ctrl+Q,F / Ctrl+Q,A / Ctrl+H | 찾기 / 찾아 바꾸기 | 통과 |
 | Ctrl+K,N / Ctrl+K,B / Ctrl+K,E | 문단 번호 모양 / 책갈피 / 필드 입력 | 셋 다 통과(2026-09-26) |
+| Ctrl+K,H / R / D / C / F | 하이퍼링크 / 상호 참조(책갈피 쪽 번호) / 날짜·시간 문자열 / 날짜·시간 코드 / 날짜·시간 형식 | rhwp 에 없어 새로 만들었다(`plugin/k-commands.ts` + 엔진 패치 `field-ex-*.rs`). 다섯 모두 통과, 한/글로 열어 다시 저장해도 필드가 남는다(2026-09-26) |
 | Ctrl+Shift+C / R / T | 가운데 / 오른쪽 / 배분 정렬 | 가운데 통과 |
 | Ctrl+F10 | 문자표 | 통과 |
 | Ctrl+J, Ctrl+Shift+Insert, Ctrl+Shift+Delete, Alt+Shift+P/S, Alt+Insert | 쪽 나누기, 문단 번호, 글머리표, 위/아래 첨자, 줄·칸 추가 | 연결만 |
@@ -215,6 +216,10 @@ rhwp 에 기능이 없어 **안 되는 한컴 키**: Ctrl+N,P(쪽 번호 매기�
 - **표 안에 표 만들기**(2026-09-26, `installNestedTableCreate`). rhwp 의 `table:create` 는 셀 안에서 막혀 있고(canExecute `!inTable`) 셀 안에 표를 만드는 엔진 API 도 없다. `pasteHtmlInCell` 은 `<table>` 을 탭 글로 펴 버린다. 플러그인이 명령 정의를 감싸, 셀 안이면 표 만들기 격자를 띄우고 한 스냅샷 안에서 ① 문서 끝에 임시 표를 **셀 안쪽 폭에 맞춘 colWidths** 로 만들고 ② `copyControl` ③ 임시 표와 그것이 더한 빈 문단 삭제 ④ `pasteInternalInCell(ByPath)` 로 커서 자리에 붙인다. 되돌리기 한 번으로 통째 취소되고, 내부 클립보드는 이 표로 바뀐다. Ctrl+N,T, 도구 모음, 메뉴 모두 이 길을 탄다. 실측: 문항 3 채점표 T6r1c4 에서 2×4 표가 칸 폭 42px(셀 안쪽 12416 HWPUNIT)로 들어가고 문단 수 17 그대로, 되돌리기 한 번에 원상.
   ⚠ `getControls` 의 셀 안 표 `Width` 는 실제 폭이 아니다(본문 폭이 남는다). 실제 폭은 `getTableCellBboxesByPath`.
   ⚠ 에디터를 `stop --force` 로 끄면 rhwp 자동 저장 복구본이 남아 다음 시작 때 「문서 복구」 창이 뜬다. 그 창이 떠 있는 동안의 키 입력은 본문으로 가서 **goto 가 잡은 선택을 지우고 글을 친다**(2026-09-26 시험에서 밟았다, 되돌림). 키 시험 전에 떠 있는 대화상자를 확인한다.
+- **Ctrl+K 넣기 기능과 도구 모음**(2026-09-26). 엔진에 「표시 글을 감싼 필드 넣기」가 없어 `insertFieldEx`(패치 `field-ex-helper`, `-method`, `-wasm`)를 더했다 — 본문과 셀(경로) 모두, `{kind: hyperlink|crossref|summary, text, params}`. `params` 는 한/글 HWPX 원문과 같은 `<hp:parameters>` 이고 그 모양은 실물에서 가져왔다: 하이퍼링크, 상호 참조는 rhwp 시료의 한/글 파일(`samples/hwpx_sample2.hwpx`, `issue6284/…charts.hwpx`), **날짜 코드는 한/글 COM(`InsertDateCode`)으로 만든 파일** — 한/글의 날짜/시간 코드는 DATE 가 아니라 **문서 요약 필드(`type="SUMMERY"`, Command `$createtime`, Prop 8)**이고 한/글은 열 때 표시를 문서 작성 일시로 다시 쓴다. 날짜 문자열(D)은 그냥 글이다. 모든 넣기는 스냅샷 하나(되돌리기 한 번). 도구 모음: 하이퍼링크 단추(rhwp 는 data-cmd 가 없어 죽은 단추), 수준▲▼(rhwp 는 「개요 N」 스타일 문단만 → 문단 번호, 글머리표 문단은 `paraLevel` 0~9), 개체 속성(셀 안이면 표/셀 속성)을 고쳤다. 실측: 다섯 키로 넣고 저장한 파일을 한/글이 열고 다시 저장해도 HYPERLINK, SUMMERY, CROSSREF 가 그대로, 단추 셋 모두 통과.
+  **필드 경계**(패치 `field-closed-edges`): rhwp 는 필드 끝에 친 글을 필드 안으로 넣었다(누름틀용 규칙). 하이퍼링크, 상호 참조, 날짜, 문서 요약 필드는 경계에 친 글을 밖에 둔다.
+  🔴 **빈 머리말이 한/글을 죽이던 것**(패치 `hf-empty-para`): rhwp 는 글 없는 머리말 문단을 `<hp:p></hp:p>`(run 없음)로 저장하고, 그 파일을 다시 열면 그 문단을 버려 **다음 저장에서 문단 없는 subList** 가 되는데 **한/글은 그 파일을 열다 죽는다**(COM 이 「원격 프로시저를 호출하지 못했습니다」). 빈 문단에도 빈 run 을 쓰고, 문단이 없으면 빈 문단 하나를 쓴다. 한/글로 열 수 없는 저장본이 의심되면 `unzip -p <파일> Contents/section0.xml` 에서 `<hp:subList …></hp:subList>` 를 먼저 본다.
+  ⚠ 한/글 COM 시험 파일을 만들 때 `zipfile.writestr(원본의 ZipInfo, …)` 를 쓰지 않는다 — 원본 ZipInfo 의 오프셋이 바뀌어 다음 읽기가 「Bad CRC」로 실패한다(손상으로 오인했다). `ZipInfo(이름, 날짜)` 를 새로 만든다. `hwp.Open` 은 절대 경로만 받는다.
 - **진단**: 앱 창을 `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9333` 로 띄우면 `node editor/tests/cdp_eval.mjs 9333 "<식>"` 에서 `S.__claudeIH()` 로 입력 처리기(커서, 기록, formatCopyState 등)를 볼 수 있다. 조용히 실패하는 기능은 이것으로 해당 함수를 직접 불러 오류 문구를 받는다.
 - `getControls()` 는 **셀 안 표도 돌려준다**(list 2). 본문 표만 세려면 `c.list < 구역 수` 이고 `getTableDimensions` 가 성공하는 것만 센다.
 - 표가 든 문단 끝에서 `splitParagraph` 하면 **표가 새 문단으로 딸려 간다.** 표 뒤에 문단을 만들 때는 `insertParagraph(s, idx)`.

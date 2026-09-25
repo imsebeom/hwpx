@@ -35,6 +35,7 @@ const LABEL = {
   setColumnDef: '단 설정', createHeaderFooter: '머리말/꼬리말 만들기', deleteHeaderFooter: '머리말/꼬리말 지우기',
   applyHfTemplate: '머리말/꼬리말 마당', deleteFootnote: '각주 지우기', endnoteShape: '미주 모양',
   insertNewNumber: '새 번호', deleteStyle: '스타일 지우기',
+  insertHyperlink: '하이퍼링크', insertCrossRef: '상호 참조', insertDateString: '날짜/시간 문자열', insertDateCode: '날짜/시간 코드',
 };
 
 export function installEditLog(host, getInputHandler) {
