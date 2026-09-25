@@ -1,8 +1,25 @@
+From 1f9abd2821ba457bf0daf8ca93946f776e67f2de Mon Sep 17 00:00:00 2001
+From: imsebeom <hccgahy1@gmail.com>
+Date: Fri, 25 Sep 2026 12:28:20 +0900
+Subject: [PATCH] =?UTF-8?q?fix(layout):=20=EC=A4=84=20=EB=B0=B0=EC=B9=98?=
+ =?UTF-8?q?=20=EC=97=86=EB=8A=94=20=EA=B8=80=EC=9E=90=EC=B2=98=EB=9F=BC=20?=
+ =?UTF-8?q?=EC=B7=A8=EA=B8=89=20=ED=91=9C=EA=B0=80=20=EC=A0=81=ED=9E=8C=20?=
+ =?UTF-8?q?=EB=86=92=EC=9D=B4=EB=A1=9C=20=EB=88=8C=EB=A0=A4=20=EC=95=84?=
+ =?UTF-8?q?=EB=9E=98=20=ED=91=9C=EC=99=80=20=EA=B2=B9=EC=B9=9C=EB=8B=A4=20?=
+ =?UTF-8?q?(#7419)?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+---
+ src/renderer/height_measurer.rs | 36 ++++++++++++++++++++++++++++++++-
+ 1 file changed, 35 insertions(+), 1 deletion(-)
+
 diff --git a/src/renderer/height_measurer.rs b/src/renderer/height_measurer.rs
-index 4de0d000..b66ccb45 100644
+index 4de0d000..b929bdef 100644
 --- a/src/renderer/height_measurer.rs
 +++ b/src/renderer/height_measurer.rs
-@@ -2202,7 +2202,17 @@ impl HeightMeasurer {
+@@ -2202,7 +2202,19 @@ impl HeightMeasurer {
                              return None;
                          };
                          if para_max_lh >= nested.common.height as i32 {
@@ -14,14 +31,16 @@ index 4de0d000..b66ccb45 100644
 +                            if !crate::renderer::para_has_no_stored_line_segs(p) {
 +                                return None; // 줄높이가 이미 담고 있다
 +                            }
-+                            let stretch = self.render_normalization.nested_table_width_scale(nested);
-+                            let mt = self.measure_table_impl(nested, 0, 0, styles, depth + 1, stretch);
++                            let stretch =
++                                self.render_normalization.nested_table_width_scale(nested);
++                            let mt =
++                                self.measure_table_impl(nested, 0, 0, styles, depth + 1, stretch);
 +                            let grown = mt.total_height - hwpunit_to_px(para_max_lh, self.dpi);
 +                            return (grown > 0.5).then_some(grown);
                          }
                          let stretch = self.render_normalization.nested_table_width_scale(nested);
                          let mt = self.measure_table_impl(nested, 0, 0, styles, depth + 1, stretch);
-@@ -3915,8 +3925,28 @@ impl HeightMeasurer {
+@@ -3915,8 +3927,30 @@ impl HeightMeasurer {
          // 편집으로 셀이 자란 성장분까지 선언높이로 눌러 다른 행의 몫을 잠식한다
          // (셀 Enter 재현: 표가 선언 높이에 고정된 채 행 경계만 위로 밀림).
          // 편집 세션은 실측을 신뢰한다.
@@ -34,7 +53,9 @@ index 4de0d000..b66ccb45 100644
 +        // 행을 셀 선언으로 되돌리고, 둘째 줄이 칸 밖으로 나가 다음 표와 겹친다.
 +        let generator_restated_height = !self.is_native_hwp5
 +            && table.cells.iter().all(|c| {
-+                c.paragraphs.iter().all(crate::renderer::para_has_no_stored_line_segs)
++                c.paragraphs
++                    .iter()
++                    .all(crate::renderer::para_has_no_stored_line_segs)
 +            })
 +            && {
 +                let declared: f64 = (0..row_count)
@@ -50,3 +71,6 @@ index 4de0d000..b66ccb45 100644
              && common_h > 0.0
              && raw_table_height > common_h + shrink_threshold
              && raw_table_height <= common_h * TAC_SHRINK_MAX_OVERFLOW_RATIO
+-- 
+2.53.0.windows.1
+
