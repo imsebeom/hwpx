@@ -118,6 +118,86 @@ function installCellPathFill(getInputHandler) {
   }
 }
 
+/**
+ * 표 선을 마우스로 클릭하면 표를 개체로 고른다(한/글처럼). rhwp 는 선 위 mousedown 을 곧바로 크기 조절
+ * 드래그로 잡고, 떼었을 때 움직임이 1 쪽 픽셀(75 HWPUNIT) 미만이고 바깥 선일 때만 표를 골랐다. 확대 화면에서는
+ * 클릭할 때의 손떨림이 그 한도를 넘어 표 선택 대신 선이 조금씩 옮겨졌다(2026-09-26 편집 기록의 「셀 크기」).
+ * 누른 자리에서 화면 4px 안에서 떼면 크기 조절을 하지 않고 표를 고른다. 안쪽 선도 같다.
+ */
+function installTableClickSelect(host, getInputHandler) {
+  let down = null;
+  const selectTable = (ih, ref) => {
+    const c = ih.cursor;
+    c.clearSelection();
+    c.exitCellSelectionMode?.();
+    ih.cellSelectionRenderer?.clear();
+    ih.exitPictureObjectSelectionIfNeeded?.();
+    c.enterTableObjectSelectionDirect(ref.sec, ref.ppi, ref.ci);
+    ih.active = true;
+    ih.caret?.hide();
+    ih.fieldMarker?.hide();
+    ih.selectionRenderer?.clear();
+    ih.renderTableObjectSelection();
+    ih.eventBus.emit('table-object-selection-changed', true);
+    ih.eventBus.emit('command-state-changed');
+    ih.textarea.focus();
+  };
+  /** 화면 좌표 → (쪽, 쪽 좌표). rhwp onClick 과 같은 계산 */
+  const toPage = (ih, e) => {
+    const sc = ih.container?.querySelector('#scroll-content');
+    if (!sc) return null;
+    const r = sc.getBoundingClientRect();
+    const cx = e.clientX - r.left;
+    const cy = e.clientY - r.top;
+    const pg = ih.virtualScroll.getPageAtPoint(cx, cy);
+    const zoom = ih.viewportManager.getZoom();
+    return { pg, x: (cx - ih.virtualScroll.getPageLeftResolved(pg, sc.clientWidth)) / zoom, y: (cy - ih.virtualScroll.getPageOffset(pg)) / zoom, zoom };
+  };
+  window.addEventListener('mousedown', (e) => { down = { x: e.clientX, y: e.clientY }; }, true);
+  // rhwp 의 클릭 처리가 표 바깥 윗선 클릭을 표 선택까지 보내지 않는 경우가 있다(2026-09-26 실측 — 커서도 안 움직인다).
+  // 떼었을 때 움직임이 없고 표 바깥 선 근처(화면 5px)인데 표가 안 골라졌으면 고른다.
+  window.addEventListener('mouseup', (e) => {
+    if (e.button !== 0 || !down || Math.hypot(e.clientX - down.x, e.clientY - down.y) >= 4) return;
+    const ih = getInputHandler();
+    if (!ih?.cursor || ih.cursor.isInTableObjectSelection()) return;
+    const p = toPage(ih, e);
+    if (!p) return;
+    const tol = 5 / p.zoom;
+    let hit = null;
+    try {
+      for (const t of host.read((doc) => listTables(doc))) {
+        let b;
+        try { b = ih.wasm.getTableBBoxAtPage(t.section, t.para, t.ctrl, p.pg); } catch { continue; }
+        if (!b || !b.width) continue;
+        const inX = p.x >= b.x - tol && p.x <= b.x + b.width + tol;
+        const inY = p.y >= b.y - tol && p.y <= b.y + b.height + tol;
+        const nearH = inX && (Math.abs(p.y - b.y) <= tol || Math.abs(p.y - (b.y + b.height)) <= tol);
+        const nearV = inY && (Math.abs(p.x - b.x) <= tol || Math.abs(p.x - (b.x + b.width)) <= tol);
+        if (nearH || nearV) { hit = { sec: t.section, ppi: t.para, ci: t.ctrl }; break; }
+      }
+    } catch { return; }
+    if (hit) setTimeout(() => { if (!ih.cursor.isInTableObjectSelection()) selectTable(ih, hit); }, 0);
+  }, true);
+  const patch = () => {
+    const ih = getInputHandler();
+    if (!ih?.finishResizeDrag) return false;
+    if (ih.__tableClick) return true;
+    const orig = ih.finishResizeDrag.bind(ih);
+    ih.finishResizeDrag = (e) => {
+      const st = ih.resizeDragState;
+      if (!st || !down || Math.hypot(e.clientX - down.x, e.clientY - down.y) >= 4) return orig(e);
+      const ref = { ...st.tableRef };
+      ih.cleanupResizeDrag();
+      selectTable(ih, ref);
+    };
+    ih.__tableClick = true;
+    return true;
+  };
+  if (!patch()) {
+    const t = setInterval(() => { if (patch()) clearInterval(t); }, 200);
+  }
+}
+
 export function createClaudePlugin(getInputHandler) {
   return {
     id: 'claude',
@@ -142,6 +222,7 @@ export function createClaudePlugin(getInputHandler) {
       installHancomKeys(host, getInputHandler);
       installMergedCellRange(host, getInputHandler);
       installCellPathFill(getInputHandler);
+      installTableClickSelect(host, getInputHandler);
       installEditLog(host, getInputHandler);   // 사용자 편집을 하나하나 /api/ops 로(`$E changes`)
       // 진단용: 디버그 포트로 붙었을 때 입력 처리기를 볼 수 있게(tests/cdp_eval.mjs 의 S.__claudeIH())
       (window as any).__claudeIH = getInputHandler;
