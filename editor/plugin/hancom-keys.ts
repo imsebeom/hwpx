@@ -81,6 +81,20 @@ const SINGLE = [
 // 셀 선택을 먼저 풀어 버려(input-handler-keyboard.ts) Alt+Shift+A/Z, Alt+L 같은 서식이 커서 셀 하나에만
 // 들어갔다. 서식 명령과 대화상자(글자 모양, 문단 모양, 스타일)는 getSelectedCellBlock 으로 블록 전체를
 // 대상으로 삼으므로 선택을 풀기 전에 부른다. 블록 계산과 줄·칸 추가/삭제도 블록이 있어야 뜻이 선다.
+// 셀 블록 상태의 한 글쇠 명령(한/글 도움말 「셀 블록 상태에서 <F5>」). rhwp 는 M, S 만 받는다.
+// [명령, 대화상자에서 열 탭]. 한/글에 있는 A(표 자동 채우기)는 rhwp 에 기능이 없다.
+const CELL_BLOCK_LETTERS = {
+  p: ['table:cell-props'],
+  l: ['table:border-each', '테두리'],   // 각 셀 테두리 모양
+  c: ['table:border-each', '배경'],     // 각 셀 배경 모양
+  b: ['table:border-one', '테두리'],    // 여러 셀 테두리 모양(하나의 셀처럼)
+  f: ['table:border-one', '배경'],      // 여러 셀 배경 모양
+  h: ['table:cell-height-equal'],
+  w: ['table:cell-width-equal'],
+  m: ['table:cell-merge'],
+  s: ['table:cell-split'],
+};
+
 const keepsCellBlock = (id) =>
   id.startsWith('format:') ||
   ['table:block-avg', 'table:block-product', 'table:insert-row-col', 'table:delete-row-col'].includes(id);
@@ -169,6 +183,24 @@ export function installHancomKeys(host, getInputHandler) {
     }
 
     if (ih.cursor?.isInCellSelectionMode?.() && !ih.cursor.isProtectedCellSelectionMode?.()) {
+      // 한/영, 한자 키는 입력기 전환만 하게 둔다(rhwp 에 넘기면 셀 선택이 풀린다).
+      if (['HangulMode', 'HanjaMode', 'Lang1', 'Lang2'].includes(e.key) || e.keyCode === 21 || e.keyCode === 25) {
+        e.stopImmediatePropagation();
+        return;
+      }
+      const letter = !ctrl && !e.altKey ? CELL_BLOCK_LETTERS[LETTER(e)] : null;
+      if (letter) {
+        swallow(e);
+        if (e.isComposing || e.keyCode === 229 || e.key === 'Process' || /^[ㄱ-ㅣ]$/.test(e.key)) dropComposition();
+        const [id, tab] = letter;
+        runCommand(id);
+        if (tab) {
+          // 대화상자는 테두리 탭으로 열린다. 방금 연 대화상자의 해당 탭을 누른다.
+          const btn = [...document.querySelectorAll('.dialog-tab')].filter((b) => b.textContent === tab).pop();
+          btn?.click();
+        }
+        return;
+      }
       const id = matchShortcut(e, defaultShortcuts);
       if (id && keepsCellBlock(id)) {
         swallow(e);
