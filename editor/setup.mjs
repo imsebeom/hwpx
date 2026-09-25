@@ -64,26 +64,37 @@ if (!fs.existsSync(path.join(STUDIO, 'package.json'))) {
 const pkgDir = path.join(RHWP, 'pkg');
 const cargoBin = path.join(os.homedir(), '.cargo', 'bin');
 const hasRust = ['cargo', 'wasm-pack'].every((b) => fs.existsSync(path.join(cargoBin, `${b}${process.platform === 'win32' ? '.exe' : ''}`)));
+// 패치 두 형태: anchor 앞에 insert 끼우기, 또는 find 를 replace 로 바꾸기(이미 replace 가 들어 있으면 건너뜀).
 const RUST_PATCHES = [
   {
+    id: 'hwpx-hf-autonum',
     file: 'src/serializer/hwpx/section.rs',
     anchor: '            c if (c as u32) < 0x20 => { /* 기타 제어문자 무시 */ }',
     insert: fs.readFileSync(path.join(HERE, 'patches', 'hwpx-hf-autonum.rs'), 'utf8'),
+    done: '[claude-hwpx 패치]',
   },
+  // rhwp#7419 — 줄 배치 없는 글자처럼 취급 표가 적힌 높이로 눌려 아래 표와 겹치는 것(patches/tac-no-ls-*.rs, devel 판은 개발 폴더 fix7419_devel.patch)
+  ...['tac-no-ls-shrink', 'tac-no-ls-nested'].map((id) => {
+    const [find, replace] = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').split('\n// ==== replace ====\n');
+    return { id, file: 'src/renderer/height_measurer.rs', find: find.replace(/^\/\/ ==== find ====\n/, ''), replace, done: `[claude-hwpx ${id}]` };
+  }),
 ];
 const builtMark = path.join(pkgDir, '.claude-patched');
-if (hasRust && !fs.existsSync(builtMark)) {
+const builtIds = fs.existsSync(builtMark) ? fs.readFileSync(builtMark, 'utf8') : '';
+if (hasRust && RUST_PATCHES.some((p) => !builtIds.includes(p.id))) {
   for (const p of RUST_PATCHES) {
     const f = path.join(RHWP, p.file);
     let src = fs.readFileSync(f, 'utf8');
-    if (src.includes('[claude-hwpx 패치]')) continue;
-    if (!src.includes(p.anchor)) throw new Error(`${p.file} 에서 패치 자리를 못 찾았다 — rhwp 버전이 바뀌었는지 확인`);
-    src = src.replace(p.anchor, p.insert + p.anchor);
+    if (src.includes(p.done)) continue;
+    const eol = (s) => (src.includes('\r\n') ? s.replace(/\r?\n/g, '\r\n') : s);   // 태그 판 소스는 CRLF 다
+    const at = eol(p.anchor ?? p.find);
+    if (!src.includes(at)) throw new Error(`${p.file} 에서 패치 자리(${p.id})를 못 찾았다 — rhwp 버전이 바뀌었는지 확인`);
+    src = p.anchor ? src.replace(at, eol(p.insert) + at) : src.replace(at, eol(p.replace));
     fs.writeFileSync(f, src);
   }
   const env = { ...process.env, PATH: `${cargoBin}${path.delimiter}${process.env.PATH}` };
   exec(path.join(cargoBin, 'wasm-pack'), ['build', '--target', 'web', '--release', '--locked', '--out-dir', 'pkg'], { cwd: RHWP, env });
-  fs.writeFileSync(builtMark, `rhwp ${RHWP_VERSION} + ${RUST_PATCHES.map((p) => p.file).join(', ')}\n`);
+  fs.writeFileSync(builtMark, `rhwp ${RHWP_VERSION} + ${RUST_PATCHES.map((p) => p.id).join(', ')}\n`);
 } else if (!hasRust && !fs.existsSync(path.join(pkgDir, 'rhwp_bg.wasm'))) {
   fs.mkdirSync(pkgDir, { recursive: true });
   sh(`npm pack @rhwp/core@${RHWP_VERSION} --silent`, BUILD);
