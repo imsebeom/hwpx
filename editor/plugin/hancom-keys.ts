@@ -242,8 +242,25 @@ export function installHancomKeys(host, getInputHandler) {
    * 한/글처럼 입력칸 이름표면 그 칸으로 가서 값을 고르고, 체크 상자와 라디오 단추는 누르고, 단추(설정(D))는 누른다.
    * 보이는 탭 안에서 같은 글쇠가 여럿이면 지금 포커스 다음 것으로 돌아가며 옮긴다.
    */
+  // 문단 모양 대화상자의 정렬 아이콘(글쇠 표시가 없다). 한컴 도움말의 정렬 단축키 글자를 그대로 쓴다:
+  // Ctrl+Shift+M 양쪽, L 왼쪽, R 오른쪽, C 가운데, T 배분(help.hancom.com …/paragraph(alignment).htm)
+  const ALIGN_ICON = { m: 'sb-al-justify', l: 'sb-al-left', r: 'sb-al-right', c: 'sb-al-center', t: 'sb-al-distribute' };
+  const clickAlign = (dlg, k) => {
+    const icon = ALIGN_ICON[k] && dlg.querySelector(`.ps-align-btn .${ALIGN_ICON[k]}`);
+    const btn = icon?.closest('button');
+    if (!btn || btn.getClientRects().length === 0) return false;
+    btn.click();
+    btn.focus();
+    return true;
+  };
+
   const onDialogKey = (e) => {
     const visible = (el) => el.getClientRects().length > 0;
+    // 대화상자 안의 Ctrl+Shift+정렬 글자: 정렬 아이콘을 누른다(본문 정렬로 새지 않게)
+    if (e.ctrlKey && e.shiftKey && !e.altKey && LETTER(e) in ALIGN_ICON) {
+      const dlg = [...document.querySelectorAll('.dialog-wrap')].filter(visible).pop();
+      if (dlg && clickAlign(dlg, LETTER(e))) { swallow(e); return; }
+    }
     // Ctrl+Tab / Ctrl+Shift+Tab: 대화상자 탭 넘기기
     if (e.ctrlKey && !e.altKey && e.key === 'Tab') {
       const dlg = [...document.querySelectorAll('.dialog-wrap')].filter(visible).pop();
@@ -278,7 +295,11 @@ export function installHancomKeys(host, getInputHandler) {
       const el = n.parentElement;
       if (n.nodeValue.includes(mark) && el && visible(el) && !owners.includes(el)) owners.push(el);
     }
-    if (!owners.length) return;
+    if (!owners.length) {
+      // 이 탭에 그 글쇠를 쓰는 항목이 없으면 Alt+정렬 글자도 정렬 아이콘으로 받는다
+      if (clickAlign(dlg, k)) swallow(e);
+      return;
+    }
     swallow(e);
     const target = (owner) => {
       const btn = owner.closest('button');
