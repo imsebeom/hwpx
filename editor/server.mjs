@@ -22,6 +22,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { readZip, stripDummyLinesegs } from './hwpx-zip.mjs';
 import { rhwpLayout } from './rhwp_layout.mjs';
+import { formatLog, formatOp, coalesceOps } from './log-format.mjs';
 
 const execFileP = promisify(execFile);
 
@@ -317,6 +318,14 @@ const server = http.createServer(async (req, res) => {
       const { ev, ...data } = await readBody(req);
       logEvent(String(ev || 'note'), data);
       return sendJson(res, 200, { ok: true });
+    }
+    if (p === '/api/logview') {   // 에디터 「로그」 패널: Claude 가 `changes`, `log` 로 읽는 것과 같은 줄
+      const readJsonl = (f) => { try { return fs.readFileSync(f, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)); } catch { return []; } };
+      const limit = Math.min(2000, Number(url.searchParams.get('limit')) || 500);
+      const ops = coalesceOps(readJsonl(OPS)).slice(-limit)
+        .map((o) => ({ t: o.t, src: o.src, act: o.act, text: formatOp(o) }));
+      const work = readJsonl(LOG).slice(-limit).map((e) => ({ t: Date.parse(e.ts), ev: e.ev, text: formatLog(e) }));
+      return sendJson(res, 200, { ok: true, doc: readSession().source ?? null, ops, work });
     }
     if (p === '/api/ops' && req.method === 'POST') {   // 스튜디오 플러그인이 편집마다 보내는 기록
       const { ops } = await readBody(req);
