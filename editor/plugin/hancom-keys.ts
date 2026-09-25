@@ -9,6 +9,7 @@
  *
  * 두 번째 키는 e.code(물리 키)로 판별한다. 한글 입력기가 켜져 있으면 e.key 가 'Process' 나 'ㅜ' 로 오기 때문이다.
  */
+import { matchShortcut, defaultShortcuts } from '@/command/shortcut-map';
 
 /**
  * 글쇠 판별: 물리 키(e.code)를 먼저 본다. 원격 데스크톱이나 매크로 입력처럼 code 가 비어 오면
@@ -75,6 +76,14 @@ const SINGLE = [
   [false, true, true, 'KeyS', 'format:subscript'],
   [false, false, true, 'Insert', 'table:insert-row-col'],
 ];
+
+// 셀 블록(F5, 여러 셀 선택)을 유지한 채 부를 명령. rhwp 는 셀 선택 중에 온 키를 「그 외 키」로 보고
+// 셀 선택을 먼저 풀어 버려(input-handler-keyboard.ts) Alt+Shift+A/Z, Alt+L 같은 서식이 커서 셀 하나에만
+// 들어갔다. 서식 명령과 대화상자(글자 모양, 문단 모양, 스타일)는 getSelectedCellBlock 으로 블록 전체를
+// 대상으로 삼으므로 선택을 풀기 전에 부른다. 블록 계산과 줄·칸 추가/삭제도 블록이 있어야 뜻이 선다.
+const keepsCellBlock = (id) =>
+  id.startsWith('format:') ||
+  ['table:block-avg', 'table:block-product', 'table:insert-row-col', 'table:delete-row-col'].includes(id);
 
 export function installHancomKeys(host, getInputHandler) {
   let pending = null;       // 'N' | 'Q' | 'M'
@@ -157,6 +166,15 @@ export function installHancomKeys(host, getInputHandler) {
       if (code === 'KeyQ') { swallow(e); arm('Q'); return; }
       if (code === 'KeyM') { swallow(e); arm('M'); return; }
       if (code === 'KeyA' && selectCellContents()) { swallow(e); return; }
+    }
+
+    if (ih.cursor?.isInCellSelectionMode?.() && !ih.cursor.isProtectedCellSelectionMode?.()) {
+      const id = matchShortcut(e, defaultShortcuts);
+      if (id && keepsCellBlock(id)) {
+        swallow(e);
+        runCommand(id);
+        return;
+      }
     }
 
     for (const [c, s, a, k2, id] of SINGLE) {
