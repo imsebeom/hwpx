@@ -34,6 +34,52 @@ function parseMaybe(value) {
   }
 }
 
+/**
+ * 셀 블록 범위를 걸친 병합 셀이 모두 들어갈 때까지 넓힌다(한/글과 같게).
+ * rhwp 의 getSelectedCellRange 는 시작 셀과 끝 셀의 첫 행, 첫 열만으로 사각형을 만들어, 병합 셀에서
+ * 끝나거나 병합 셀을 반만 걸치면 선택이 드래그 방향에 따라 달라지고 셀 합치기가 조용히 실패했다.
+ * 선택 그리기, 서식, 합치기가 모두 이 메서드를 거치므로 커서 인스턴스에서 감싼다.
+ */
+function installMergedCellRange(host, getInputHandler) {
+  const expand = (cursor, range) => {
+    const ctx = cursor.getCellTableContext?.();
+    if (!range || !ctx || (ctx.cellPath?.length ?? 1) > 1) return range; // 셀 안 표는 그대로
+    const cells = host.read((doc) => {
+      const n = JSON.parse(doc.getTableDimensions(ctx.sec, ctx.ppi, ctx.ci)).cellCount;
+      return Array.from({ length: n }, (_, i) => JSON.parse(doc.getCellInfo(ctx.sec, ctx.ppi, ctx.ci, i)));
+    });
+    let { startRow: r0, startCol: c0, endRow: r1, endCol: c1 } = range;
+    for (let grown = true; grown; ) {
+      grown = false;
+      for (const c of cells) {
+        const cr1 = c.row + c.rowSpan - 1;
+        const cc1 = c.col + c.colSpan - 1;
+        if (c.row > r1 || cr1 < r0 || c.col > c1 || cc1 < c0) continue; // 범위와 안 겹친다
+        if (c.row < r0) { r0 = c.row; grown = true; }
+        if (c.col < c0) { c0 = c.col; grown = true; }
+        if (cr1 > r1) { r1 = cr1; grown = true; }
+        if (cc1 > c1) { c1 = cc1; grown = true; }
+      }
+    }
+    return { startRow: r0, startCol: c0, endRow: r1, endCol: c1 };
+  };
+  const patch = () => {
+    const cursor = getInputHandler()?.cursor;
+    if (!cursor) return false;
+    if (cursor.__mergedRange) return true;
+    const orig = cursor.getSelectedCellRange.bind(cursor);
+    cursor.getSelectedCellRange = () => {
+      const range = orig();
+      try { return expand(cursor, range); } catch { return range; }
+    };
+    cursor.__mergedRange = true;
+    return true;
+  };
+  if (!patch()) {
+    const t = setInterval(() => { if (patch()) clearInterval(t); }, 200);
+  }
+}
+
 export function createClaudePlugin(getInputHandler) {
   return {
     id: 'claude',
@@ -56,6 +102,7 @@ export function createClaudePlugin(getInputHandler) {
 
       // 한컴 한/글 기본 단축키(Ctrl+N 계열, 셀 안 Ctrl+A 등)
       installHancomKeys(host, getInputHandler);
+      installMergedCellRange(host, getInputHandler);
 
       const mutating = (op) => {
         if (op.tool) return !READ_TOOLS.has(op.tool);
