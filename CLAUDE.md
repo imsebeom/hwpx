@@ -76,8 +76,15 @@
   - **작업 기록 기능**(스킬 5c4d5d9, 푸시) — 사용자 지시 「에디터가 작업기록을 남기지 않나보네. 로그 기능 추가해라」.
     `editor-log.jsonl`(비우지 않음)에 시작, 불러옴(줄 배치 경로), 열림, 편집, 저장, 다른 파일 열기, 오류, 종료. **화면 저장은 host.js 가 iframe 의 `createWritable` 을 감싸 잡는다**(스튜디오는 저장 이벤트를 안 낸다, 파일 이름만 남는다). `cli.mjs log [N|--all]`.
     시험은 OPFS(`navigator.storage.getDirectory()`) 파일 핸들로 대화상자 없이 같은 쓰기 경로를 탔다 — `tests/cdp_eval.mjs 9333` + `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9333`
+  - **한글 없는 환경의 표 겹침 해결**(스킬 024e2f2, 푸시) — 사용자 지시 「해결방법 찾아라」.
+    🔑 **원인은 rhwp 의 TAC 비례 축소 규칙**(`height_measurer.rs` `TAC_SHRINK_MAX_OVERFLOW_RATIO = 1.5`): 글자처럼 취급하는 표에서 내용이 적힌 `hp:sz height` 의 1.5배 이하로 넘치면 적힌 높이로 누르는데, 줄 배치가 없으면 행별 하한이 0 이다. `session_edited` 는 HWP5 에서만 켜진다.
+    그래서 「지시문 세 배」 변형(1.5배 초과)은 늘고, 재현 파일(1.1배)은 눌렸다. 높이 0 은 축소를 피하지만 쪽 나누기가 표를 0 으로 보아 쪽 밖으로 밀어낸다(문항 3에서 5쪽).
+    처방 `editor/rhwp_layout.mjs`: 높이 0 으로 열어 `getTableCellBboxes` 로 잰 행 높이 합을 적어 다시 넘긴다. 서버가 한글 실패 또는 비 Windows 에서 쓴다(`HWPX_EDITOR_NO_HANCOM=1` 로 시험).
+    Node 용 WASM 은 `studio-dist/node/`(setup.mjs 가 복사. `studio-dist/rhwp.js` 는 번들과 짝이 달라 「function import requires a callable」). 지금 설치본에는 개발 폴더 `.build/rhwp/pkg` 에서 손으로 복사했다(md5 852d8442 동일)
+    검증: 일곱 표가 한글 재저장본과 같은 쪽, 창 캡처로 겹침 없음, 보정본의 한글 PDF 가 원본과 6쪽 픽셀 동일. #7419 에 원인과 우회를 댓글로 달았다
+    ⚠ 셀 안의 표는 보정하지 않는다. 한글과 줄 나눔이 조금 달라 쪽을 넘는 칸의 끊기는 줄이 한 줄쯤 다를 수 있다
   - **next_steps**: ① 에디터 서버는 새 코드로 다시 띄웠다가 닫았다(지금 꺼져 있음). 저장 시험 끝남
-    ② ~~결함 보고~~ #7419 게시 완료(`gh issue view 7419 -R edwardkim/rhwp`). 답이 오면 반영 ③ ~~실제 줄 배치~~ 3dc908e 완료. **한글 없는 환경에서 만든 문서는 여전히 더미라 rhwp 에서 겹친다** ④ 캠프와 채움AI 프로젝트의 `_scripts/` 는 이 스킬의 복제본이라 이번 변경을 받지 않는다(그쪽 산출물은 에디터가 열 때 한글 줄 배치로 보정된다) ⑤ md2hwpx 산출물 polaris JID 11041 2건 미조사 ⑥ `~/.cache/rhwp-devel`(devel 빌드, 비교 도구, 재현 파일, 저장 시험 사본 `savetest/`)은 남겨 두었다
+    ② ~~결함 보고~~ #7419 게시 완료(`gh issue view 7419 -R edwardkim/rhwp`). 답이 오면 반영 ③ ~~실제 줄 배치~~ 3dc908e 완료, ~~한글 없는 환경 겹침~~ 024e2f2 완료(에디터가 rhwp 로 보정) ④ 캠프와 채움AI 프로젝트의 `_scripts/` 는 이 스킬의 복제본이라 이번 변경을 받지 않는다(그쪽 산출물은 에디터가 열 때 한글 줄 배치로 보정된다) ⑤ md2hwpx 산출물 polaris JID 11041 2건 미조사 ⑥ `~/.cache/rhwp-devel`(devel 빌드, 비교 도구, 재현 파일, 저장 시험 사본 `savetest/`)은 남겨 두었다
 - intent: /hwpx 스킬에 rhwp 에디터 모드(Claude 와 사용자가 같은 문서를 실시간 공동 편집)를 만들어 스킬에 통합하고 GitHub 에 올리기(2026-09-25 세션).
 - changes_made (2026-09-25, 커밋 405488e~019139e):
   - editor/ 전체: 플러그인(doc/m/run/tool op), 브리지 서버, 호스트 페이지, CLI, setup, 앱 창(app.py), EDITOR.md
