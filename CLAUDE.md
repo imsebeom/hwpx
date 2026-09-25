@@ -83,6 +83,12 @@
     Node 용 WASM 은 `studio-dist/node/`(setup.mjs 가 복사. `studio-dist/rhwp.js` 는 번들과 짝이 달라 「function import requires a callable」). 지금 설치본에는 개발 폴더 `.build/rhwp/pkg` 에서 손으로 복사했다(md5 852d8442 동일)
     검증: 일곱 표가 한글 재저장본과 같은 쪽, 창 캡처로 겹침 없음, 보정본의 한글 PDF 가 원본과 6쪽 픽셀 동일. #7419 에 원인과 우회를 댓글로 달았다
     ⚠ 셀 안의 표는 보정하지 않는다. 한글과 줄 나눔이 조금 달라 쪽을 넘는 칸의 끊기는 줄이 한 줄쯤 다를 수 있다
+  - 🔴 **에디터는 세션 사이에 공유된다 — 두 Claude 세션이 동시에 쓰면 서로의 문서를 덮어쓴다**(2026-09-25 10:24 실측).
+    포트 7780 과 `~/.claude/cache/hwpx-editor/` 가 하나라, 내가 시험 파일을 연 직후 한국문화교재개발 세션이 `start` 로 자기 문서를 같은 창에 열었다.
+    내 CDP 클릭 한 번이 그 문서에 들어갔다(dirty false, 변경 0 확인). **다른 세션 문서가 열려 있으면 `start` 가 멈추고 묻게** 하거나 세션마다 포트와 상태 폴더를 나눠야 한다(미착수)
+  - **rhwp 근본 수정 진행 중**(`~/.cache/rhwp-devel/rhwp`, devel) — 원인은 두 보정의 맞물림이다. ① 측정기 TAC 축소가 행을 [25.5, 38.5] 로 줄여 합을 선언 64 에 맞추고
+    ② layout `trust_declared_row_heights` 의 viewtext 갈래(칸 전부 NO_LS 면 선언 신뢰)가 합이 같다고 행을 셀 선언 [32, 32] 로 되돌린다. 진단은 네이티브 디버그 빌드(`target/debug/rhwp.exe export-svg`, 증분 1~2분) + `RHWP_DIAG_ROWH`.
+    수정안: `height_measurer.rs` 축소 조건에 `generator_restated_height`(hwpx, 칸 전부 NO_LS, 표 선언 == 행별 셀 선언 합)면 축소하지 않음. 재현 파일 행 [32.0, 38.5] = 한글 재저장본과 같음
   - **next_steps**: ① 에디터 서버는 새 코드로 다시 띄웠다가 닫았다(지금 꺼져 있음). 저장 시험 끝남
     ② ~~결함 보고~~ #7419 게시 완료(`gh issue view 7419 -R edwardkim/rhwp`). 답이 오면 반영 ③ ~~실제 줄 배치~~ 3dc908e 완료, ~~한글 없는 환경 겹침~~ 024e2f2 완료(에디터가 rhwp 로 보정) ④ 캠프와 채움AI 프로젝트의 `_scripts/` 는 이 스킬의 복제본이라 이번 변경을 받지 않는다(그쪽 산출물은 에디터가 열 때 한글 줄 배치로 보정된다) ⑤ md2hwpx 산출물 polaris JID 11041 2건 미조사 ⑥ `~/.cache/rhwp-devel`(devel 빌드, 비교 도구, 재현 파일, 저장 시험 사본 `savetest/`)은 남겨 두었다
 - intent: /hwpx 스킬에 rhwp 에디터 모드(Claude 와 사용자가 같은 문서를 실시간 공동 편집)를 만들어 스킬에 통합하고 GitHub 에 올리기(2026-09-25 세션).
