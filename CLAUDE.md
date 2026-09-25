@@ -71,8 +71,12 @@
   - **rhwp 결함 보고 준비** — 최소 재현 `~/.cache/rhwp-devel/repro/repro_nols_tac.hwpx`(md2hwpx 표 둘, `treatAsChar="1"`, 줄 배치 없음). 🔑 **`treatAsChar="0"` 이면 재현되지 않는다** — 원인 조건은 「글자처럼 취급하는 표 + NO_LS 셀 문단」이다.
     본문 `repro/issue_body.md`(재현 파일 base64 포함, md5 대조 통과). 기존 #7416 은 더미 사다리를 믿는 축이라 겹치지 않는다. **게시함: https://github.com/edwardkim/rhwp/issues/7419**(imsebeom). gh 로그인은 안 된 상태라 git 자격 증명 관리자의 토큰을 그 명령에만 넘겨 올렸다(`git credential fill` → `GH_TOKEN`)
   - **gh 로그인 완료**(imsebeom, keyring, scopes repo·workflow·gist·read:org). 이제 `gh issue view 7419 -R edwardkim/rhwp` 로 답을 본다
-  - **next_steps**: ⓪ **지금 떠 있는 에디터 서버는 3dc908e 이전 코드다**(`editor/hancom_layout.py` 경로를 부른다 — 옮겨서 없다). 사용자 저장 시험이 끝나면 `cli.mjs stop` 후 `start` 로 새 코드를 띄운다. 그 전에 문서를 다시 열면 더미만 걷는 경로로 물러나 표가 겹쳐 보인다
-    ① **에디터 저장본은 아직 시험하지 않았다** — 한글 줄 배치를 받은 문서를 `save` 해 한글에서 열어 볼 것(줄 배치와 표 높이가 한글 값이라 문제없을 것으로 보이나 실측 전) ② ~~결함 보고~~ #7419 게시 완료. 답이 오면 반영 ③ ~~실제 줄 배치~~ 3dc908e 완료. **한글 없는 환경에서 만든 문서는 여전히 더미라 rhwp 에서 겹친다** ④ 캠프와 채움AI 프로젝트의 `_scripts/` 는 이 스킬의 복제본이라 이번 변경을 받지 않는다(그쪽 산출물은 에디터가 열 때 한글 줄 배치로 보정된다) ⑤ md2hwpx 산출물 polaris JID 11041 2건 미조사 ⑥ `~/.cache/rhwp-devel`(devel 빌드, 비교 도구)은 남겨 두었다
+  - **저장 시험 통과** — 사용자가 에디터 **화면**에서 저장했다(바탕화면 `제출_문항3_이산화탄소_260924_01.hwpx`, 원본과 같은 이름. 새 판 규칙은 cli save 에만 걸린다).
+    글자 4,484자 원본과 동일, 더미 0 / 한글 줄 배치 316, 그림 PNG 유지(104KB), 한글에서 6쪽으로 열림. 한글 PDF 대조로 2~6쪽 픽셀 동일, 1쪽은 사용자가 서식을 바꾼 「자료출처」 칸(T1r20) 한 곳만 다르다
+  - **작업 기록 기능**(스킬 5c4d5d9, 푸시) — 사용자 지시 「에디터가 작업기록을 남기지 않나보네. 로그 기능 추가해라」.
+    `editor-log.jsonl`(비우지 않음)에 시작, 불러옴(줄 배치 경로), 열림, 편집, 저장, 다른 파일 열기, 오류, 종료. **화면 저장은 host.js 가 iframe 의 `createWritable` 을 감싸 잡는다**(스튜디오는 저장 이벤트를 안 낸다, 파일 이름만 남는다). `cli.mjs log [N|--all]`.
+    시험은 OPFS(`navigator.storage.getDirectory()`) 파일 핸들로 대화상자 없이 같은 쓰기 경로를 탔다 — `tests/cdp_eval.mjs 9333` + `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9333`
+  - **next_steps**: ① 에디터 서버는 새 코드로 다시 띄웠다가 닫았다(지금 꺼져 있음)
 - intent: /hwpx 스킬에 rhwp 에디터 모드(Claude 와 사용자가 같은 문서를 실시간 공동 편집)를 만들어 스킬에 통합하고 GitHub 에 올리기(2026-09-25 세션).
 - changes_made (2026-09-25, 커밋 405488e~019139e):
   - editor/ 전체: 플러그인(doc/m/run/tool op), 브리지 서버, 호스트 페이지, CLI, setup, 앱 창(app.py), EDITOR.md
