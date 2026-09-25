@@ -53,7 +53,7 @@
   - 도구: `~/.cache/rhwp-devel/cmp.mjs`(2쪽 글자 줄과 셀 상자), `allpages.mjs <pkg> <a> <b>`(전 쪽 글자 좌표 대조), `variants.py`, `winshot.py`(에디터 창을 앞으로 올리지 않고 PrintWindow 로 캡처 — 사용자 화면을 뺏지 않는다)
 
 ## 컨텍스트 앵커
-- **intent(09-25): 생각쓰기캠프 문항 3(`제출_문항3_이산화탄소_260924_01.hwpx`)을 에디터로 열었더니 ⑴ 문단이 한 줄로 눌리고 ⑵ 표가 아래 표와 겹쳤다(사용자 발견). 둘 다 스킬 쪽에서 고쳤다.**
+- **intent(09-25 둘째 세션): 문항 3을 에디터로 열었더니 문단이 한 줄로 눌리고 표가 겹친 것(사용자 발견)을 스킬과 rhwp 양쪽에서 끝까지 고쳤다 — 에디터 보정, 실제 줄 배치, 세션별 에디터, 작업 기록, rhwp 엔진 패치와 PR #7433.**
   - **changes_made**(스킬 커밋 a6413e6, 042a754 — hwpx, hwpx2 푸시):
     ⓐ `hwpx-zip.mjs stripDummyLinesegs()` + `server.mjs /api/doc` — 더미 줄 배치를 걷고 보낸다
     ⓑ `editor/hancom_layout.py` — 사본을 한글로 열어(쪽수를 읽어 조판을 끝낸 뒤) 저장하고, 줄 배치와 표 `sz height` 만 문단끼리, 표끼리 짝지어 원본에 옮겨 심는다.
@@ -85,8 +85,8 @@
     ⚠ 셀 안의 표는 보정하지 않는다. 한글과 줄 나눔이 조금 달라 쪽을 넘는 칸의 끊기는 줄이 한 줄쯤 다를 수 있다
   - 🔴 **에디터는 세션 사이에 공유된다 — 두 Claude 세션이 동시에 쓰면 서로의 문서를 덮어쓴다**(2026-09-25 10:24 실측).
     포트 7780 과 `~/.claude/cache/hwpx-editor/` 가 하나라, 내가 시험 파일을 연 직후 한국문화교재개발 세션이 `start` 로 자기 문서를 같은 창에 열었다.
-    내 CDP 클릭 한 번이 그 문서에 들어갔다(dirty false, 변경 0 확인). **다른 세션 문서가 열려 있으면 `start` 가 멈추고 묻게** 하거나 세션마다 포트와 상태 폴더를 나눠야 한다(미착수)
-  - **rhwp 근본 수정 진행 중**(`~/.cache/rhwp-devel/rhwp`, devel) — 원인은 두 보정의 맞물림이다. ① 측정기 TAC 축소가 행을 [25.5, 38.5] 로 줄여 합을 선언 64 에 맞추고
+    내 CDP 클릭 한 번이 그 문서에 들어갔다(dirty false, 변경 0 확인). → **아래 「여러 에디터」(012c176)로 해결**
+  - **rhwp 근본 원인**(`~/.cache/rhwp-devel/rhwp`, devel — 아래 PR #7433 으로 마무리) — 원인은 두 보정의 맞물림이다. ① 측정기 TAC 축소가 행을 [25.5, 38.5] 로 줄여 합을 선언 64 에 맞추고
     ② layout `trust_declared_row_heights` 의 viewtext 갈래(칸 전부 NO_LS 면 선언 신뢰)가 합이 같다고 행을 셀 선언 [32, 32] 로 되돌린다. 진단은 네이티브 디버그 빌드(`target/debug/rhwp.exe export-svg`, 증분 1~2분) + `RHWP_DIAG_ROWH`.
     수정안: `height_measurer.rs` 축소 조건에 `generator_restated_height`(hwpx, 칸 전부 NO_LS, 표 선언 == 행별 셀 선언 합)면 축소하지 않음. 재현 파일 행 [32.0, 38.5] = 한글 재저장본과 같음
   - **여러 에디터**(스킬 012c176, 푸시): 세션마다 `hwpx-editor/<세션 ID 앞 8자>/` 와 포트(7780~). `HWPX_EDITOR_INSTANCE`, `cli list`, 창 제목에 문서와 인스턴스.
@@ -109,8 +109,17 @@
     검증(9c190efb, base b3e3d4e2): fmt, unit 3,873, 전체 integration 10,207(2시간 13분), Native Skia 3,930+2+4, Clippy 셋, 배정 계약, OVR(프리셋 5종 불변, 표 속 표 h+6.5 는 의도). 새 회귀 시험은 수정 전 2 failed / 수정 후 2 passed.
     최신 devel(c80a8370)로 rebase 뒤 fmt, native Clippy, 새 시험(suite_008), suite_021(211) 재실행 — 사용자 선택 「빠른 검사만 다시」.
     ⚠ 이 PC 함정: 두 Rust 빌드를 동시에 돌리면 메모리 부족으로 백그라운드 작업이 강제 종료된다 → `CARGO_BUILD_JOBS=4` 로 하나씩 / OVR `--diff-against` 의 worktree 120초 제한 → review worktree 에서만 1,200초 / `--generate` 가 아니라 `--prepare` 를 써야 48 대상 예산이 맞는다
-  - **next_steps**: ① 에디터 서버는 새 코드로 다시 띄웠다가 닫았다(지금 꺼져 있음). 저장 시험 끝남
-    ② ~~결함 보고~~ #7419, **PR #7433** — `gh pr checks 7433 -R edwardkim/rhwp` 로 CI 와 리뷰를 본다. 받아들여지면 에디터 패치(`patches/tac-no-ls-*.rs`)를 걷고 rhwp 판을 올린다 ③ ~~실제 줄 배치~~ 3dc908e 완료, ~~한글 없는 환경 겹침~~ 024e2f2 완료(에디터가 rhwp 로 보정) ④ 캠프와 채움AI 프로젝트의 `_scripts/` 는 이 스킬의 복제본이라 이번 변경을 받지 않는다(그쪽 산출물은 에디터가 열 때 한글 줄 배치로 보정된다) ⑤ md2hwpx 산출물 polaris JID 11041 2건 미조사 ⑥ `~/.cache/rhwp-devel`(devel 빌드, 비교 도구, 재현 파일, 저장 시험 사본 `savetest/`)은 남겨 두었다
+  - **마무리**(스킬 d8f87e1, 푸시): README 에 에디터 모드 절, 크레딧(rhwp 스튜디오와 WASM, 형제 프로젝트 편집 도구, pywebview), 한글 줄 배치, 설치(에디터 빌드)를 넣었다 — **앞선 세션의 에디터 통합 때 README 를 빠뜨렸었다.**
+    THIRD_PARTY_NOTICES 에 `editor/patches/*.rs` 가 rhwp 소스를 고친 조각(MIT 고지 대상)임을 밝혔다. 디스크 정리: rhwp 빌드 캐시 49.6GB, 검증 워크트리, 잠긴 OVR 임시 워크트리, `savetest/`, `hwpx-editor/test2` 삭제(C 드라이브 81 → 120GB)
+  - **decisions**: ⓐ rhwp PR 은 로컬 전체 검증 후 게시하되, 최신 devel 로 rebase 한 뒤에는 빠른 검사만 다시 하고 본문에 그 사실을 밝혔다(사용자 선택) ⓑ 에디터 엔진 패치는 v0.8.6 에 손으로 옮겨 넣었다(사용자 선택) ⓒ 에디터 열 때 보정(rhwp_layout 두 번 처리)은 엔진 패치 뒤에도 쪽 나누기용으로 남긴다
+  - **next_steps**:
+    ① **PR #7433 따라가기** — `gh pr checks 7433 -R edwardkim/rhwp`, `gh pr view 7433 -R edwardkim/rhwp --comments`. 수정 요청이 오면 `~/.cache/rhwp-devel/rhwp` 의 브랜치 `fix/7419-tac-no-ls-row-growth` 에서 고치고 `git push fork`.
+       빌드 캐시를 지웠으므로 다시 빌드부터 해야 한다(디버그 7분, `CARGO_BUILD_JOBS=4`, 검증 worktree 는 `git worktree add` 후 `--prepare`).
+       받아들여지면 에디터 패치(`editor/patches/tac-no-ls-*.rs`)를 걷고 setup.mjs 의 `RHWP_VERSION` 을 올려 재빌드(20분)
+    ② 캠프와 채움AI 프로젝트 `_scripts/` 는 스킬 복제본이라 「실제 줄 배치 넣기」를 받지 않는다 — 넣을지 사용자 결정 대기(급하지 않음, 에디터가 열 때 보정)
+    ③ md2hwpx 산출물 polaris JID 11041 2건 — 원래 있던 것, 미조사
+    ④ 쪽 나누기가 TAC 표의 적힌 높이를 쓰는 rhwp 한계는 PR 범위 밖으로 남겼다 — 필요하면 별도 이슈
+    ⑤ `~/.cache/rhwp-devel/` 에 rhwp 저장소(PR 브랜치), 재현 파일, 비교 도구(cmp/allpages/overlap/winshot/cdp_click)가 남아 있다. 개발 폴더 `editor/.build` 는 스킬 `editor/.build` 가 junction 으로 가리키는 에디터 빌드 캐시다
 - intent: /hwpx 스킬에 rhwp 에디터 모드(Claude 와 사용자가 같은 문서를 실시간 공동 편집)를 만들어 스킬에 통합하고 GitHub 에 올리기(2026-09-25 세션).
 - changes_made (2026-09-25, 커밋 405488e~019139e):
   - editor/ 전체: 플러그인(doc/m/run/tool op), 브리지 서버, 호스트 페이지, CLI, setup, 앱 창(app.py), EDITOR.md
