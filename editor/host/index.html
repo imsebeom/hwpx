@@ -5,12 +5,14 @@
   <title>HWPX 에디터 · Claude 연결</title>
   <style>
     :root { --bar: #1f2937; --fg: #e5e7eb; --ok: #34d399; --warn: #fbbf24; --err: #f87171; }
-    html, body { margin: 0; height: 100%; background: #111827; font-family: 'Pretendard', 'Malgun Gothic', sans-serif; }
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #111827; font-family: 'Pretendard', 'Malgun Gothic', sans-serif; }
     #bar { height: 28px; display: flex; align-items: center; gap: 14px; padding: 0 12px; background: var(--bar); color: var(--fg); font-size: 12px; }
     #dot { width: 8px; height: 8px; border-radius: 50%; background: var(--warn); }
     #dot.ok { background: var(--ok); } #dot.err { background: var(--err); }
     #log { margin-left: auto; opacity: .75; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 55%; }
-    #editor { height: calc(100% - 28px); }
+    #editor { height: calc(100% - 28px); overflow: hidden; }
+    /* iframe 은 인라인이라 글자 기준선 아래 몇 px 가 더 붙어 창에 세로 스크롤바가 생겼다 */
+    #editor iframe { display: block; border: 0; }
   </style>
 </head>
 <body>
