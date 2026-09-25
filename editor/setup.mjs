@@ -91,6 +91,17 @@ const RUST_PATCHES = [
     const [find, replace] = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n').split('\n// ==== replace ====\n');
     return { id, file: 'src/document_core/commands/formatting.rs', find: find.replace(/^\/\/ ==== find ====\n/, ''), replace, done: `[claude-hwpx ${id}]` };
   }),
+  // 표 오른쪽 끝(아래 끝)까지 셀을 합치면 없던 오른쪽(아래) 선이 생기던 것(patches/merge-edge-*.rs)
+  ...[['merge-edge', '    pub fn merge_table_cells_native(', 'merge-edge-helper'],
+    ['merge-edge-after', '        let reflow_cell: Option<(usize, usize)> = {', 'merge-edge-after']].map(([id, anchor, f]) => ({
+    id, file: 'src/document_core/commands/table_ops.rs', anchor,
+    insert: fs.readFileSync(path.join(HERE, 'patches', `${f}.rs`), 'utf8').replace(/\r\n/g, '\n'),
+    done: `[claude-hwpx ${id}]`,
+  })),
+  (() => {
+    const [find, replace] = fs.readFileSync(path.join(HERE, 'patches', 'merge-edge-before.rs'), 'utf8').replace(/\r\n/g, '\n').split('\n// ==== replace ====\n');
+    return { id: 'merge-edge-before', file: 'src/document_core/commands/table_ops.rs', find: find.replace(/^\/\/ ==== find ====\n/, ''), replace, done: '[claude-hwpx merge-edge-before]' };
+  })(),
 ];
 const builtMark = path.join(pkgDir, '.claude-patched');
 const builtIds = fs.existsSync(builtMark) ? fs.readFileSync(builtMark, 'utf8') : '';
