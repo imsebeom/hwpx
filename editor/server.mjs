@@ -78,6 +78,18 @@ const CHANGES = path.join(STATE_DIR, 'changes.jsonl');
 const SESSION = path.join(STATE_DIR, 'session.json');
 
 /**
+ * 작업 기록(editor-log.jsonl). changes.jsonl 은 start 때마다 비우는 「읽지 않은 편집」 큐이고,
+ * 이것은 비우지 않고 쌓는 기록이다 — 세션 시작, 문서 열기(줄 배치 경로), 편집, 저장(화면 저장 포함), 종료, 오류.
+ */
+const LOG = path.join(STATE_DIR, 'editor-log.jsonl');
+export function logEvent(ev, data = {}) {
+  try {
+    const s = readSession();
+    fs.appendFileSync(LOG, JSON.stringify({ ts: new Date().toISOString(), ev, doc: s.source ? path.basename(s.source) : null, ...data }) + '\n');
+  } catch { /* 기록 실패가 편집을 막지 않는다 */ }
+}
+
+/**
  * 에디터에 보낼 문서 바이트. 스킬 파이프라인 산출물(더미 줄 배치)이면 한글로 줄 배치와 표 높이를 계산해
  * 옮겨 심은 판(hancom_layout.py)을 보낸다. 한글이 없거나 실패하면 더미만 걷어낸다(표가 겹칠 수 있다).
  * 원본 파일은 어느 경우에도 건드리지 않는다. 결과는 원본의 크기와 수정 시각으로 캐시한다.
@@ -86,21 +98,26 @@ const LAYOUT_CACHE = path.join(STATE_DIR, 'layout-cache.hwpx');
 const LAYOUT_KEY = path.join(STATE_DIR, 'layout-cache.json');
 async function editorBytes(src) {
   const raw = fs.readFileSync(src);
-  if (!/\.hwpx$/i.test(src)) return raw;
+  if (!/\.hwpx$/i.test(src)) { logEvent('load', { layout: 'raw' }); return raw; }
   const stripped = stripDummyLinesegs(raw);
-  if (!stripped.removed) return raw;
-  if (process.platform !== 'win32') return stripped.buf;
+  if (!stripped.removed) { logEvent('load', { layout: 'stored' }); return raw; }
+  if (process.platform !== 'win32') { logEvent('load', { layout: 'strip', dummy: stripped.removed }); return stripped.buf; }
   const st = fs.statSync(src);
   const key = JSON.stringify({ src, size: st.size, mtimeMs: st.mtimeMs });
-  try { if (fs.readFileSync(LAYOUT_KEY, 'utf8') === key) return fs.readFileSync(LAYOUT_CACHE); } catch { /* 캐시 없음 */ }
+  try {
+    if (fs.readFileSync(LAYOUT_KEY, 'utf8') === key) { logEvent('load', { layout: 'hancom-cache', dummy: stripped.removed }); return fs.readFileSync(LAYOUT_CACHE); }
+  } catch { /* 캐시 없음 */ }
   try {
     await execFileP('python', [path.join(HERE, '..', 'scripts', 'hancom_layout.py'), src, LAYOUT_CACHE],
       { timeout: 120000, windowsHide: true, env: { ...process.env, PYTHONIOENCODING: 'utf-8' } });
     fs.writeFileSync(LAYOUT_KEY, key);
     console.log(`한글 줄 배치 적용: ${path.basename(src)}`);
+    logEvent('load', { layout: 'hancom', dummy: stripped.removed });
     return fs.readFileSync(LAYOUT_CACHE);
   } catch (e) {
-    console.error(`한글 줄 배치 실패, 더미만 걷어냄: ${String(e?.stderr || e?.message || e).trim().split('\n').pop()}`);
+    const why = String(e?.stderr || e?.message || e).trim().split('\n').pop();
+    console.error(`한글 줄 배치 실패, 더미만 걷어냄: ${why}`);
+    logEvent('load', { layout: 'strip', dummy: stripped.removed, error: why });
     return stripped.buf;
   }
 }
@@ -214,6 +231,16 @@ function saveSnapshot(body) {
     if (!entry.diff.length) entry.formatOnly = true;   // 글자는 그대로, 서식이나 개체만 바뀜
   }
   fs.appendFileSync(CHANGES, JSON.stringify(entry) + '\n');
+  if (body.source === 'open') logEvent('open', { bytes: bytes.length });
+  else {
+    logEvent('edit', {
+      by: body.source,
+      refs: entry.formatOnly ? [] : entry.diff.slice(0, 12).map((d) => d.ref ?? `줄${d.line}`),
+      count: entry.diff.length,
+      formatOnly: Boolean(entry.formatOnly),
+      at: entry.cursor?.cell?.ref ?? (entry.cursor ? `p${entry.cursor.para}` : null),
+    });
+  }
   writeSession({ lastSnapshotAt: entry.ts, changeSeq: body.changeSeq, bytes: bytes.length });
   return entry;
 }
@@ -259,12 +286,18 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
   const p = url.pathname;
   try {
+    if (p === '/api/log' && req.method === 'POST') {   // 호스트 페이지(화면 저장, 오류)와 CLI(start, save)가 남기는 기록
+      const { ev, ...data } = await readBody(req);
+      logEvent(String(ev || 'note'), data);
+      return sendJson(res, 200, { ok: true });
+    }
     if (p === '/api/health') {
       return sendJson(res, 200, { ok: true, pid: process.pid, browser: Date.now() - lastPollAt < 30_000, session: readSession(), stateDir: STATE_DIR });
     }
     if (p === '/api/cmd' && req.method === 'POST') {
       const body = await readBody(req);
       if (body.type === 'shutdown') {
+        logEvent('stop');
         sendJson(res, 200, { ok: true });
         setTimeout(() => process.exit(0), 100);
         return;

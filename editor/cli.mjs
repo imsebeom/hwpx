@@ -13,6 +13,7 @@
  *   node cli.mjs changes [--all]       아직 안 읽은 사용자 수정 내역 (읽으면 읽음 처리)
  *   node cli.mjs save [출력.hwpx]      새 판으로 저장 (기본: <이름>_<YYMMDD>_<NN>.hwpx, 덮어쓰기 없음)
  *   node cli.mjs undo                  마지막 배치 되돌리기
+ *   node cli.mjs log [N | --all]       작업 기록(시작, 불러옴, 편집, 화면 저장 포함 저장, 종료, 오류). 비우지 않고 쌓인다
  *   node cli.mjs status | stop
  */
 import fs from 'node:fs';
@@ -37,6 +38,30 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function health() {
   try { return await (await fetch(`${BASE}/api/health`)).json(); } catch { return null; }
+}
+
+/** 작업 기록(editor-log.jsonl)에 한 줄. 서버가 없으면 조용히 넘어간다. */
+async function postLog(ev, data = {}) {
+  try { await fetch(`${BASE}/api/log`, { method: 'POST', body: JSON.stringify({ ev, ...data }) }); } catch { /* 서버 꺼짐 */ }
+}
+
+const LOG = path.join(STATE_DIR, 'editor-log.jsonl');
+const kb = (n) => (n == null ? '' : n < 1024 ? `${n}B` : `${(n / 1024).toFixed(1)}KB`);
+const LAYOUT = { hancom: '한글 줄 배치 적용', 'hancom-cache': '한글 줄 배치(캐시)', strip: '더미 줄 배치만 걷음 — 표가 겹칠 수 있다', stored: '저장된 줄 배치 그대로', raw: 'hwp 그대로' };
+function formatLog(e) {
+  const t = new Date(e.ts).toLocaleString('sv-SE').slice(5, 16);
+  const who = e.by === 'user' ? '사용자' : e.by === 'claude' ? 'Claude' : '';
+  switch (e.ev) {
+    case 'start': return `${t}  시작      ${e.file}`;
+    case 'load': return `${t}  불러옴    ${e.doc} — ${LAYOUT[e.layout] ?? e.layout}${e.error ? ` (${e.error})` : ''}`;
+    case 'open': return `${t}  열림      ${e.doc} ${kb(e.bytes)}`;
+    case 'edit': return `${t}  ${who} 편집 ${e.formatOnly ? '서식이나 개체만' : `${e.count}곳 ${e.refs.join(' ')}${e.count > e.refs.length ? ' …' : ''}`}${e.at ? ` (커서 ${e.at})` : ''}`;
+    case 'save': return `${t}  ${who} 저장 ${e.path ?? e.name} ${kb(e.bytes)}${e.via ? ` (${e.via})` : ''}`;
+    case 'open-file': return `${t}  ${who} 다른 파일 열기 ${e.names.join(', ')} (${e.via})`;
+    case 'error': return `${t}  오류      ${e.cmd ?? ''} ${e.error}`;
+    case 'stop': return `${t}  종료`;
+    default: return `${t}  ${e.ev} ${JSON.stringify(e)}`;
+  }
 }
 
 async function cmd(body) {
@@ -147,6 +172,7 @@ switch (sub) {
     fs.writeFileSync(CHANGES, '');
     fs.writeFileSync(SEEN, '0');
     await ensureServer();
+    await postLog('start', { file });
     let h = await health();
     if (!h.browser && aliveAppPid()) {                // 옛 앱 창이 새 서버에 다시 붙기를 기다린다
       for (let i = 0; i < 20 && !h.browser; i++) { await sleep(500); h = await health(); }
@@ -202,7 +228,15 @@ switch (sub) {
     if (fix.fixed) out(`머리말/꼬리말 쪽 번호 ${fix.fixed}개 보정`);
     for (const why of fix.skipped) out(`⚠ 쪽 번호 보정 못 함: ${why}`);
     await cmd({ type: 'saved', fileName: path.basename(target) });
+    await postLog('save', { by: 'claude', path: target, bytes: fix.buf.length, hfFixed: fix.fixed || undefined });
     out(`저장: ${target}`);
+    break;
+  }
+  case 'log': {                                     // 작업 기록. 기본 최근 30줄, --all 전부, 숫자로 줄 수
+    let lines = [];
+    try { lines = fs.readFileSync(LOG, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)); } catch { /* 기록 없음 */ }
+    const n = args.includes('--all') ? lines.length : Number(args.find((a) => /^\d+$/.test(a)) ?? 30);
+    out(lines.length ? lines.slice(-n).map(formatLog).join('\n') : '기록 없음');
     break;
   }
   case 'status': out((await health()) ?? '서버 꺼짐'); break;

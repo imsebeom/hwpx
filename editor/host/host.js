@@ -10,6 +10,48 @@ const studio = await createStudio('#editor', {
   plugins: ['hwpctrl', 'claude'],
 });
 
+const postLog = (ev, data = {}) => fetch('/api/log', { method: 'POST', body: JSON.stringify({ ev, ...data }) }).catch(() => {});
+
+/**
+ * 에디터 화면의 저장과 열기를 작업 기록에 남긴다. 스튜디오는 저장 이벤트를 내보내지 않고 File System Access API
+ * (showSaveFilePicker → createWritable)로 파일을 쓰므로, iframe(같은 출처) 안의 그 함수들을 감싼다.
+ * 브라우저는 전체 경로를 알려 주지 않아 파일 이름만 남는다.
+ */
+function watchFileAccess() {
+  const w = $('editor').querySelector('iframe')?.contentWindow;
+  const proto = w?.FileSystemFileHandle?.prototype;
+  if (!proto || proto.__claudeLogged) return;
+  proto.__claudeLogged = true;
+  const create = proto.createWritable;
+  proto.createWritable = async function (...args) {
+    const handle = this;
+    const writable = await create.apply(this, args);
+    let bytes = 0;
+    const write = writable.write.bind(writable);
+    writable.write = (data) => {
+      const d = data?.type === 'write' ? data.data : data;
+      bytes += d?.size ?? d?.byteLength ?? 0;
+      return write(data);
+    };
+    const close = writable.close.bind(writable);
+    writable.close = async () => {
+      const r = await close();
+      postLog('save', { by: 'user', name: handle.name, bytes, via: '에디터 화면' });
+      log(`저장 기록: ${handle.name}`);
+      return r;
+    };
+    return writable;
+  };
+  if (w.showOpenFilePicker) {
+    const pick = w.showOpenFilePicker.bind(w);
+    w.showOpenFilePicker = async (...args) => {
+      const hs = await pick(...args);
+      postLog('open-file', { by: 'user', names: hs.map((h) => h.name), via: '에디터 화면' });
+      return hs;
+    };
+  }
+}
+
 let busy = false;          // Claude 명령 실행 중에는 사용자 변경 감지를 멈춘다
 let lastKey = null;        // 마지막으로 기록한 문서 상태
 
@@ -126,6 +168,7 @@ async function pollLoop() {
     } catch (e) {
       reply = { ok: false, error: String(e?.message || e), code: e?.code };
       log(`명령 실패: ${reply.error}`);
+      postLog('error', { by: 'claude', cmd: cmd.type, error: reply.error.slice(0, 300) });
     } finally {
       busy = false;
     }
@@ -147,5 +190,6 @@ setInterval(async () => {
 }, 1500);
 
 setStatus('Claude 연결 대기', '');
+watchFileAccess();
 await openFromServer();
 pollLoop();
