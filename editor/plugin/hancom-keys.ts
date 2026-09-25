@@ -50,6 +50,14 @@ const CHORD_N = {
   d: null, // 호환 문서
 };
 
+// Ctrl+K,? (입력 도우미). rhwp 에 있는 것만. 하이퍼링크(H), 상호 참조(R), 날짜/시간(D, C, F)은 기능이 없다(null).
+const CHORD_K = {
+  n: 'format:para-num-shape',
+  b: 'insert:bookmark',
+  e: 'insert:field',
+  h: null, r: null, d: null, c: null, f: null,
+};
+
 // Ctrl+Q,? (찾기)
 const CHORD_Q = {
   f: 'edit:find',
@@ -167,6 +175,8 @@ export function installHancomKeys(host, getInputHandler) {
         if (id) runCommand(id);
       } else if (which === 'Q') {
         if (CHORD_Q[k]) runCommand(CHORD_Q[k]);
+      } else if (which === 'K') {
+        if (CHORD_K[k]) runCommand(CHORD_K[k]);
       } else if (which === 'M') {
         if (COLORS[k]) getInputHandler()?.applyCharFormat?.({ textColor: COLORS[k] });
         else if (CHORD_M_FALLBACK[k]) runCommand(CHORD_M_FALLBACK[k]);
@@ -178,6 +188,7 @@ export function installHancomKeys(host, getInputHandler) {
     if (ctrl && !e.shiftKey && !e.altKey) {
       if (code === 'KeyN') { swallow(e); arm('N'); return; }
       if (code === 'KeyQ') { swallow(e); arm('Q'); return; }
+      if (code === 'KeyK') { swallow(e); arm('K'); return; }
       if (code === 'KeyM') { swallow(e); arm('M'); return; }
       if (code === 'KeyA' && selectCellContents()) { swallow(e); return; }
     }

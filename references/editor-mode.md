@@ -175,11 +175,12 @@ rhwp 는 브라우저 예약키를 피하려고 한컴 키 일부를 옮겨 두�
 | Ctrl+N,M, B, C, H, S, K, A, Z, F | 수식, 글상자, 캡션, 머리말, 감추기, 개체 고치기, 표 나누기, 표 붙이기, 계산식 | 연결만(글상자는 그리기 상태라 화면 판정 불가) |
 | Ctrl+M,K/R/B/D/G/Y/C/W | 글자 색 검정/빨강/파랑/자주/초록/노랑/청록/흰색 (한컴 값, #993366 등) | 빨강 통과 |
 | Ctrl+Q,F / Ctrl+Q,A / Ctrl+H | 찾기 / 찾아 바꾸기 | 통과 |
+| Ctrl+K,N / Ctrl+K,B / Ctrl+K,E | 문단 번호 모양 / 책갈피 / 필드 입력 | 셋 다 통과(2026-09-26) |
 | Ctrl+Shift+C / R / T | 가운데 / 오른쪽 / 배분 정렬 | 가운데 통과 |
 | Ctrl+F10 | 문자표 | 통과 |
 | Ctrl+J, Ctrl+Shift+Insert, Ctrl+Shift+Delete, Alt+Shift+P/S, Alt+Insert | 쪽 나누기, 문단 번호, 글머리표, 위/아래 첨자, 줄·칸 추가 | 연결만 |
 
-rhwp 에 기능이 없어 **안 되는 한컴 키**: Ctrl+N,P(쪽 번호 매기기 — 머리말/꼬리말 쪽 번호는 Claude 에게 요청), Ctrl+N,L(문단 띠), Ctrl+N,O(OLE), Ctrl+N,D(호환 문서), Ctrl+Q 의 L/1~0/B/R/I, Ctrl+K 계열 대부분(책갈피 B, 문단 번호 모양 N 만 rhwp 에 있음), Ctrl+G 의 L/Z/R/D, Ctrl+W 계열, F8 맞춤법, F9 한자, Alt+I 상용구, Alt+Shift+C 보통 모양(rhwp 는 이 키를 가운데 정렬로 씀).
+rhwp 에 기능이 없어 **안 되는 한컴 키**: Ctrl+N,P(쪽 번호 매기기 — 머리말/꼬리말 쪽 번호는 Claude 에게 요청), Ctrl+N,L(문단 띠), Ctrl+N,O(OLE), Ctrl+N,D(호환 문서), Ctrl+Q 의 L/1~0/B/R/I, Ctrl+K 의 H, R, D, C, F(하이퍼링크, 상호 참조, 날짜/시간), Ctrl+G 의 L/Z/R/D, Ctrl+W 계열, F8 맞춤법, F9 한자, Alt+I 상용구, Alt+Shift+C 보통 모양(rhwp 는 이 키를 가운데 정렬로 씀).
 
 - **셀 블록(F5로 여러 셀을 고른 상태)에서도 서식 키가 선택한 셀 전체에 먹는다**(2026-09-25 수정). rhwp 는 셀 선택 중에 온 키를 「그 외 키」로 보고 셀 선택부터 풀어 버려(`input-handler-keyboard.ts`) Alt+Shift+A/Z(줄 간격), Alt+L(글자 모양) 같은 키가 커서 셀 하나에만 들어갔다. `hancom-keys.ts` 가 캡처 단계에서 rhwp 단축키 맵의 `format:*` 명령 전부와 블록 계산, 줄·칸 추가/삭제를 선택을 풀기 전에 부른다. 실측(실제 키 입력): 세 셀 블록에서 Alt+Shift+Z 가 세 셀 모두 160→170%, 블록 밖 셀은 그대로 / Alt+L 이 글자 모양 창을 열고 Esc 뒤에도 블록이 남는다.
   **셀 블록의 한 글쇠 명령**(한/글 도움말 「셀 블록 상태에서 <F5>」)도 같은 층이 받는다. rhwp 는 M, S 만 받았다.
