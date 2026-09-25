@@ -75,7 +75,8 @@ const RUST_PATCHES = [
   },
   // rhwp#7419 — 줄 배치 없는 글자처럼 취급 표가 적힌 높이로 눌려 아래 표와 겹치는 것(patches/tac-no-ls-*.rs, devel 판은 개발 폴더 fix7419_devel.patch)
   ...['tac-no-ls-shrink', 'tac-no-ls-nested'].map((id) => {
-    const [find, replace] = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').split('\n// ==== replace ====\n');
+    // git 이 체크아웃하며 CRLF 로 바꿔도 나눌 수 있게 LF 로 맞춘다(소스 쪽 줄바꿈은 아래에서 다시 맞춘다)
+    const [find, replace] = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n').split('\n// ==== replace ====\n');
     return { id, file: 'src/renderer/height_measurer.rs', find: find.replace(/^\/\/ ==== find ====\n/, ''), replace, done: `[claude-hwpx ${id}]` };
   }),
 ];
