@@ -76,7 +76,8 @@
   - **작업 기록 기능**(스킬 5c4d5d9, 푸시) — 사용자 지시 「에디터가 작업기록을 남기지 않나보네. 로그 기능 추가해라」.
     `editor-log.jsonl`(비우지 않음)에 시작, 불러옴(줄 배치 경로), 열림, 편집, 저장, 다른 파일 열기, 오류, 종료. **화면 저장은 host.js 가 iframe 의 `createWritable` 을 감싸 잡는다**(스튜디오는 저장 이벤트를 안 낸다, 파일 이름만 남는다). `cli.mjs log [N|--all]`.
     시험은 OPFS(`navigator.storage.getDirectory()`) 파일 핸들로 대화상자 없이 같은 쓰기 경로를 탔다 — `tests/cdp_eval.mjs 9333` + `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9333`
-  - **next_steps**: ① 에디터 서버는 새 코드로 다시 띄웠다가 닫았다(지금 꺼져 있음)
+  - **next_steps**: ① 에디터 서버는 새 코드로 다시 띄웠다가 닫았다(지금 꺼져 있음). 저장 시험 끝남
+    ② ~~결함 보고~~ #7419 게시 완료(`gh issue view 7419 -R edwardkim/rhwp`). 답이 오면 반영 ③ ~~실제 줄 배치~~ 3dc908e 완료. **한글 없는 환경에서 만든 문서는 여전히 더미라 rhwp 에서 겹친다** ④ 캠프와 채움AI 프로젝트의 `_scripts/` 는 이 스킬의 복제본이라 이번 변경을 받지 않는다(그쪽 산출물은 에디터가 열 때 한글 줄 배치로 보정된다) ⑤ md2hwpx 산출물 polaris JID 11041 2건 미조사 ⑥ `~/.cache/rhwp-devel`(devel 빌드, 비교 도구, 재현 파일, 저장 시험 사본 `savetest/`)은 남겨 두었다
 - intent: /hwpx 스킬에 rhwp 에디터 모드(Claude 와 사용자가 같은 문서를 실시간 공동 편집)를 만들어 스킬에 통합하고 GitHub 에 올리기(2026-09-25 세션).
 - changes_made (2026-09-25, 커밋 405488e~019139e):
   - editor/ 전체: 플러그인(doc/m/run/tool op), 브리지 서버, 호스트 페이지, CLI, setup, 앱 창(app.py), EDITOR.md
