@@ -105,8 +105,12 @@
   - **rhwp PR 준비**: 개발판 클론(`~/.cache/rhwp-devel/rhwp`) 브랜치 `fix/7419-tac-no-ls-row-growth`, 커밋 1f9abd28(`cargo fmt` 통과). 패치 사본 `fix7419_devel.patch`.
     검증 worktree `~/.cache/rhwp-devel/rhwp-rust-review` 에서 `--prepare`(48 묶음, 최소 6,559건) 후 `cargo nextest --cargo-profile release-test --tests` 실행 중.
     ⚠ 이 PC 의 git 은 core.autocrlf=true 라 worktree 가 CRLF 로 나와 rustfmt 가 전 파일을 문제 삼았다 — 저장소 설정을 false 로 바꾸고 `git rm --cached -r . && git reset --hard` 로 다시 받았다
+  - **rhwp PR 게시: https://github.com/edwardkim/rhwp/pull/7433**(devel 대상, 포크 imsebeom/rhwp 브랜치 `fix/7419-tac-no-ls-row-growth`, 커밋 52a51c0a9 수정 + 4905a31d0 시험). 본문 사본 `pr7433_body.md`.
+    검증(9c190efb, base b3e3d4e2): fmt, unit 3,873, 전체 integration 10,207(2시간 13분), Native Skia 3,930+2+4, Clippy 셋, 배정 계약, OVR(프리셋 5종 불변, 표 속 표 h+6.5 는 의도). 새 회귀 시험은 수정 전 2 failed / 수정 후 2 passed.
+    최신 devel(c80a8370)로 rebase 뒤 fmt, native Clippy, 새 시험(suite_008), suite_021(211) 재실행 — 사용자 선택 「빠른 검사만 다시」.
+    ⚠ 이 PC 함정: 두 Rust 빌드를 동시에 돌리면 메모리 부족으로 백그라운드 작업이 강제 종료된다 → `CARGO_BUILD_JOBS=4` 로 하나씩 / OVR `--diff-against` 의 worktree 120초 제한 → review worktree 에서만 1,200초 / `--generate` 가 아니라 `--prepare` 를 써야 48 대상 예산이 맞는다
   - **next_steps**: ① 에디터 서버는 새 코드로 다시 띄웠다가 닫았다(지금 꺼져 있음). 저장 시험 끝남
-    ② ~~결함 보고~~ #7419 게시 완료(`gh issue view 7419 -R edwardkim/rhwp`). 답이 오면 반영 ③ ~~실제 줄 배치~~ 3dc908e 완료, ~~한글 없는 환경 겹침~~ 024e2f2 완료(에디터가 rhwp 로 보정) ④ 캠프와 채움AI 프로젝트의 `_scripts/` 는 이 스킬의 복제본이라 이번 변경을 받지 않는다(그쪽 산출물은 에디터가 열 때 한글 줄 배치로 보정된다) ⑤ md2hwpx 산출물 polaris JID 11041 2건 미조사 ⑥ `~/.cache/rhwp-devel`(devel 빌드, 비교 도구, 재현 파일, 저장 시험 사본 `savetest/`)은 남겨 두었다
+    ② ~~결함 보고~~ #7419, **PR #7433** — `gh pr checks 7433 -R edwardkim/rhwp` 로 CI 와 리뷰를 본다. 받아들여지면 에디터 패치(`patches/tac-no-ls-*.rs`)를 걷고 rhwp 판을 올린다 ③ ~~실제 줄 배치~~ 3dc908e 완료, ~~한글 없는 환경 겹침~~ 024e2f2 완료(에디터가 rhwp 로 보정) ④ 캠프와 채움AI 프로젝트의 `_scripts/` 는 이 스킬의 복제본이라 이번 변경을 받지 않는다(그쪽 산출물은 에디터가 열 때 한글 줄 배치로 보정된다) ⑤ md2hwpx 산출물 polaris JID 11041 2건 미조사 ⑥ `~/.cache/rhwp-devel`(devel 빌드, 비교 도구, 재현 파일, 저장 시험 사본 `savetest/`)은 남겨 두었다
 - intent: /hwpx 스킬에 rhwp 에디터 모드(Claude 와 사용자가 같은 문서를 실시간 공동 편집)를 만들어 스킬에 통합하고 GitHub 에 올리기(2026-09-25 세션).
 - changes_made (2026-09-25, 커밋 405488e~019139e):
   - editor/ 전체: 플러그인(doc/m/run/tool op), 브리지 서버, 호스트 페이지, CLI, setup, 앱 창(app.py), EDITOR.md
