@@ -76,6 +76,7 @@ const LATEST = path.join(STATE_DIR, 'latest.hwpx');
 const LATEST_TXT = path.join(STATE_DIR, 'latest.txt');
 const LATEST_MODEL = path.join(STATE_DIR, 'latest.model.json');
 const CHANGES = path.join(STATE_DIR, 'changes.jsonl');
+const OPS = path.join(STATE_DIR, 'ops.jsonl');   // 실시간 편집 기록(plugin/edit-log.ts). 편집 하나가 한 줄
 const SESSION = path.join(STATE_DIR, 'session.json');
 
 /**
@@ -315,6 +316,11 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/log' && req.method === 'POST') {   // 호스트 페이지(화면 저장, 오류)와 CLI(start, save)가 남기는 기록
       const { ev, ...data } = await readBody(req);
       logEvent(String(ev || 'note'), data);
+      return sendJson(res, 200, { ok: true });
+    }
+    if (p === '/api/ops' && req.method === 'POST') {   // 스튜디오 플러그인이 편집마다 보내는 기록
+      const { ops } = await readBody(req);
+      if (Array.isArray(ops) && ops.length) fs.appendFileSync(OPS, ops.map((o) => JSON.stringify(o)).join('\n') + '\n');
       return sendJson(res, 200, { ok: true });
     }
     if (p === '/api/health') {

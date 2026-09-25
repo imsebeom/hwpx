@@ -64,6 +64,8 @@ async function allocatePort() {
 const SESSION = path.join(STATE_DIR, 'session.json');
 const CHANGES = path.join(STATE_DIR, 'changes.jsonl');
 const SEEN = path.join(STATE_DIR, 'changes.seen');
+const OPS = path.join(STATE_DIR, 'ops.jsonl');
+const OPS_SEEN = path.join(STATE_DIR, 'ops.seen');
 const APP_PID = path.join(STATE_DIR, 'app.pid');
 
 const out = (obj) => process.stdout.write((typeof obj === 'string' ? obj : JSON.stringify(obj, null, 2)) + '\n');
@@ -177,6 +179,51 @@ function nextVersion(source) {
   return path.join(dir, `${prefix}_${today}_${String(max + 1).padStart(2, '0')}.hwpx`);
 }
 
+function readOps() {
+  try { return fs.readFileSync(OPS, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)); } catch { return []; }
+}
+
+const localTime = (t) => new Date(t).toTimeString().slice(0, 8);
+
+// 서식 속성 이름과 값(글자 크기는 1/100 pt)
+const PROP = {
+  fontSize: ['글자 크기', (v) => `${v / 100}pt`], lineSpacing: ['줄 간격', (v) => `${v}%`], lineSpacingType: ['줄 간격 종류'],
+  bold: ['진하게'], italic: ['기울임'], underline: ['밑줄'], strikethrough: ['취소선'], textColor: ['글자 색'],
+  shadeColor: ['음영 색'], fontId: ['글꼴'], fontIds: ['글꼴'], ratios: ['장평', (v) => `${v?.[0]}%`],
+  spacings: ['자간', (v) => `${v?.[0]}%`], relativeSizes: ['상대 크기'], superscript: ['위 첨자'], subscript: ['아래 첨자'],
+  alignment: ['정렬'], indent: ['들여쓰기'], marginLeft: ['왼쪽 여백'], marginRight: ['오른쪽 여백'],
+  spacingBefore: ['문단 위'], spacingAfter: ['문단 아래'], keepWithNext: ['다음 문단과 함께'], keepLines: ['문단 보호'],
+  widowOrphan: ['외톨이줄 보호'], pageBreakBefore: ['앞에서 쪽 나눔'], headType: ['문단 머리'],
+};
+const propText = (k, [a, b]) => {
+  const [name, fmt] = PROP[k] ?? [k];
+  const f = (v) => (v === undefined ? '?' : fmt ? fmt(v) : typeof v === 'string' ? v : JSON.stringify(v));
+  return `${name} ${f(a)} → ${f(b)}`;
+};
+
+/** 이어 친 글자(같은 자리, 붙은 위치)를 한 줄로 묶는다. */
+function coalesceOps(ops) {
+  const outOps = [];
+  for (const o of ops) {
+    const last = outOps[outOps.length - 1];
+    if (last && o.type === 'insertText' && last.type === 'insertText' && last.act === o.act && last.atKey === o.atKey &&
+        last.end === o.off && o.t - last.t < 5000) {
+      outOps[outOps.length - 1] = { ...last, text: last.text + o.text, end: o.end, t: o.t };
+    } else outOps.push({ ...o });
+  }
+  return outOps;
+}
+
+/** 실시간 편집 기록 한 줄: [시각] 동작 자리 내용. 서식은 속성: 전 → 후 */
+function formatOp(o) {
+  const act = { undo: '되돌리기 ', redo: '다시 실행 ', reserve: '' }[o.act] ?? '';
+  let what = '';
+  if (o.type === 'insertText') what = `「${o.text}」`;
+  else if (o.type === 'deleteText') what = o.text ? `「${o.text}」` : `${o.count}자`;
+  if (o.props && Object.keys(o.props).length) what = Object.entries(o.props).map(([k, v]) => propText(k, v)).join(', ');
+  return `[${localTime(o.t)}] ${act}${o.label}${o.at ? `  ${o.at}` : ''}${what ? `  ${what}` : ''}`;
+}
+
 function readChanges() {
   try { return fs.readFileSync(CHANGES, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)); } catch { return []; }
 }
@@ -190,7 +237,7 @@ function describeCursor(cur) {
 }
 
 function formatChange(c) {
-  const head = `[${c.ts.slice(11, 19)}] ${c.source === 'user' ? '사용자' : c.source === 'claude' ? 'Claude' : '열림'}`;
+  const head = `[${localTime(c.ts)}] ${c.source === 'user' ? '사용자' : c.source === 'claude' ? 'Claude' : '열림'}`;
   const cur = describeCursor(c.cursor);
   if (c.note) return `${head} ${c.note}`;
   if (c.formatOnly) return `${head} 서식이나 개체만 바뀜(글자 변화 없음)${cur}`;
@@ -211,6 +258,8 @@ switch (sub) {
     fs.writeFileSync(SESSION, JSON.stringify({ source: file, startedAt: new Date().toISOString() }, null, 2));
     fs.writeFileSync(CHANGES, '');
     fs.writeFileSync(SEEN, '0');
+    fs.writeFileSync(OPS, '');
+    fs.writeFileSync(OPS_SEEN, '0');
     if (!process.env.HWPX_EDITOR_PORT) { PORT = await allocatePort(); BASE = `http://127.0.0.1:${PORT}`; }
     await ensureServer();
     await postLog('start', { file, instance: path.basename(STATE_DIR), port: PORT });
@@ -252,11 +301,19 @@ switch (sub) {
   case 'tools': out((await cmd({ type: 'tools' })).result); break;
   case 'undo': out((await cmd({ type: 'undo' })).result); break;
   case 'changes': {
+    // ① 실시간 편집 기록(편집 하나가 한 줄, 서식은 전 → 후) ② 글자 diff(문단, 셀 단위 전 → 후). 서식만 바뀐 스냅샷은 ①이 대신한다
+    const ops = readOps();
+    const opsSeen = args.includes('--all') ? 0 : Number(fs.existsSync(OPS_SEEN) ? fs.readFileSync(OPS_SEEN, 'utf8') : 0);
+    const freshOps = ops.slice(opsSeen).filter((o) => o.src === 'user');
+    fs.writeFileSync(OPS_SEEN, String(ops.length));
     const all = readChanges();
     const seen = args.includes('--all') ? 0 : Number(fs.existsSync(SEEN) ? fs.readFileSync(SEEN, 'utf8') : 0);
-    const fresh = all.slice(seen).filter((c) => c.source === 'user');
+    const fresh = all.slice(seen).filter((c) => c.source === 'user' && !(c.formatOnly && freshOps.length));
     fs.writeFileSync(SEEN, String(all.length));
-    out(fresh.length ? fresh.map(formatChange).join('\n') : '새 사용자 수정 없음');
+    const parts = [];
+    if (freshOps.length) parts.push(coalesceOps(freshOps).map(formatOp).join('\n'));
+    if (fresh.length) parts.push((freshOps.length ? '── 글자 변화(문단, 셀 전 → 후)\n' : '') + fresh.map(formatChange).join('\n'));
+    out(parts.length ? parts.join('\n') : '새 사용자 수정 없음');
     break;
   }
   case 'save': {

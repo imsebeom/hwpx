@@ -18,6 +18,7 @@ import { TOOLS, listTables, outline, resolveTarget, runTool } from './doc-tools.
 import { detectDocType, findSlots, inspect } from './doc-rules.js';
 import { modelOf } from './collab-ops.js';
 import { installHancomKeys } from './hancom-keys';
+import { installEditLog } from './edit-log';
 
 // 이름이 이렇게 시작하는 WASM 메서드는 문서를 바꾸지 않는다고 본다.
 const READ_DOC = /^(get|search|export|render|is|has|list|find|measure|hitTest|pageCount)/;
@@ -112,6 +113,7 @@ export function createClaudePlugin(getInputHandler) {
       // 한컴 한/글 기본 단축키(Ctrl+N 계열, 셀 안 Ctrl+A 등)
       installHancomKeys(host, getInputHandler);
       installMergedCellRange(host, getInputHandler);
+      installEditLog(host, getInputHandler);   // 사용자 편집을 하나하나 /api/ops 로(`$E changes`)
 
       const mutating = (op) => {
         if (op.tool) return !READ_TOOLS.has(op.tool);
