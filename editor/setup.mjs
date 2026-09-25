@@ -79,6 +79,18 @@ const RUST_PATCHES = [
     const [find, replace] = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n').split('\n// ==== replace ====\n');
     return { id, file: 'src/renderer/height_measurer.rs', find: find.replace(/^\/\/ ==== find ====\n/, ''), replace, done: `[claude-hwpx ${id}]` };
   }),
+  // 문단 모양 대화상자에서 아무것도 안 바꾸고 설정을 눌러도 문단에 네 변 실선 상자가 생기던 것(patches/para-bf-base-*.rs)
+  {
+    id: 'para-bf-base',
+    file: 'src/document_core/commands/formatting.rs',
+    anchor: '    pub fn apply_para_format_native(',
+    insert: fs.readFileSync(path.join(HERE, 'patches', 'para-bf-base-helper.rs'), 'utf8').replace(/\r\n/g, '\n'),
+    done: '[claude-hwpx para-bf-base]',
+  },
+  ...['para-bf-base-body', 'para-bf-base-cell'].map((id) => {
+    const [find, replace] = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n').split('\n// ==== replace ====\n');
+    return { id, file: 'src/document_core/commands/formatting.rs', find: find.replace(/^\/\/ ==== find ====\n/, ''), replace, done: `[claude-hwpx ${id}]` };
+  }),
 ];
 const builtMark = path.join(pkgDir, '.claude-patched');
 const builtIds = fs.existsSync(builtMark) ? fs.readFileSync(builtMark, 'utf8') : '';

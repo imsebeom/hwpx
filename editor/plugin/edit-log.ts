@@ -163,11 +163,12 @@ export function installEditLog(host, getInputHandler) {
     h.__editLog = true;
 
     // 서식: 무엇을 무엇에서 무엇으로 바꿨는지
-    const wrapFormat = (name, kind, readBefore) => {
+    const wrapFormat = (name, kind, readBefore, propsAt = 0) => {
       const orig = ih[name]?.bind(ih);
       if (!orig) return;
-      ih[name] = (props, ...rest) => {
-        if (formatCtx) return orig(props, ...rest);   // 안쪽 호출은 바깥 것이 기록한다
+      ih[name] = (...args) => {
+        if (formatCtx) return orig(...args);   // 안쪽 호출은 바깥 것이 기록한다
+        const props = args[propsAt];
         let before = {};
         try { before = readBefore() ?? {}; } catch { /* 없으면 후만 */ }
         const diff = {};
@@ -176,7 +177,7 @@ export function installEditLog(host, getInputHandler) {
         }
         formatCtx = { kind, props: diff, at: whereNow(), logged: false };
         try {
-          return orig(props, ...rest);
+          return orig(...args);
         } finally {
           const ctx = formatCtx;
           formatCtx = null;
@@ -189,6 +190,9 @@ export function installEditLog(host, getInputHandler) {
     };
     wrapFormat('applyCharFormat', 'applyCharFormat', () => ih.getCharPropertiesAtCursor?.());
     wrapFormat('applyParaFormat', 'applyParaFormat', () => ih.getParaProperties?.());
+    // 글자 모양, 문단 모양 대화상자의 설정은 이 두 함수로 온다(start, end, props)
+    wrapFormat('applyCharPropsToRange', 'applyCharFormat', () => ih.getCharPropertiesAtCursor?.(), 2);
+    wrapFormat('applyParaPropsToRange', 'applyParaFormat', () => ih.getParaProperties?.(), 2);
     return true;
   };
   if (!hook()) {

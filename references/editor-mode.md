@@ -205,6 +205,7 @@ rhwp 에 기능이 없어 **안 되는 한컴 키**: Ctrl+N,P(쪽 번호 매기�
 
 형제 프로젝트 `Desktop/code/hwpx에디터기반AI`(OpenAI API 채팅형, 같은 rhwp 0.8.6)의 실측 중 여기 해당하는 것:
 
+- **문단 모양 대화상자에서 아무것도 안 바꾸고 설정을 누르면 문단에 네 변 실선 상자가 생겼다**(2026-09-25 수정). 두 결함이 겹쳤다 — ① 배경 없는 문단의 `patternType` 이 0 으로 읽히는데 대화상자 무늬 선택지에 0 이 없어(없음 = -1) 「배경이 바뀌었다」고 보고 `fillType` 을 보낸다 ② 엔진은 `fillType` 이 오면 문단의 BorderFill 을 **기본값(네 변 실선)에서** 새로 만든다. 패치 `patches/para-bf-base-*.rs` 가 본문, 셀 문단 모두 **그 문단의 지금 BorderFill 에서** 시작하게 한다(요청에 borderFillId 가 없을 때). ①은 그대로라 편집 기록에 `patternType 0 → -1` 이 찍히지만 문서에는 해가 없다. 각주, 머리말/꼬리말 문단은 패치하지 않았다.
 - `getControls()` 는 **셀 안 표도 돌려준다**(list 2). 본문 표만 세려면 `c.list < 구역 수` 이고 `getTableDimensions` 가 성공하는 것만 센다.
 - 표가 든 문단 끝에서 `splitParagraph` 하면 **표가 새 문단으로 딸려 간다.** 표 뒤에 문단을 만들 때는 `insertParagraph(s, idx)`.
 - 0번 문단은 구역 정의(secd)를 담고 있다. 지우지 않는다.
