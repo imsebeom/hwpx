@@ -237,9 +237,87 @@ export function installHancomKeys(host, getInputHandler) {
     }, 0);
   }
 
+  /**
+   * 대화상자의 Alt+글쇠(이름표의 「(Z)」 같은 표시). rhwp 는 표시만 하고 받지 않는다(글자 모양의 그림자 라디오만 accessKey).
+   * 한/글처럼 입력칸 이름표면 그 칸으로 가서 값을 고르고, 체크 상자와 라디오 단추는 누르고, 단추(설정(D))는 누른다.
+   * 보이는 탭 안에서 같은 글쇠가 여럿이면 지금 포커스 다음 것으로 돌아가며 옮긴다.
+   */
+  const onDialogKey = (e) => {
+    const visible = (el) => el.getClientRects().length > 0;
+    // Ctrl+Tab / Ctrl+Shift+Tab: 대화상자 탭 넘기기
+    if (e.ctrlKey && !e.altKey && e.key === 'Tab') {
+      const dlg = [...document.querySelectorAll('.dialog-wrap')].filter(visible).pop();
+      const tabs = dlg ? [...dlg.querySelectorAll('.dialog-tab')].filter(visible) : [];
+      if (tabs.length < 2) return;
+      swallow(e);
+      const cur = Math.max(0, tabs.findIndex((t) => t.classList.contains('active')));
+      const next = tabs[(cur + (e.shiftKey ? -1 : 1) + tabs.length) % tabs.length];
+      next.click();
+      next.focus(); // 포커스가 대화상자 밖에 있으면 대화상자의 Esc(오버레이에 걸림)가 안 먹는다
+      return;
+    }
+    // 대화상자가 떠 있는데 포커스가 그 밖(본문 입력칸, 페이지 몸통)이면 Esc 가 대화상자에 닿지 않는다. 닫기 단추를 누른다.
+    if (e.key === 'Escape' && !e.ctrlKey && !e.altKey) {
+      const dlg = [...document.querySelectorAll('.dialog-wrap')].filter(visible).pop();
+      if (!dlg || dlg.closest('.modal-overlay')?.contains(document.activeElement)) return;
+      const close = dlg.querySelector('.dialog-close');
+      if (!close) return;
+      swallow(e);
+      close.click();
+      return;
+    }
+    if (!e.altKey || e.ctrlKey || e.metaKey) return;
+    const k = LETTER(e);
+    if (!k) return;
+    const dlg = [...document.querySelectorAll('.dialog-wrap')].filter(visible).pop();
+    if (!dlg) return;
+    const mark = `(${k.toUpperCase()})`;
+    const owners = [];
+    const walker = document.createTreeWalker(dlg, NodeFilter.SHOW_TEXT);
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      const el = n.parentElement;
+      if (n.nodeValue.includes(mark) && el && visible(el) && !owners.includes(el)) owners.push(el);
+    }
+    if (!owners.length) return;
+    swallow(e);
+    const target = (owner) => {
+      const btn = owner.closest('button');
+      if (btn) return { el: btn, press: true };
+      const box = owner.closest('label')?.querySelector('input[type=checkbox], input[type=radio]');
+      if (box) return { el: box, press: true };
+      for (let s = owner.nextElementSibling; s; s = s.nextElementSibling) {
+        const c = s.matches('input, select, textarea, button') ? s : s.querySelector('input, select, textarea, button');
+        if (c) return { el: c, press: false };
+      }
+      return null;
+    };
+    const targets = owners.map(target).filter(Boolean);
+    if (!targets.length) return;
+    const cur = targets.findIndex((t) => t.el === document.activeElement);
+    const t = targets[(cur + 1) % targets.length];
+    t.el.focus();
+    // 같은 글쇠가 여럿이면 옮기기만 한다(Windows 대화상자 규칙). 하나일 때만 체크 상자, 단추를 누른다.
+    if (t.press && targets.length === 1) t.el.click();
+    else t.el.select?.();
+  };
+
+  // 대화상자 탭 단추를 누른 뒤 닫으면 포커스가 페이지 몸통에 남아 본문 단축키가 안 먹었다(2026-09-25 실측).
+  // 대화상자가 닫혔는데 포커스가 빈 곳이면 본문 입력칸으로 돌린다.
+  const refocus = () => setTimeout(() => {
+    const ta = getInputHandler()?.textarea;
+    if (!ta || (document.activeElement && document.activeElement !== document.body)) return;
+    if ([...document.querySelectorAll('.dialog-wrap, .modal-overlay, .find-dialog')].some((d) => d.getClientRects().length > 0)) return;
+    ta.focus();
+  }, 50);
+  window.addEventListener('keyup', refocus, true);
+  window.addEventListener('click', refocus, true);
+  window.addEventListener('keydown', onDialogKey, true);
   window.addEventListener('keydown', onKey, true);
   for (const t of IME_EVENTS) window.addEventListener(t, onIme, true);
   return () => {
+    window.removeEventListener('keyup', refocus, true);
+    window.removeEventListener('click', refocus, true);
+    window.removeEventListener('keydown', onDialogKey, true);
     window.removeEventListener('keydown', onKey, true);
     for (const t of IME_EVENTS) window.removeEventListener(t, onIme, true);
   };
