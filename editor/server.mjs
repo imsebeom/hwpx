@@ -94,7 +94,7 @@ async function editorBytes(src) {
   const key = JSON.stringify({ src, size: st.size, mtimeMs: st.mtimeMs });
   try { if (fs.readFileSync(LAYOUT_KEY, 'utf8') === key) return fs.readFileSync(LAYOUT_CACHE); } catch { /* 캐시 없음 */ }
   try {
-    await execFileP('python', [path.join(HERE, 'hancom_layout.py'), src, LAYOUT_CACHE],
+    await execFileP('python', [path.join(HERE, '..', 'scripts', 'hancom_layout.py'), src, LAYOUT_CACHE],
       { timeout: 120000, windowsHide: true, env: { ...process.env, PYTHONIOENCODING: 'utf-8' } });
     fs.writeFileSync(LAYOUT_KEY, key);
     console.log(`한글 줄 배치 적용: ${path.basename(src)}`);

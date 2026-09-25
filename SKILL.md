@@ -18,7 +18,8 @@ ${CLAUDE_SKILL_DIR}/
 │   ├── table_calc.py          # ★ 표 계산식 엔진 (SUM/AVG/IF 등, rhwp 포팅)
 │   ├── build_hwpx.py          # 템플릿+XML → .hwpx 조립
 │   ├── build_version.py       # ★ 파일명 날짜·순번 자동 부여 (같은 날 재빌드 덮어쓰기 방지)
-│   ├── fix_namespaces.py      # ★ 필수: 네임스페이스 후처리
+│   ├── fix_namespaces.py      # ★ 필수: 네임스페이스 후처리 + 한글 줄 배치(규칙 42)
+│   ├── hancom_layout.py       # ★ 한글(COM)로 실제 줄 배치와 표 높이를 계산해 옮겨 심기
 │   ├── validate.py            # HWPX 구조 검증
 │   ├── analyze_template.py    # HWPX 심층 분석 (xpath_local 사용)
 │   ├── clone_form.py           # ★ 양식 복제 (Workflow F)
@@ -1707,6 +1708,8 @@ import subprocess
 subprocess.run(["python3", f"{SKILL_DIR}/scripts/fix_namespaces.py", "output.hwpx"], check=True)
 ```
 
+**명령줄로 실행하면 마지막에 한글(COM)로 실제 줄 배치를 넣는다**(`scripts/hancom_layout.py`, 문서당 3~6초, 2026-09-26). 빌더들이 넣는 한 줄짜리 더미 줄 배치(`LINESEG_DUMMY`)는 한글만 무시하고 **rhwp 같은 다른 구현체는 그대로 믿어** 문단이 한 줄로 눌리거나 표가 아래 표와 겹친다(규칙 42). 한글이 없거나 실패하면 `WARNING` 만 내고 파일은 그대로 둔다. 끄려면 `--no-layout` 또는 `HWPX_NO_LAYOUT=1`(한글이 없는 환경이나 수십 개 일괄 빌드). `import` 해서 쓰는 `fix_hwpx_namespaces()` 는 줄 배치를 넣지 않는다.
+
 | URI | 프리픽스 |
 |-----|---------|
 | `.../2011/head` | `hh` |
@@ -1777,6 +1780,7 @@ subprocess.run(["python3", f"{SKILL_DIR}/scripts/fix_namespaces.py", "output.hwp
 39. **수식은 이미지가 아니라 개체로 넣는다**: `python scripts/add_equation.py in.hwpx -o out.hwpx --after "앵커" --script "1 over 2"` — 한컴 네이티브 `<hp:equation>` 이라 수식 편집기로 다시 열린다. 표 셀은 `--table/--row/--col`(cellAddr 격자, 규칙 37과 같은 좌표계). 수식은 자기완결 개체라 header.xml·BinData 등록이 필요 없고, `treatAsChar="1"` 이 **맞다**(글자 크기 인라인 개체라 쪽을 넘길 일이 없다 — 표가 0이어야 하는 것과 반대). 문법과 함정은 [references/equation-syntax.md](references/equation-syntax.md): `&` 는 글자가 아니라 **열 구분자**라 그대로 쓰면 사라지고, `matrix` 는 **괄호를 그리지 않아** `LEFT ( matrix{…} RIGHT )` 로 감싸야 한다 (2026-09-08 한컴 개봉·PDF 렌더로 토큰 검증)
 40. **명사형 종결 변환은 보고서에만**: `writing_optimizer.py` 의 R3/R4/R5(`~보입니다`→`예상`, `~판단됩니다`→`판단`, `~예정이었으나 유예`)는 개조식 보고서 문체다. **공문·이메일은 서술형에 경어**(`~하시기 바랍니다`)가 행정 규범이라 적용하면 격식 위반이고, 정규식이 관형형을 남겨 **비문을 만든다** — `적정하게 이행된 것으로 판단됩니다` → `적정하게 이행된 판단`(2026-09-08 실측). 그래서 기본은 검토 권장으로만 보고하고 자동 치환하지 않는다. 보고서 원고에는 `--nominal-endings` 로 켜되, 켠 뒤 앞말은 사람이 명사형으로 고친다. 근거는 [references/layout-rules.md](references/layout-rules.md) §8-1
 41. **🔴 텍스트 치환은 `<hp:t>` 안에서만 — XML 전체 `str.replace` 금지**: section0.xml 문자열에 `text.replace(old, new)` 를 걸면 **속성값도 같이 바뀐다.** 2026-09-15 실측(코덱스가 만든 계획서): 「7→4」, 「17→」, 「4.2→」 같은 짧은 키가 `pagePr height="84186"` 을 `8` 로, 여백 `1417` 을 `14` 로, 표 7행 `rowAddr` 를 4 로 바꿨고 **XML 은 유효해서 `validate.py` 를 통과했는데 한글은 그 파일을 열다 멈췄다**(쪽 높이 8 HWPUNIT). 원본과 요소 수 1,706 동일, 속성 다른 요소 413. 처방 = ⓐ 치환은 `hwpx_helpers.replace_in_text_nodes()` 로 한다(태그와 속성은 건드리지 않고 `<hp:t>` 내부 글자만, 인라인 `<hp:tab/>` 조각도 처리). `zip_replace_all.py` 와 `clone_form.py` Phase 1 의 **기본이 이 방식**이고 XML 전체 치환은 `--raw` 를 줘야 한다(짧거나 숫자뿐인 키면 경고) ⓑ `validate.py` 가 **쪽 크기 상식(pagePr 10,000~300,000 HWPUNIT)과 표 격자(cellAddr 중복·빈 칸)** 를 검사한다 — 유효한 XML 이라도 이 둘에 걸리면 INVALID ⓒ 한글이 파일을 열다 멈추면 XML 오류가 아니라 **속성값 오염을 먼저 의심**하고, 글자를 뺀 구조 diff(태그와 속성만 나열해 원본과 대조)로 찾는다. AI 에게 hwpx 편집 스크립트를 쓰게 할 때도 「본문 글자만 바꿔라, 서식과 표 구조는 그대로」를 지시에 넣는다
+42. **🔴 줄 배치(`linesegarray`)는 한글이 계산한 것을 넣는다 — 더미는 다른 구현체를 깨뜨린다**: 빌더가 넣는 `LINESEG_DUMMY`(한 줄짜리, polaris-dvc JID 11004 대응)는 한글만 다시 조판하고 **rhwp 는 그대로 믿어 문단 전체를 한 줄에 눌러 그린다.** 더미를 걷어도 **글자처럼 취급(`treatAsChar="1"`)하는 표**는 rhwp 가 행을 늘리지 못해 넘친 줄이 아래 표와 겹친다(rhwp 결함, v0.8.6과 devel 모두). 한글이 계산한 줄 배치와 **표 `hp:sz height`** 를 넣으면 rhwp 가 한글 재저장본과 글자 좌표까지 같게 그린다(2026-09-26 서술형 문항지 6쪽 3,478자 대조). 그래서 `fix_namespaces.py` 명령줄 실행이 마지막에 `hancom_layout.py` 를 부른다 — 사본을 한글로 열어 **쪽수를 읽어 조판을 끝낸 뒤**(`PageCount` 를 묻지 않고 `SaveAs` 하면 더미가 그대로 저장된다) 저장하고, 문단끼리 짝지어 줄 배치를, 표끼리 짝지어 `sz height` 를 원본에 옮긴다. 한글 재저장본을 통째로 쓰지 않는 것은 그림을 BMP 로 다시 넣어 파일이 부풀기 때문이다. 여러 빌드가 동시에 불러도 잠금 파일로 한 번에 하나씩 돌고, 닫히는 중인 한글에 붙어 나는 RPC 오류는 통째로 다시 시도한다(4건 동시 × 3회 전부 성공, 결과 md5 동일). 두 번 돌려도 결과가 같다
 
 ---
 
