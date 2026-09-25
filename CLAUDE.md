@@ -89,6 +89,15 @@
   - **rhwp 근본 수정 진행 중**(`~/.cache/rhwp-devel/rhwp`, devel) — 원인은 두 보정의 맞물림이다. ① 측정기 TAC 축소가 행을 [25.5, 38.5] 로 줄여 합을 선언 64 에 맞추고
     ② layout `trust_declared_row_heights` 의 viewtext 갈래(칸 전부 NO_LS 면 선언 신뢰)가 합이 같다고 행을 셀 선언 [32, 32] 로 되돌린다. 진단은 네이티브 디버그 빌드(`target/debug/rhwp.exe export-svg`, 증분 1~2분) + `RHWP_DIAG_ROWH`.
     수정안: `height_measurer.rs` 축소 조건에 `generator_restated_height`(hwpx, 칸 전부 NO_LS, 표 선언 == 행별 셀 선언 합)면 축소하지 않음. 재현 파일 행 [32.0, 38.5] = 한글 재저장본과 같음
+  - **여러 에디터**(스킬 012c176, 푸시): 세션마다 `hwpx-editor/<세션 ID 앞 8자>/` 와 포트(7780~). `HWPX_EDITOR_INSTANCE`, `cli list`, 창 제목에 문서와 인스턴스.
+    옛 공용 에디터가 떠 있으면 계속 쓴다. 두 인스턴스 동시 시험 통과, 이후 다른 세션(615ea4fc)과 실제로 나란히 돌았다.
+    같은 커밋에서 **줄 배치 없는 문단 + TAC 표 문서도 열 때 보정**(학교교육계획류 131개가 대상)
+  - **rhwp 패치 둘**(`fix7419_devel.patch`, devel 기준, `height_measurer.rs` 한 파일 31줄):
+    ① 축소 조건에 `generator_restated_height`(hwpx, 칸 전부 NO_LS, 표 선언 == 행별 셀 선언 합이면 축소 안 함) — 본문 표 [32, 38.5] = 한글
+    ② `unabsorbed_nested_tables_height`: 합성 줄(NO_LS)이 선언 표 높이만 담으면 중첩 표가 자란 차이를 더함 — 표 속 표 바깥 칸 67.8 → 74.2px, 안쪽 표 [32, 38.5]
+    `cargo test --lib` 3,873 통과(47분). 통합 시험은 `node scripts/rust-test-suite-manifest.mjs --prepare` 후 `cargo nextest --cargo-profile release-test --tests` + Native Skia 3종이라 수 시간(CONTRIBUTING.md 1~2절)
+    ⚠ v0.8.6(에디터가 쓰는 판)에는 그대로 안 들어간다 — 문맥이 다르고 layout 의 viewtext 선언 신뢰 갈래가 없다. 손으로 옮겨야 한다
+  - **표 속 이미지 클릭**: 재현 안 됨. 문항 3 그래프와 한국문화 2단원 사진 모두 클릭으로 선택됐다(창 캡처). 보정 전에는 그림을 그리는 자리와 판정 칸이 어긋나 있었던 것이 원인으로 추정
   - **next_steps**: ① 에디터 서버는 새 코드로 다시 띄웠다가 닫았다(지금 꺼져 있음). 저장 시험 끝남
     ② ~~결함 보고~~ #7419 게시 완료(`gh issue view 7419 -R edwardkim/rhwp`). 답이 오면 반영 ③ ~~실제 줄 배치~~ 3dc908e 완료, ~~한글 없는 환경 겹침~~ 024e2f2 완료(에디터가 rhwp 로 보정) ④ 캠프와 채움AI 프로젝트의 `_scripts/` 는 이 스킬의 복제본이라 이번 변경을 받지 않는다(그쪽 산출물은 에디터가 열 때 한글 줄 배치로 보정된다) ⑤ md2hwpx 산출물 polaris JID 11041 2건 미조사 ⑥ `~/.cache/rhwp-devel`(devel 빌드, 비교 도구, 재현 파일, 저장 시험 사본 `savetest/`)은 남겨 두었다
 - intent: /hwpx 스킬에 rhwp 에디터 모드(Claude 와 사용자가 같은 문서를 실시간 공동 편집)를 만들어 스킬에 통합하고 GitHub 에 올리기(2026-09-25 세션).
