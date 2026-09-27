@@ -214,6 +214,11 @@ const RUST_PATCHES = [
     return { id, file, find: find.replace(/^\/\/ ==== find ====\n/, ''), replace: replace.replace(/\n$/, ''), all: true, done };
   }),
   // 표 옆 글을 고쳐 줄을 다시 나누면 글자처럼 취급 표 줄에서 바깥 여백이 빠지던 것(patches/tac-line-outer.rs)
+  // 글자처럼 취급 표의 행 높이를 저장 줄 배치 사다리로 정한다(patches/tac-row-ladder.rs)
+  (() => {
+    const [find, replace] = fs.readFileSync(path.join(HERE, 'patches', 'tac-row-ladder.rs'), 'utf8').replace(/\r\n/g, '\n').split('\n// ==== replace ====\n');
+    return { id: 'tac-row-ladder', file: 'src/renderer/height_measurer.rs', find: find.replace(/^\/\/ ==== find ====\n/, ''), replace: replace.replace(/\n$/, ''), done: '[claude-hwpx tac-row-ladder]' };
+  })(),
   ...['tac-line-outer', 'tac-line-outer-size'].map((id) => {
     const [find, replace] = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n').split('\n// ==== replace ====\n');
     return { id, file: 'src/renderer/composer/line_breaking.rs', find: find.replace(/^\/\/ ==== find ====\n/, ''), replace: replace.replace(/\n$/, ''), done: `[claude-hwpx ${id}]` };

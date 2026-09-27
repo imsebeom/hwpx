@@ -129,11 +129,47 @@
         for cell in probe.cells.iter_mut() {
             recalculate_cell_paragraph_vpos(&mut cell.paragraphs, 0, None, &self.styles, self.dpi, hwp3);
         }
+        if let Some(h) = Self::claude_ladder_table_height(&probe) {
+            return h;
+        }
         let native_hwp5 = self.document.layout_profile().native_hwp5_layout();
         let px = crate::renderer::height_measurer::HeightMeasurer::new(self.dpi)
             .with_native_hwp5(native_hwp5)
             .measure_table_for_edit(&probe, parent_para_idx, control_idx, &self.styles);
         crate::renderer::px_to_hwpunit(px, self.dpi)
+    }
+
+    /// [claude-hwpx tac-sync-ladder] 칸마다 「줄 배치 마지막 줄 끝 + 위아래 칸 여백」과 적힌 칸 높이 중 큰 값을 행별로 더한 표 높이.
+    /// 한글이 저장한 표 높이와 같다(d05 p4: 2431 + 8415 ≈ sz 10853, 칸에 문단을 더한 판 51.1px = 한글 51.2px, 그림 문단 104.45px = 104.4px).
+    /// rhwp 측정기는 칸에 문단을 하나 더하면 줄 간격(550HU)만큼 크게 재고 그 몫이 다른 행에까지 나뉘었다(2026-09-28).
+    /// 합친 칸, 세로쓰기 칸, 줄 배치 없는 문단이 있으면 None 을 돌려 측정기로 잰다.
+    fn claude_ladder_table_height(t: &crate::model::table::Table) -> Option<i32> {
+        let rows = t.row_count as usize;
+        if rows == 0 {
+            return None;
+        }
+        let mut row_h = vec![0i32; rows];
+        for c in &t.cells {
+            if c.row_span != 1 || c.text_direction != 0 || (c.row as usize) >= rows {
+                return None;
+            }
+            if c.paragraphs.is_empty() || c.paragraphs.iter().any(|p| p.line_segs.is_empty()) {
+                return None;
+            }
+            let end = c
+                .paragraphs
+                .iter()
+                .flat_map(|p| p.line_segs.iter())
+                .map(|s| s.vertical_pos.saturating_add(s.line_height))
+                .max()?;
+            // 칸 여백: apply_inner_margin 이면 칸 값, 아니면 표 값(rhwp resolve_cell_padding 과 같은 규칙)
+            let pad = if c.apply_inner_margin { &c.padding } else { &t.padding };
+            let need = end + pad.top as i32 + pad.bottom as i32;
+            let declared = if c.height < 0x8000_0000 { c.height as i32 } else { 0 };
+            let r = c.row as usize;
+            row_h[r] = row_h[r].max(need.max(declared));
+        }
+        Some(row_h.iter().sum::<i32>() + t.cell_spacing as i32 * (rows as i32 - 1))
     }
 
     /// [claude-hwpx tac-sync-offset] 편집한 표의 새 높이(HWPUNIT) = 잰 높이 − 처음 잰 어긋남. 칸 크기 조절도 쓴다.
