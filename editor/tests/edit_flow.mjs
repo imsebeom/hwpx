@@ -2,6 +2,7 @@
 // 표 높이가 따라가는지, 쪽 끝을 넘거나 표와 겹치는 글 줄이 생기는지, 되돌린 뒤 원래대로인지 본다.
 //   node editor/tests/edit_flow.mjs <문서.hwpx> [--verbose]
 // 시험 종류: ① 칸 끝에 두 줄 넣기/지우기(미룬 쪽 나누기) ② 칸 Enter 두 번/합치기 ③ 칸 글자 16pt ④ 칸 안 그림 넣기
+//          ⑤ 본문 그림 문단 넣기(문서 전체에서 5곳)
 // 판정: 처음에 없던 넘침, 겹침이 생기면 실패. ①②는 되돌린 뒤 표 높이가 처음과 1px 안인지도 본다.
 // 비례 축소로 처음부터 눌려 그려지던 표는 되돌린 뒤 실제 내용 높이로 커질 수 있다(실패로 치지 않고 「바로잡힘」으로 적는다).
 import fs from 'node:fs';
@@ -27,7 +28,7 @@ function problems(doc) {
     const info = JSON.parse(doc.getPageInfo(pg));
     let l = doc.getPageControlLayout(pg); l = typeof l === 'string' ? JSON.parse(l) : l;
     const boxes = l.controls.filter((c) => c.type === 'table');
-    for (const r of JSON.parse(doc.getPageTextLayout(pg)).runs.filter((r) => !r.cellPath)) {
+    for (const r of JSON.parse(doc.getPageTextLayout(pg)).runs.filter((r) => !r.cellPath && r.w >= 1)) {
       if (r.y + r.h > info.footerArea.y + 1) over++;
       if (boxes.some((t) => r.y + r.h > t.y + 1 && r.y < t.y + t.h - 1 && r.x < t.x + t.w && r.x + r.w > t.x)) overlap++;
     }
@@ -99,20 +100,37 @@ for (const t of tables(new m.HwpDocument(bytes))) {
       report('글자 16pt', t, !worse(p1), `넘침 ${p1.over} 겹침 ${p1.overlap}`);
     }
   }
-  // ④ 칸 안 그림(20mm)
+  // ④ 칸 안 그림(20mm) — cli image 와 같게 칸 첫 문단 뒤에 새 문단을 만들어 넣는다
   {
     const doc = new m.HwpDocument(bytes);
     const h0 = height(doc, t);
     const len = doc.getCellParagraphLength(0, t.p, t.c, 0, 0);
+    doc.splitParagraphInCell(0, t.p, t.c, 0, 0, len);
     const w = Math.round((20 * 7200) / 25.4);
     const r = JSON.parse(doc.insertPictureEx(JSON.stringify({
-      sectionIdx: 0, paraIdx: t.p, charOffset: len,
-      cellPath: JSON.stringify([{ controlIndex: t.c, cellIndex: 0, cellParaIndex: 0 }]),
+      sectionIdx: 0, paraIdx: t.p, charOffset: 0,
+      cellPath: JSON.stringify([{ controlIndex: t.c, cellIndex: 0, cellParaIndex: 1 }]),
       width: w, height: w, naturalWidthPx: 1, naturalHeightPx: 1, extension: 'png', description: '',
       paperOffsetXHu: -2147483648, paperOffsetYHu: 0,
     }), PNG));
     const h1 = height(doc, t), p1 = problems(doc);
     report('칸 그림', t, r.ok && !worse(p1) && h1 >= h0, `높이 ${h0.toFixed(1)} → ${h1.toFixed(1)} 넘침 ${p1.over} 겹침 ${p1.overlap}`);
+  }
+}
+// ⑤ 본문 그림(40mm): 문단마다 뒤에 그림 문단을 넣어 본다(글 있는 문단 가운데 5곳)
+{
+  const probe = new m.HwpDocument(bytes);
+  const n = probe.getParagraphCount(0);
+  const picks = [];
+  for (let p = 0; p < n && picks.length < 5; p += Math.max(1, Math.floor(n / 6))) if (probe.getParagraphLength(0, p) > 10) picks.push(p);
+  for (const p of picks) {
+    const doc = new m.HwpDocument(bytes);
+    doc.splitParagraph(0, p, doc.getParagraphLength(0, p));
+    const w = Math.round((40 * 7200) / 25.4);
+    const r = JSON.parse(doc.insertPictureEx(JSON.stringify({ sectionIdx: 0, paraIdx: p + 1, charOffset: 0, cellPath: '', width: w, height: w, naturalWidthPx: 1, naturalHeightPx: 1, extension: 'png', description: '' }), PNG));
+    if (r.ok) doc.setPictureProperties(0, r.paraIdx, r.controlIdx, JSON.stringify({ treatAsChar: true }));
+    const p1 = problems(doc);
+    report('본문 그림', { p }, r.ok && !worse(p1), `넘침 ${p1.over} 겹침 ${p1.overlap}`);
   }
 }
 console.log(`${path.basename(file)}: 처음 넘침 ${base.over} 겹침 ${base.overlap} | 실패 ${fails}${fixed ? `, 바로잡힘 ${fixed}` : ''}`);

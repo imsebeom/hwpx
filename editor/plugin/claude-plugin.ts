@@ -476,26 +476,45 @@ export function createClaudePlugin(getInputHandler) {
 
       /**
        * 그림 넣기(cli.mjs image). run 의 JSON 으로는 그림 바이트를 넘길 수 없어 base64 로 받는다.
-       * im: { base64, ext, naturalW, naturalH, at?(p7, T2r0c0), end?, widthMm?, desc? }. 자리를 안 주면 사용자 커서.
+       * im: { base64, ext, naturalW, naturalH, at?(p7, T2r0c0), end?, widthMm?, desc? }.
+       * 그림은 **그림만 담은 새 문단**으로 넣는다 — 좌표를 주면 그 문단 앞(end 면 칸의 마지막 문단이나 그 문단 뒤),
+       * 좌표가 없으면 사용자 커서가 있는 문단 뒤. 글이 있는 문단 끝에 끼우면 rhwp 줄 나누기가 그림 높이를 첫 줄에 줘
+       * 첫 줄 위에 빈칸이 생기고 그림이 눌려 그려졌다(2026-09-28 실측, 본문과 칸 모두).
        * 폭을 안 주면 원본 픽셀 크기(1px = 75 HWPUNIT)를 쓰되 본문 150mm, 칸은 칸 폭을 넘지 않게 줄인다.
        */
       const insertImage = (doc, im) => {
         const pos = im.at ? resolveTarget(doc, im.at) : getInputHandler()?.getCursorPosition?.();
         if (!pos) throw new Error(`그림 넣을 자리를 못 찾음: ${im.at ?? '커서'}`);
         const inCell = pos.parentParaIndex != null;
-        const charOffset = im.end && pos.length != null ? pos.length : (pos.charOffset ?? 0);
+        const after = !im.at || im.end;
+        const sec = pos.sectionIndex;
+        // 새 빈 문단을 만들고 그 번호를 얻는다
+        let target;
+        if (inCell) {
+          const [ppi, ci, cell] = [pos.parentParaIndex, pos.controlIndex, pos.cellIndex];
+          let cp = pos.cellParaIndex ?? 0;
+          if (im.at && im.end) cp = doc.getCellParagraphCount(sec, ppi, ci, cell) - 1;
+          const off = after ? doc.getCellParagraphLength(sec, ppi, ci, cell, cp) : 0;
+          doc.splitParagraphInCell(sec, ppi, ci, cell, cp, off);
+          target = after ? cp + 1 : cp;
+        } else {
+          const p = pos.paragraphIndex;
+          const off = after ? doc.getParagraphLength(sec, p) : 0;
+          doc.splitParagraph(sec, p, off);
+          target = after ? p + 1 : p;
+        }
         let maxW = 42520;
         if (inCell) {
-          try { maxW = Math.max(2000, JSON.parse(doc.getCellProperties(pos.sectionIndex, pos.parentParaIndex, pos.controlIndex, pos.cellIndex)).width - 1200); } catch { /* 기본값 */ }
+          try { maxW = Math.max(2000, JSON.parse(doc.getCellProperties(sec, pos.parentParaIndex, pos.controlIndex, pos.cellIndex)).width - 1200); } catch { /* 기본값 */ }
         }
         const width = im.widthMm ? Math.round((im.widthMm * 7200) / 25.4) : Math.min(im.naturalW * 75, maxW);
         const height = Math.round((width * im.naturalH) / im.naturalW);
         const bytes = Uint8Array.from(atob(im.base64), (c) => c.charCodeAt(0));
         const opts = {
-          sectionIdx: pos.sectionIndex,
-          paraIdx: inCell ? pos.parentParaIndex : pos.paragraphIndex,
-          charOffset,
-          cellPath: inCell ? JSON.stringify([{ controlIndex: pos.controlIndex, cellIndex: pos.cellIndex, cellParaIndex: pos.cellParaIndex ?? 0 }]) : '',
+          sectionIdx: sec,
+          paraIdx: inCell ? pos.parentParaIndex : target,
+          charOffset: 0,
+          cellPath: inCell ? JSON.stringify([{ controlIndex: pos.controlIndex, cellIndex: pos.cellIndex, cellParaIndex: target }]) : '',
           width, height, naturalWidthPx: im.naturalW, naturalHeightPx: im.naturalH,
           extension: im.ext, description: im.desc ?? '',
           // 칸: 엔진 패치 cell-pic-inline 의 약속값. 칸 문단 안에 글자처럼 취급 그림으로 넣고 표 높이를 맞춘다
@@ -503,8 +522,8 @@ export function createClaudePlugin(getInputHandler) {
         };
         const r = parseMaybe(doc.insertPictureEx(JSON.stringify(opts), bytes));
         // 본문은 스튜디오 그림 넣기처럼 글자처럼 취급으로 바꾼다(안 바꾸면 쪽 왼쪽 위 0,0 에 뜬다)
-        if (r?.ok && !inCell) doc.setPictureProperties(opts.sectionIdx, r.paraIdx, r.controlIdx, JSON.stringify({ treatAsChar: true }));
-        return { ...r, widthMm: +(width * 25.4 / 7200).toFixed(1), heightMm: +(height * 25.4 / 7200).toFixed(1), inCell };
+        if (r?.ok && !inCell) doc.setPictureProperties(sec, r.paraIdx, r.controlIdx, JSON.stringify({ treatAsChar: true }));
+        return { ...r, at: inCell ? `셀 문단 ${target}` : `p${target}`, widthMm: +(width * 25.4 / 7200).toFixed(1), heightMm: +(height * 25.4 / 7200).toFixed(1), inCell };
       };
 
       const step = (doc, op, i) => {
