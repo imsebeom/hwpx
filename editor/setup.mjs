@@ -120,6 +120,30 @@ const RUST_PATCHES = [
     const [find, replace] = fs.readFileSync(path.join(HERE, 'patches', 'merge-edge-before.rs'), 'utf8').replace(/\r\n/g, '\n').split('\n// ==== replace ====\n');
     return { id: 'merge-edge-before', file: 'src/document_core/commands/table_ops.rs', find: find.replace(/^\/\/ ==== find ====\n/, ''), replace, done: '[claude-hwpx merge-edge-before]' };
   })(),
+  // 글자처럼 취급 개체(표, 그림, 수식) 뒤에서 입력, 삭제, 복사, 선택 음영이 한 칸씩 어긋나고 개체가 선택에 안 들던 것
+  // (patches/caret-axis-*.rs). 캐럿 축 ↔ 글자, 나누기 축 변환, 캐럿 축 삭제, 복사, 음영. 스튜디오 쪽은 STUDIO_PATCHES
+  ...[['caret-axis-helpers', 'src/document_core/helpers.rs', '/// ShapeObject에서 TextBox를 추출하는 헬퍼', 'fn caret_axis_items('],
+    ['caret-axis-clip', 'src/document_core/commands/clipboard.rs', 'fn collect_max_clipboard_field_id(', 'fn remove_control_from_para('],
+    ['caret-axis-copy', 'src/document_core/commands/clipboard.rs', '    /// 컨트롤 객체(표, 이미지, 도형)를 내부 클립보드에 복사한다.', 'fn copy_caret_paragraphs('],
+    ['caret-axis-delete', 'src/document_core/commands/text_editing.rs', '    /// 표 셀에 대한 가변 참조를 얻는다.', 'fn delete_range_caret_native('],
+    ['caret-axis-selbox-fn', 'src/document_core/queries/cursor_nav.rs', '/// 전체 중첩 경로가 같은 셀 컨테이너의 현재 문단을 가리키는지 확인한다.', 'fn caret_axis_find_control_box('],
+    ['caret-axis-wasm', 'src/wasm_api.rs', '    /// 논리적 오프셋 → 텍스트 오프셋 변환.', 'js_name = convertCaretOffset']].map(([id, file, anchor, done]) => ({
+    id, file, anchor, done,
+    insert: fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n'),
+  })),
+  ...[['caret-axis-linestart', 'src/document_core/queries/cursor_nav.rs', 'utf16_pos_to_caret_idx(para, ls.text_start)'],
+    ['caret-axis-selbox', 'src/document_core/queries/cursor_nav.rs', 'let mut hit_any = false;'],
+    ['caret-axis-selsplit', 'src/document_core/queries/cursor_nav.rs', 'let mut hit_piece = false;'],
+    ['caret-axis-insert', 'src/model/paragraph.rs', 'let after_inline = INSERT_AFTER_INLINE_CONTROLS'],
+    ['caret-axis-paste-body', 'src/document_core/commands/clipboard.rs', '[claude-hwpx caret-axis paste-body]'],
+    ['caret-axis-paste-cell', 'src/document_core/commands/clipboard.rs', '[claude-hwpx caret-axis paste-cell]'],
+    ['caret-axis-html-body', 'src/document_core/commands/html_import.rs', '[claude-hwpx caret-axis html-body]'],
+    ['caret-axis-html-cell', 'src/document_core/commands/html_import.rs', '[claude-hwpx caret-axis html-cell]']].map(([id, file, done]) => {
+    const [find, replace] = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n').split('\n// ==== replace ====\n');
+    return { id, file, find: find.replace(/^\/\/ ==== find ====\n/, ''), replace, done };
+  }),
+  { id: 'caret-axis-insert-flag', file: 'src/model/paragraph.rs', anchor: '\nimpl Paragraph {\n', done: 'static INSERT_AFTER_INLINE_CONTROLS',
+    insert: fs.readFileSync(path.join(HERE, 'patches', 'caret-axis-insert-flag.rs'), 'utf8').replace(/\r\n/g, '\n') },
   // 가운데 정렬 문단을 첫 글자부터 고르면 선택 음영이 줄 왼쪽 여백부터 칠해지던 것(patches/sel-left-at-glyph.rs)
   (() => {
     const [find, replace] = fs.readFileSync(path.join(HERE, 'patches', 'sel-left-at-glyph.rs'), 'utf8').replace(/\r\n/g, '\n').split('\n// ==== replace ====\n');
@@ -170,6 +194,37 @@ if (!main.includes(REGISTER)) {
   main = main.replace(anchor, REGISTER + anchor);
 }
 fs.writeFileSync(mainTs, main);
+
+// 스튜디오 소스 패치(patches/*.ts). 캐럿 축 연결은 wasm-bridge.ts 끝에 덧붙인다 — 엔진 패치 caret-axis-* 와 짝
+for (const p of [{ id: 'caret-axis-bridge', file: 'src/core/wasm-bridge.ts', done: '[claude-hwpx caret-axis] 캐럿 축 연결.' }]) {
+  const f = path.join(STUDIO, p.file);
+  const block = fs.readFileSync(path.join(HERE, 'patches', `${p.id}.ts`), 'utf8').replace(/\r\n/g, '\n');
+  let src = fs.readFileSync(f, 'utf8');
+  const at = src.indexOf(p.done);
+  if (at >= 0) src = src.slice(0, src.lastIndexOf('\n', src.lastIndexOf('\n', at) - 1) + 1);   // 옛 판을 걷고 새로 붙인다
+  fs.writeFileSync(f, src.replace(/\n*$/, '\n') + block);
+}
+// Backspace, Delete 로 지울 한 칸이 글자처럼 취급 개체면 선택 삭제 명령으로(개체까지 지우고 되돌리기에서 개체도 돌아온다).
+// 한 글자 삭제 명령은 되돌리기용으로 글자만 저장한다 — 연결층의 isCaretControlSlot 과 짝
+{
+  const f = path.join(STUDIO, 'src', 'engine', 'input-handler-text.ts');
+  let src = fs.readFileSync(f, 'utf8');
+  if (!src.includes('isCaretControlSlot')) {
+    const edits = [
+      ['  DeleteTextCommand,\n  MergeParagraphCommand,', '  DeleteTextCommand,\n  DeleteSelectionCommand,\n  MergeParagraphCommand,'],
+      ["command: new DeleteTextCommand(deletePos, 1, 'backward') });",
+        "command: this.wasm.isCaretControlSlot?.(deletePos) ? new DeleteSelectionCommand(deletePos, pos) : new DeleteTextCommand(deletePos, 1, 'backward') }); // [claude-hwpx caret-axis]"],
+      ["command: new DeleteTextCommand(pos, 1, 'forward') });",
+        "command: this.wasm.isCaretControlSlot?.(pos) ? new DeleteSelectionCommand(pos, { ...pos, charOffset: pos.charOffset + 1 }) : new DeleteTextCommand(pos, 1, 'forward') }); // [claude-hwpx caret-axis]"],
+    ];
+    const eol = (s) => (src.includes('\r\n') ? s.replace(/\r?\n/g, '\r\n') : s);
+    for (const [find, replace] of edits) {
+      if (!src.includes(eol(find))) throw new Error(`input-handler-text.ts 에서 패치 자리를 못 찾았다: ${find.slice(0, 40)}`);
+      src = src.split(eol(find)).join(eol(replace));
+    }
+    fs.writeFileSync(f, src);
+  }
+}
 
 // 4. 빌드
 if (!fs.existsSync(path.join(STUDIO, 'node_modules'))) sh('npm ci --no-audit --no-fund', STUDIO);
