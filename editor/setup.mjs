@@ -166,6 +166,15 @@ const RUST_PATCHES = [
     const [find, replace] = fs.readFileSync(path.join(HERE, 'patches', 'cell-pic-delta-after.rs'), 'utf8').replace(/\r\n/g, '\n').split('\n// ==== replace ====\n');
     return { id: 'cell-pic-delta-after', file: 'src/document_core/commands/object_ops/table.rs', find: find.replace(/^\/\/ ==== find ====\n/, ''), replace, done: '[claude-hwpx cell-pic-delta] 위 동기화' };
   })(),
+  // 글자처럼 취급 표를 끌면 남은 거리를 세로 위치에 적어 표가 다른 문단과 겹치던 것(patches/tac-table-move.rs)
+  (() => {
+    const [find, replace] = fs.readFileSync(path.join(HERE, 'patches', 'tac-table-move.rs'), 'utf8').replace(/\r\n/g, '\n').split('\n// ==== replace ====\n');
+    return { id: 'tac-table-move', file: 'src/document_core/commands/table_ops.rs', find: find.replace(/^\/\/ ==== find ====\n/, ''), replace, done: '[claude-hwpx tac-table-move]' };
+  })(),
+  (() => {
+    const [find, replace] = fs.readFileSync(path.join(HERE, 'patches', 'tac-table-move-ret.rs'), 'utf8').replace(/\r\n/g, '\n').split('\n// ==== replace ====\n');
+    return { id: 'tac-table-move-ret', file: 'src/document_core/commands/table_ops.rs', find: find.replace(/^\/\/ ==== find ====\n/, ''), replace, done: '[claude-hwpx tac-table-move-ret]' };
+  })(),
   // 가운데 정렬 문단을 첫 글자부터 고르면 선택 음영이 줄 왼쪽 여백부터 칠해지던 것(patches/sel-left-at-glyph.rs)
   (() => {
     const [find, replace] = fs.readFileSync(path.join(HERE, 'patches', 'sel-left-at-glyph.rs'), 'utf8').replace(/\r\n/g, '\n').split('\n// ==== replace ====\n');
@@ -259,6 +268,23 @@ for (const p of [{ id: 'caret-axis-bridge', file: 'src/core/wasm-bridge.ts', don
     const eol = (s) => (src.includes('\r\n') ? s.replace(/\r?\n/g, '\r\n') : s);
     if (src.split(eol(find)).length !== 2) throw new Error('table-resize-updates.ts 에서 패치 자리(boundary-merged)를 하나로 못 찾았다');
     fs.writeFileSync(f, src.replace(eol(find), eol(replace)));
+  }
+}
+
+// 표 끌기 되돌리기가 거리를 반대로 끄는 방식이라 제자리로 오지 않던 것, 글자처럼 취급 표 끌기의 남은 거리 넘기기(patches/table-move-undo.ts)
+{
+  const f = path.join(STUDIO, 'src', 'engine', 'input-handler-table.ts');
+  let src = fs.readFileSync(f, 'utf8');
+  if (!src.includes('[claude-hwpx table-move-undo]')) {
+    const eol = (s) => (src.includes('\r\n') ? s.replace(/\r?\n/g, '\r\n') : s);
+    const blocks = fs.readFileSync(path.join(HERE, 'patches', 'table-move-undo.ts'), 'utf8').replace(/\r\n/g, '\n')
+      .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n');
+    for (const b of blocks) {
+      const [find, replace] = b.split('\n// ==== replace ====\n');
+      if (src.split(eol(find)).length !== 2) throw new Error('input-handler-table.ts 에서 패치 자리(table-move-undo)를 하나로 못 찾았다');
+      src = src.replace(eol(find), eol(replace));
+    }
+    fs.writeFileSync(f, src);
   }
 }
 
