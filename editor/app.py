@@ -9,6 +9,7 @@ pywebview 는 브라우저 단축키(Ctrl+F 찾기, Ctrl+P 인쇄, Ctrl+R 새로
 
 import os
 import sys
+import threading
 
 import webview
 
@@ -26,10 +27,52 @@ class Api:
         window.confirm_close = bool(dirty)
 
 
+flushed = False
+
+
+def on_closing():
+    """닫기를 한 번 보류하고 마지막 편집을 기록한 뒤 다시 닫는다.
+
+    closing 은 UI 스레드에서 돌아 여기서 evaluate_js 를 기다리면 멈춘다. 그래서 따로 기록하고 destroy 로 다시 닫는다.
+    다시 닫을 때 저장 안 한 편집이 있으면 confirm_close 대화상자가 뜬다.
+    """
+    global flushed
+    if flushed:
+        flushed = False
+        return None
+    threading.Thread(target=flush_then_close, daemon=True).start()
+    return False
+
+
+def flush_then_close():
+    global flushed
+    result = {}
+    done = threading.Event()
+
+    def resolved(value):
+        result["r"] = value
+        done.set()
+
+    # Promise 는 반환값이 아니라 콜백으로 온다(반환값은 빈 dict)
+    threading.Thread(
+        target=lambda: window.evaluate_js(
+            "window.__claudeFlushForClose ? window.__claudeFlushForClose() : Promise.resolve(null)",
+            resolved,
+        ),
+        daemon=True,
+    ).start()
+    done.wait(10)  # 기록이 멈춰도 창은 닫힌다
+    if isinstance(result.get("r"), dict):
+        window.confirm_close = bool(result["r"].get("dirty"))
+    flushed = True
+    window.destroy()
+
+
 # 화면보다 큰 고정 크기로 열면 오른쪽 위에 붙는 찾기 창 같은 패널이 화면 밖으로 나간다(2026-09-25 실측). 최대화로 연다.
 window = webview.create_window(
     title, url, maximized=True, min_size=(900, 600), js_api=Api()
 )
+window.events.closing += on_closing
 # 두 쪽 보기, 확대 비율 같은 에디터 설정(localStorage)이 다음 실행에도 남도록 저장 공간을 고정한다.
 webview.start(
     private_mode=False,

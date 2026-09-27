@@ -189,6 +189,15 @@ setInterval(async () => {
   } catch { /* 문서 교체 중이면 다음 주기에 */ }
 }, 1500);
 
+// 앱 창을 닫기 직전에 app.py 가 부른다. 입력이 1.5초 멈추기 전에 닫아도 마지막 편집이 changes 에 남는다.
+window.__claudeFlushForClose = async () => {
+  for (let i = 0; busy && i < 50; i++) await new Promise((r) => setTimeout(r, 100));
+  let recorded = false;
+  if (lastKey !== null && (await mutationKey()) !== lastKey) { await snapshot('user'); recorded = true; }
+  // 1초 주기 알림이 닿기 전에 닫을 수 있으니 저장 여부를 함께 돌려준다(app.py 가 확인 대화상자 여부로 쓴다)
+  return { recorded, dirty: Boolean((await studio.getDocumentState()).dirty) };
+};
+
 // 앱 창(app.py)에 저장 안 한 편집이 있는지 알린다. 있으면 창을 닫을 때 확인 대화상자가 뜬다.
 let lastDirty = null;
 setInterval(async () => {
