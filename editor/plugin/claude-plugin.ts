@@ -27,6 +27,8 @@ import { installKCommands } from './k-commands';
 import { installLogPanel } from './log-panel';
 import { installColorPalettes } from './color-palette';
 import { installParaPreview } from './para-preview';
+import { installDialogEnter } from './dialog-enter';
+import { installCellBlockErase } from './cell-block-erase';
 
 // 이름이 이렇게 시작하는 WASM 메서드는 문서를 바꾸지 않는다고 본다.
 const READ_DOC = /^(get|search|export|render|is|has|list|find|measure|hitTest|pageCount)/;
@@ -455,6 +457,8 @@ export function createClaudePlugin(getInputHandler) {
       installCellBlockDialogs(getInputHandler);
       installColorPalettes(getInputHandler);
       installParaPreview();
+      installDialogEnter();
+      installCellBlockErase(getInputHandler);
       installLogPanel();
       installEditLog(host, getInputHandler);   // 사용자 편집을 하나하나 /api/ops 로(`$E changes`)
       // 진단용: 디버그 포트로 붙었을 때 입력 처리기를 볼 수 있게(tests/cdp_eval.mjs 의 S.__claudeIH())

@@ -193,7 +193,7 @@ if (hasRust && RUST_PATCHES.some((p) => !builtIds.includes(p.id))) {
 }
 
 // 3. claude 플러그인 복사와 allowlist 등록
-for (const f of ['claude-plugin.ts', 'hancom-keys.ts', 'edit-log.ts', 'k-commands.ts', 'log-panel.ts', 'color-palette.ts', 'para-preview.ts']) fs.copyFileSync(path.join(HERE, 'plugin', f), path.join(STUDIO, 'src', 'plugin', f));
+for (const f of ['claude-plugin.ts', 'hancom-keys.ts', 'edit-log.ts', 'k-commands.ts', 'log-panel.ts', 'color-palette.ts', 'para-preview.ts', 'dialog-enter.ts', 'cell-block-erase.ts']) fs.copyFileSync(path.join(HERE, 'plugin', f), path.join(STUDIO, 'src', 'plugin', f));
 // 편집 도구 라이브러리(lib/SOURCE.md)도 같은 자리로. 플러그인이 './doc-tools.js' 로 부른다.
 for (const f of ['doc-tools.js', 'doc-rules.js', 'collab-ops.js']) {
   fs.copyFileSync(path.join(HERE, 'plugin', 'lib', f), path.join(STUDIO, 'src', 'plugin', f));
@@ -238,6 +238,20 @@ for (const p of [{ id: 'caret-axis-bridge', file: 'src/core/wasm-bridge.ts', don
       src = src.split(eol(find)).join(eol(replace));
     }
     fs.writeFileSync(f, src);
+  }
+}
+
+// 여러 줄에 걸친 병합 칸이 있는 셀 블록을 Shift+방향키로 경계 이동하면 병합 칸 옆 둘째 줄부터 이웃이 안 줄어 표가 뒤틀리던 것
+// (patches/boundary-resize-merged.ts). 스튜디오 소스를 찾아 바꾼다
+{
+  const f = path.join(STUDIO, 'src', 'engine', 'table-resize-updates.ts');
+  let src = fs.readFileSync(f, 'utf8');
+  if (!src.includes('[claude-hwpx boundary-merged]')) {
+    const [find, replace] = fs.readFileSync(path.join(HERE, 'patches', 'boundary-resize-merged.ts'), 'utf8').replace(/\r\n/g, '\n')
+      .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== replace ====\n');
+    const eol = (s) => (src.includes('\r\n') ? s.replace(/\r?\n/g, '\r\n') : s);
+    if (src.split(eol(find)).length !== 2) throw new Error('table-resize-updates.ts 에서 패치 자리(boundary-merged)를 하나로 못 찾았다');
+    fs.writeFileSync(f, src.replace(eol(find), eol(replace)));
   }
 }
 
