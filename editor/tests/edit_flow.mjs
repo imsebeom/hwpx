@@ -5,7 +5,7 @@
 //          ⑤ 본문 그림 문단 넣기(문서 전체에서 5곳) ⑥ 마지막 행 아래 행 추가/삭제 ⑦ 열 추가/삭제 ⑧ 칸 합치기/나누기
 // 판정: 처음에 없던 넘침, 겹침이 생기면 실패. ②는 칸이 표 밖으로 삐져나오면 실패. 글자 없는 줄은 넘침으로 세지 않는다
 // (쪽 끝 빈 문단은 엔진이 높이 0으로 흡수한다).
-// 비례 축소로 처음부터 눌려 그려지던 표는 되돌린 뒤 실제 내용 높이로 커질 수 있다(실패로 치지 않고 「바로잡힘」으로 적는다).
+// ①⑥은 되돌린 뒤 표 높이가 처음(①은 편집 기준값도 허용)과 1px 안이어야 한다(엔진 패치 tac-sync-offset 뒤로, 내용이 그대로면 높이도 그대로다).
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -67,7 +67,7 @@ function spill(doc, t) {
 }
 
 const base = problems(new m.HwpDocument(bytes));
-let fails = 0, fixed = 0;
+let fails = 0;
 const report = (name, t, ok, detail) => {
   if (!ok) fails++;
   if (!ok || verbose) console.log(`${ok ? '통과' : '실패'} ${name} p${t.p}: ${detail}`);
@@ -84,10 +84,14 @@ for (const t of tables(new m.HwpDocument(bytes))) {
     const h1 = height(doc, t), p1 = problems(doc);
     doc.deleteTextInCellDeferredPagination(0, t.p, t.c, 0, 0, len, [...LINE].length); doc.flushDeferredPagination();
     const h2 = height(doc, t), p2 = problems(doc);
-    const back = Math.abs(h2 - h0) <= 1;
-    if (!back && h2 > h0) fixed++;
-    report('넣기/지우기', t, !worse(p1) && !worse(p2) && h1 > h0 - 0.5,
-      `높이 ${h0.toFixed(1)} → ${h1.toFixed(1)} → ${h2.toFixed(1)}${back ? '' : '(바로잡힘)'} 넘침 ${p1.over}/${p2.over} 겹침 ${p1.overlap}/${p2.overlap}`);
+    // 편집 기준값: 같은 자리에 글 하나 넣고 지운 높이. 처음 그린 높이가 한글과 다른 표는 편집하면 기준값으로 간다
+    // (d02 p5: 처음 106.9, 한글 98.0, 편집 뒤 98.0). 내용이 그대로면 둘 중 하나와 같아야 한다
+    const noop = new m.HwpDocument(bytes);
+    noop.insertTextInCell(0, t.p, t.c, 0, 0, len, 'x'); noop.deleteTextInCell(0, t.p, t.c, 0, 0, len, 1);
+    const hn = height(noop, t);
+    const back = Math.abs(h2 - h0) <= 1 || Math.abs(h2 - hn) <= 1;
+    report('넣기/지우기', t, !worse(p1) && !worse(p2) && h1 > Math.min(h0, hn) - 0.5 && back,
+      `높이 ${h0.toFixed(1)} → ${h1.toFixed(1)} → ${h2.toFixed(1)}${back ? '' : `(안 돌아옴, 편집 기준값 ${hn.toFixed(1)})`} 넘침 ${p1.over}/${p2.over} 겹침 ${p1.overlap}/${p2.overlap}`);
   }
   // ② Enter/합치기
   {
@@ -139,9 +143,8 @@ for (const t of tables(new m.HwpDocument(bytes))) {
     doc.deleteTableRow(0, t.p, t.c, rows);
     const h2 = height(doc, t), p2 = problems(doc);
     const back = Math.abs(h2 - h0) <= 1;
-    if (!back && h2 > h0) fixed++;
-    report('행 추가/삭제', t, r.ok && !worse(p1) && !worse(p2) && h1 > h0 + 1 && s1 <= 1 && (back || h2 > h0),
-      `높이 ${h0.toFixed(1)} → ${h1.toFixed(1)} → ${h2.toFixed(1)}${back ? '' : '(바로잡힘)'} 삐짐 ${s1.toFixed(1)} 넘침 ${p1.over}/${p2.over} 겹침 ${p1.overlap}/${p2.overlap}`);
+    report('행 추가/삭제', t, r.ok && !worse(p1) && !worse(p2) && h1 > h0 + 1 && s1 <= 1 && back,
+      `높이 ${h0.toFixed(1)} → ${h1.toFixed(1)} → ${h2.toFixed(1)}${back ? '' : '(안 돌아옴)'} 삐짐 ${s1.toFixed(1)} 넘침 ${p1.over}/${p2.over} 겹침 ${p1.overlap}/${p2.overlap}`);
   }
   // ⑦ 마지막 열 오른쪽에 열 추가 뒤 지우기 — 칸이 좁아져 줄이 늘어도 표가 따라가는지
   {
@@ -186,5 +189,5 @@ for (const t of tables(new m.HwpDocument(bytes))) {
     report('본문 그림', { p }, r.ok && !worse(p1), `넘침 ${p1.over} 겹침 ${p1.overlap}`);
   }
 }
-console.log(`${path.basename(file)}: 처음 넘침 ${base.over} 겹침 ${base.overlap} | 실패 ${fails}${fixed ? `, 바로잡힘 ${fixed}` : ''}`);
+console.log(`${path.basename(file)}: 처음 넘침 ${base.over} 겹침 ${base.overlap} | 실패 ${fails}`);
 process.exit(fails ? 1 : 0);
