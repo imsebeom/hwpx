@@ -1,7 +1,7 @@
     /// [claude-hwpx tac-host-sync] 칸 편집으로 글자처럼 취급 표의 높이가 바뀌면 표 높이(hp:sz)와 표를 담은
     /// 줄의 높이를 새 높이로 맞춘다. 한글은 둘을 함께 고치는데 rhwp 는 그대로 두어, 표는 커져 그려지는데
     /// 쪽 나누기는 옛 줄 높이만큼만 자리를 잡아 쪽 끝 줄이 본문 영역 밖으로 반 줄 나갔다(2026-09-27 실측,
-    /// 한 줄 늘어난 1×1 표 아래 문단). 문단에 글자처럼 취급 표가 하나이고 캡션이 없을 때만 고친다.
+    /// 한 줄 늘어난 1×1 표 아래 문단). 캡션 없는 표만 고친다.
     /// 둘째 판(같은 날): ① 표는 적힌 높이를 0 으로 둔 사본으로 잰다 — 적힌 높이 그대로 재면 글자처럼 취급 표 비례
     /// 축소가 늘어난 내용을 도로 눌러, 한 줄이 늘면 다른 줄이 그만큼 줄고 표는 그대로였다(프롬프트 표 19.8+102.4 →
     /// 50.0+72.2). ② 「줄 높이 = 표 높이 + 바깥 여백」 관계를 요구하지 않고 줄 높이는 표 높이 변화만큼 더한다
@@ -23,18 +23,34 @@
         else {
             return;
         };
-        let tac_count = para
+        let tac_ctrls: Vec<usize> = para
             .controls
             .iter()
-            .filter(|c| matches!(c, Control::Table(t) if t.common.treat_as_char))
-            .count();
+            .enumerate()
+            .filter(|(_, c)| matches!(c, Control::Table(t) if t.common.treat_as_char))
+            .map(|(i, _)| i)
+            .collect();
         let Some(Control::Table(table)) = para.controls.get(control_idx) else {
             return;
         };
-        if !table.common.treat_as_char || tac_count != 1 || table.caption.is_some() {
+        if !table.common.treat_as_char || table.caption.is_some() {
             return;
         }
-        if para.line_segs.first().is_none() {
+        // 표를 담은 줄. 표가 하나면 첫 줄, 여럿이면 글 없는 문단에 줄마다 표 하나(한글 저장 관례)일 때만
+        // 그 순번의 줄이다(2026-09-28: 한 문단의 둘째 표가 칸 내용을 따라가지 않아 칸이 표 밖으로 2px 삐졌다).
+        let seg_idx = if tac_ctrls.len() == 1 {
+            0
+        } else if para.text.chars().all(|c| c.is_whitespace() || c.is_control())
+            && para.line_segs.len() == tac_ctrls.len()
+        {
+            match tac_ctrls.iter().position(|&i| i == control_idx) {
+                Some(k) => k,
+                None => return,
+            }
+        } else {
+            return;
+        };
+        if para.line_segs.get(seg_idx).is_none() {
             return;
         }
         let old_h = table.common.height as i32;
@@ -44,7 +60,13 @@
             .with_native_hwp5(native_hwp5);
         let new_px = measurer.measure_table_for_edit(&probe, parent_para_idx, control_idx, &self.styles);
         let new_h = px_to_hwpunit(new_px, dpi);
-        if new_h <= 0 || (hwpunit_to_px(new_h - old_h, dpi)).abs() < 1.0 {
+        // 글 없는 줄(표만 담은 줄)은 한글처럼 「표 높이 + 바깥 여백」으로 맞춘다. 행 추가, 삭제는 표 높이(hp:sz)를
+        // 먼저 바꿔 두어, 표 높이 변화만 보면 줄이 옛 높이로 남았다(2026-09-28: 표 498px, 줄 264px 이라 뒤 문단이 쪽 밖으로).
+        let outer = table.outer_margin_top as i32 + table.outer_margin_bottom as i32;
+        let text_free = para.text.chars().all(|c| c.is_whitespace() || c.is_control());
+        let seg_lh = para.line_segs[seg_idx].line_height;
+        let line_off = text_free && hwpunit_to_px(seg_lh - (new_h + outer), dpi).abs() >= 1.0;
+        if new_h <= 0 || (hwpunit_to_px(new_h - old_h, dpi).abs() < 1.0 && !line_off) {
             return;
         }
         let para = &mut self.document.sections[section_idx].paragraphs[parent_para_idx];
@@ -52,8 +74,13 @@
         if let Some(Control::Table(table)) = para.controls.get_mut(control_idx) {
             table.common.height = new_h as u32;
         }
-        if let Some(seg) = para.line_segs.first_mut() {
-            let new_lh = (seg.line_height + (new_h - old_h)).max(1);
+        if let Some(seg) = para.line_segs.get_mut(seg_idx) {
+            let new_lh = if text_free {
+                new_h + outer
+            } else {
+                seg.line_height + (new_h - old_h)
+            }
+            .max(1);
             if seg.line_height > 0 {
                 seg.baseline_distance =
                     (seg.baseline_distance as i64 * new_lh as i64 / seg.line_height as i64) as i32;
@@ -91,7 +118,7 @@
     /// [claude-hwpx tac-host-sync] 문단 from 의 높이가 바뀐 뒤 뒤 문단들의 저장 세로 위치(vertpos)를 다시 매긴다.
     /// 쪽 나누기는 문단마다 저장 vertpos 로 되감아 맞추므로, 그대로 두면 늘어난 만큼이 되감겨 쪽 끝 줄이 넘쳤다
     /// (한글은 뒤 문단을 모두 다시 매긴다). rhwp 의 본문 재계산(recalculate_section_vpos)을 쓰고, 바뀌기 전 문단 끝
-    /// stored_end 를 넘겨 낡은 쪽 경계를 알아보게 한다(vpos-stale-reset 패치).
+    /// stored_end 를 넘긴다.
     pub(crate) fn claude_shift_following_vpos(
         &mut self,
         section_idx: usize,

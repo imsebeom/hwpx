@@ -153,7 +153,7 @@ const RUST_PATCHES = [
   { id: 'tac-host-sync-measure', file: 'src/renderer/height_measurer.rs', anchor: '    /// 재귀적 높이 제한',
     insert: fs.readFileSync(path.join(HERE, 'patches', 'tac-host-sync-measure.rs'), 'utf8').replace(/\r\n/g, '\n'), done: '[claude-hwpx tac-host-sync] 편집한 표 하나' },
   { id: 'tac-host-sync-fn', file: 'src/document_core/commands/text_editing.rs', anchor: '    fn reflow_cell_paragraph_after_text_edit(',
-    insert: fs.readFileSync(path.join(HERE, 'patches', 'tac-host-sync-fn.rs'), 'utf8').replace(/\r\n/g, '\n'), done: 'stored_end 를 넘겨 낡은 쪽 경계를 알아보게' },
+    insert: fs.readFileSync(path.join(HERE, 'patches', 'tac-host-sync-fn.rs'), 'utf8').replace(/\r\n/g, '\n'), done: '글 없는 문단에 줄마다 표 하나' },
   (() => {
     // 입력과 삭제 두 경로에 같은 자리가 있어 모두 바꾼다(all)
     const [find, replace] = fs.readFileSync(path.join(HERE, 'patches', 'tac-host-sync-call.rs'), 'utf8').replace(/\r\n/g, '\n').split('\n// ==== replace ====\n');
@@ -203,6 +203,11 @@ const RUST_PATCHES = [
     const [find, replace] = fs.readFileSync(path.join(HERE, 'patches', 'replace-cell-dirty.rs'), 'utf8').replace(/\r\n/g, '\n').split('\n// ==== replace ====\n');
     return { id: 'replace-cell-dirty', file: 'src/document_core/queries/search_query.rs', find: find.replace(/^\/\/ ==== find ====\n/, ''), replace, done: '[claude-hwpx replace-cell-dirty]' };
   })(),
+  // 칸 크기 조절에 표 높이를 함께 받는다 — Ctrl+위/아래로 고른 행만 키워도 모든 행이 비례로 커지던 것(patches/row-resize-th-*.rs, 스튜디오 row-resize-rendered.ts)
+  ...['row-resize-th-parse', 'row-resize-th-apply'].map((id) => {
+    const [find, replace] = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n').split('\n// ==== replace ====\n');
+    return { id, file: 'src/document_core/commands/table_ops.rs', find: find.replace(/^\/\/ ==== find ====\n/, ''), replace, done: id === 'row-resize-th-parse' ? 'let claude_table_height' : 'if claude_table_height.is_some()' };
+  }),
   // 가운데 정렬 문단을 첫 글자부터 고르면 선택 음영이 줄 왼쪽 여백부터 칠해지던 것(patches/sel-left-at-glyph.rs)
   (() => {
     const [find, replace] = fs.readFileSync(path.join(HERE, 'patches', 'sel-left-at-glyph.rs'), 'utf8').replace(/\r\n/g, '\n').split('\n// ==== replace ====\n');
@@ -325,6 +330,19 @@ for (const p of [{ id: 'caret-axis-bridge', file: 'src/core/wasm-bridge.ts', don
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== replace ====\n');
     const eol = (s) => (src.includes('\r\n') ? s.replace(/\r?\n/g, '\r\n') : s);
     if (src.split(eol(find)).length !== 2) throw new Error('table-resize-updates.ts 에서 패치 자리(column-resize-min)를 하나로 못 찾았다');
+    fs.writeFileSync(f, src.replace(eol(find), eol(replace)));
+  }
+}
+
+// Ctrl+위/아래는 고른 행을 그려진 높이에서 한 단계 바꾸고 표 높이도 함께 보낸다(patches/row-resize-rendered.ts, 엔진 row-resize-th-*)
+{
+  const f = path.join(STUDIO, 'src', 'engine', 'input-handler-table.ts');
+  let src = fs.readFileSync(f, 'utf8');
+  if (!src.includes('[claude-hwpx row-resize-rendered]')) {
+    const [find, replace] = fs.readFileSync(path.join(HERE, 'patches', 'row-resize-rendered.ts'), 'utf8').replace(/\r\n/g, '\n')
+      .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== replace ====\n');
+    const eol = (s) => (src.includes('\r\n') ? s.replace(/\r?\n/g, '\r\n') : s);
+    if (src.split(eol(find)).length !== 2) throw new Error('input-handler-table.ts 에서 패치 자리(row-resize-rendered)를 하나로 못 찾았다');
     fs.writeFileSync(f, src.replace(eol(find), eol(replace)));
   }
 }
