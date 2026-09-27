@@ -53,12 +53,22 @@
   - 도구: `~/.cache/rhwp-devel/cmp.mjs`(2쪽 글자 줄과 셀 상자), `allpages.mjs <pkg> <a> <b>`(전 쪽 글자 좌표 대조), `variants.py`, `winshot.py`(에디터 창을 앞으로 올리지 않고 PrintWindow 로 캡처 — 사용자 화면을 뺏지 않는다)
 
 ## 컨텍스트 앵커
-- **09-27(이어서)**: 스킬 787f5fd 글자 색 목록(빠른 단추, 글자 모양 대화상자), f587643 가운데 정렬 첫 글자 선택 음영(엔진 `sel-left-at-glyph`),
-  bf05e4d~a763d1e **캐럿 축 수정**(사용자 선택 「어긋남 전체 + 개체 선택」) — 글자처럼 취급 개체 뒤 입력, 삭제, 복사, 음영, 굵게, 엔터 어긋남과 개체 선택 불가.
-  원인: 스튜디오 캐럿은 캐럿 축(개체 한 칸), 엔진 편집 함수는 글자 축, `split_at` 은 나누기 축. 엔진 패치 15개(`patches/caret-axis-*.rs`) + 연결층 `caret-axis-bridge.ts` + Backspace/Delete 개체 칸 → 선택 삭제.
-  검증 `cargo test --lib` 3,898 통과, 에디터 키 입력 실측 통과. rhwp 이슈 **#7444**(PR 없음, 사용자 지시). 결함 목록과 한계는 스킬 `references/editor-mode.md`.
-  남은 것: 셀 안 개체 실측 안 함, 찾기/바꾸기와 필드 정보는 글자 축 그대로. 데스크탑 앱 미리보기 열기는 스킬 050f3a8(`CLAUDE_CODE_ENTRYPOINT` 가 cli 가 아니면 `.claude/launch.json` 의 hwpx-editor → `cli.mjs hold`) — 실제 데스크탑 앱에서는 아직 안 써 봤다.
-- **09-27**: 셀 블록(F5 여러 셀)에서 표/셀 속성, 문단 모양은 첫 칸에만, 글자 모양은 대화상자가 안 열리던 것을 플러그인 `installCellBlockDialogs` 로 고침(스킬 73c4177, hwpx·hwpx2 푸시). 툴바, 단축키, 스타일, 문단 번호, 셀 테두리/배경은 원래 정상(12/12 실측). rhwp devel 도 표/셀 속성 대화상자는 같은 결함 — 보고 여부 미정
+- **intent(09-27 세션)**: 사용자가 에디터를 직접 시험하며 찾은 결함을 차례로 고쳤다 — 여러 셀 대화상자, 글자 색 선택, 가운데 정렬 음영, 글자처럼 취급 표 선택과 편집 어긋남(엔진), 데스크탑 앱 미리보기 열기.
+  - **changes_made**(스킬 커밋, hwpx·hwpx2 푸시):
+    ⓐ 73c4177 셀 블록(F5 여러 셀)에서 표/셀 속성, 문단 모양은 첫 칸에만, 글자 모양은 대화상자가 안 열리던 것 — 플러그인 `installCellBlockDialogs`(12/12 실측, 되돌리기 한 번)
+    ⓑ 787f5fd 글자 색 빠른 단추와 글자 모양 대화상자 색 칸에 색 목록(`plugin/color-palette.ts`, 테마, 표준, 최근 색)
+    ⓒ f587643 가운데 정렬 문단을 첫 글자부터 고르면 음영이 왼쪽 여백부터 — 엔진 패치 `sel-left-at-glyph`
+    ⓓ bf05e4d, b2a3346, a763d1e **캐럿 축 수정** — 스튜디오 캐럿은 캐럿 축(개체 한 칸), 엔진 편집 함수는 글자 축, `split_at` 은 나누기 축이라 개체 뒤 입력, 삭제, 복사, 음영, 굵게, 엔터가 한 칸씩 어긋나고 개체가 선택에 안 들었다.
+       엔진 패치 15개(`patches/caret-axis-*.rs`: convertCaretOffset, deleteRangeCaret*, copySelectionCaret*, setInsertAfterInline, 붙여넣기 캐럿 삽입, 음영 줄 시작과 개체 자리 나누기) + 연결층 `caret-axis-bridge.ts`(약 40개 메서드 축 변환) + Backspace/Delete 개체 칸 → 선택 삭제 명령.
+       검증 `cargo test --lib` 3,898 통과, 에디터 키 입력 실측 9종 통과. 스튜디오 `npm test` 실패 8건은 CRLF 소스 정규식(고친 파일과 무관). rhwp 이슈 **#7444**
+    ⓔ 050f3a8 데스크탑 앱이면(`CLAUDE_CODE_ENTRYPOINT` 가 cli 아님) 앱 창 대신 `.claude/launch.json` 의 `hwpx-editor`(`cli.mjs hold <상태 폴더>`)로 미리보기. 다른 세션이 데스크탑에서 실측해 editor-mode.md 에 「창이 숨김으로 남아 Browser 단추를 눌러야 보인다」를 적었다
+  - **decisions**: 대화상자 결함은 플러그인에서(스튜디오 원본 불변), 캐럿 축은 사용자 선택 「엔진 수정, 어긋남 전체 + 개체 선택」 — 엔진 API 는 글자 축 그대로 두고 연결층에서 변환(Claude 편집 도구가 글자 축을 쓰므로), rhwp 에는 이슈만 올리고 PR 은 내지 않는다(사용자 지시). 사용자 에디터는 다시 띄우기 전에 묻는다(재시작으로 저장 안 한 편집을 잃었다)
+  - **next_steps**:
+    ① 셀 안 글자처럼 취급 개체(표 속 표, 셀 속 수식)에서 입력, 삭제, 음영 실측 — 시험 창은 `HWPX_EDITOR_INSTANCE=mcdbg WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9334`, 도구는 세션 scratchpad 의 cdprun.mjs/key.mjs/type.mjs 방식(editor/tests 로 올릴지 검토)
+    ② 셀 안 수식 음영(상자 찾기가 본문 수식만), 찾기/바꾸기와 필드 정보의 축 변환은 미적용
+    ③ 표 뒤 입력 직후 Shift+End 선택이 표 앞에서 시작한 일이 한 번 있었다 — 재현 안 됨, 다시 보이면 조사
+    ④ rhwp #7444, PR #7433 답 확인(`gh issue view 7444 -R edwardkim/rhwp`). 표/셀 속성 대화상자 여러 셀 결함은 rhwp 보고 여부 미정
+    ⑤ 캐럿 축 임시 단위 시험(9건)은 지웠다 — 패치에 시험을 넣을지 검토
 - **intent(09-25 둘째 세션): 문항 3을 에디터로 열었더니 문단이 한 줄로 눌리고 표가 겹친 것(사용자 발견)을 스킬과 rhwp 양쪽에서 끝까지 고쳤다 — 에디터 보정, 실제 줄 배치, 세션별 에디터, 작업 기록, rhwp 엔진 패치와 PR #7433.**
   - **changes_made**(스킬 커밋 a6413e6, 042a754 — hwpx, hwpx2 푸시):
     ⓐ `hwpx-zip.mjs stripDummyLinesegs()` + `server.mjs /api/doc` — 더미 줄 배치를 걷고 보낸다
