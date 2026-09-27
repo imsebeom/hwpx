@@ -48,13 +48,12 @@
             return;
         }
         let para = &mut self.document.sections[section_idx].paragraphs[parent_para_idx];
+        let old_end = crate::renderer::composer::paragraph_flow_end(para);
         if let Some(Control::Table(table)) = para.controls.get_mut(control_idx) {
             table.common.height = new_h as u32;
         }
-        let mut dh = 0;
         if let Some(seg) = para.line_segs.first_mut() {
             let new_lh = (seg.line_height + (new_h - old_h)).max(1);
-            dh = new_lh - seg.line_height;
             if seg.line_height > 0 {
                 seg.baseline_distance =
                     (seg.baseline_distance as i64 * new_lh as i64 / seg.line_height as i64) as i32;
@@ -62,11 +61,7 @@
             seg.line_height = new_lh;
             seg.text_height = new_lh;
         }
-        Self::claude_shift_following_vpos(
-            &mut self.document.sections[section_idx].paragraphs,
-            parent_para_idx,
-            dh,
-        );
+        self.claude_shift_following_vpos(section_idx, parent_para_idx, old_end);
         // 쪽 나누기는 조판해 둔 문단(composed)의 줄 높이를 쓰므로 다시 조판한다(dirty 표시 포함)
         self.recompose_paragraph(section_idx, parent_para_idx);
         self.mark_section_dirty(section_idx);
@@ -93,30 +88,25 @@
         }
     }
 
-    /// [claude-hwpx tac-host-sync] 문단 from 이 dh 만큼 커졌을 때 뒤 문단들의 저장 세로 위치(vertpos)를 dh 만큼 민다.
-    /// 쪽 나누기는 문단마다 저장 vertpos 로 되감아 맞추므로, 밀지 않으면 늘어난 만큼이 되감겨 쪽 끝 줄이 넘쳤다
-    /// (한 줄 늘어난 표 아래 문단, 한글은 뒤 문단을 모두 다시 매긴다). 저장 사다리에서 쪽이 바뀌는 곳(첫 줄 vertpos 가
-    /// 앞 문단보다 작아지는 곳) 앞까지만 민다.
-    pub(crate) fn claude_shift_following_vpos(paragraphs: &mut [Paragraph], from: usize, dh: i32) {
-        if dh == 0 {
-            return;
-        }
-        let mut prev = paragraphs
-            .get(from)
-            .and_then(|p| p.line_segs.first())
-            .map(|s| s.vertical_pos)
-            .unwrap_or(0);
-        for para in paragraphs.iter_mut().skip(from + 1) {
-            let Some(first) = para.line_segs.first().map(|s| s.vertical_pos) else {
-                continue;
-            };
-            if first < prev {
-                break;
-            }
-            prev = first;
-            for seg in para.line_segs.iter_mut() {
-                seg.vertical_pos += dh;
-            }
-        }
+    /// [claude-hwpx tac-host-sync] 문단 from 의 높이가 바뀐 뒤 뒤 문단들의 저장 세로 위치(vertpos)를 다시 매긴다.
+    /// 쪽 나누기는 문단마다 저장 vertpos 로 되감아 맞추므로, 그대로 두면 늘어난 만큼이 되감겨 쪽 끝 줄이 넘쳤다
+    /// (한글은 뒤 문단을 모두 다시 매긴다). rhwp 의 본문 재계산(recalculate_section_vpos)을 쓰고, 바뀌기 전 문단 끝
+    /// stored_end 를 넘겨 낡은 쪽 경계를 알아보게 한다(vpos-stale-reset 패치).
+    pub(crate) fn claude_shift_following_vpos(
+        &mut self,
+        section_idx: usize,
+        from: usize,
+        stored_end: Option<i32>,
+    ) {
+        let hwp3 = self.document.layout_profile().hwp3_layout();
+        crate::renderer::composer::recalculate_section_vpos(
+            &mut self.document.sections[section_idx].paragraphs,
+            from,
+            None,
+            stored_end,
+            &self.styles,
+            self.dpi,
+            hwp3,
+        );
     }
 

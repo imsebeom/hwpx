@@ -153,7 +153,7 @@ const RUST_PATCHES = [
   { id: 'tac-host-sync-measure', file: 'src/renderer/height_measurer.rs', anchor: '    /// 재귀적 높이 제한',
     insert: fs.readFileSync(path.join(HERE, 'patches', 'tac-host-sync-measure.rs'), 'utf8').replace(/\r\n/g, '\n'), done: '[claude-hwpx tac-host-sync] 편집한 표 하나' },
   { id: 'tac-host-sync-fn', file: 'src/document_core/commands/text_editing.rs', anchor: '    fn reflow_cell_paragraph_after_text_edit(',
-    insert: fs.readFileSync(path.join(HERE, 'patches', 'tac-host-sync-fn.rs'), 'utf8').replace(/\r\n/g, '\n'), done: '쪽 나누기 직전에 부른다. 편집으로 dirty' },
+    insert: fs.readFileSync(path.join(HERE, 'patches', 'tac-host-sync-fn.rs'), 'utf8').replace(/\r\n/g, '\n'), done: 'stored_end 를 넘겨 낡은 쪽 경계를 알아보게' },
   (() => {
     // 입력과 삭제 두 경로에 같은 자리가 있어 모두 바꾼다(all)
     const [find, replace] = fs.readFileSync(path.join(HERE, 'patches', 'tac-host-sync-call.rs'), 'utf8').replace(/\r\n/g, '\n').split('\n// ==== replace ====\n');
@@ -164,7 +164,7 @@ const RUST_PATCHES = [
     insert: fs.readFileSync(path.join(HERE, 'patches', 'cell-pic-delta-before.rs'), 'utf8').replace(/\r\n/g, '\n'), done: '[claude-hwpx cell-pic-delta] 바꾸기 전' },
   (() => {
     const [find, replace] = fs.readFileSync(path.join(HERE, 'patches', 'cell-pic-delta-after.rs'), 'utf8').replace(/\r\n/g, '\n').split('\n// ==== replace ====\n');
-    return { id: 'cell-pic-delta-after', file: 'src/document_core/commands/object_ops/table.rs', find: find.replace(/^\/\/ ==== find ====\n/, ''), replace, done: '[claude-hwpx cell-pic-delta] 위 동기화' };
+    return { id: 'cell-pic-delta-after', file: 'src/document_core/commands/object_ops/table.rs', find: find.replace(/^\/\/ ==== find ====\n/, ''), replace, done: 'claude_old_end = Some(' };
   })(),
   // 글자처럼 취급 표를 끌면 남은 거리를 세로 위치에 적어 표가 다른 문단과 겹치던 것(patches/tac-table-move.rs)
   (() => {
