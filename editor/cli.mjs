@@ -2,7 +2,8 @@
 /**
  * Claude 가 쓰는 에디터 조작 CLI.
  *
- *   node cli.mjs start <문서.hwpx>     서버를 띄우고 에디터 앱 창(없으면 브라우저)에 연다 [--browser]
+ *   node cli.mjs start <문서.hwpx>     서버를 띄우고 앱 창(터미널) 또는 데스크탑 앱 미리보기(.claude/launch.json)에 연다 [--app|--preview|--browser]
+ *   node cli.mjs hold <상태 폴더>      미리보기가 실행한다 — 떠 있는 에디터 서버에 붙어 있다
  *   node cli.mjs run <ops.json | ->    JSON 명령 배열을 에디터에 적용 (한 트랜잭션, undo 1스텝)
  *   node cli.mjs text                  현재 본문 텍스트
  *   node cli.mjs outline [시작 끝]      좌표(p12, T1r2c1)가 붙은 문서 개요
@@ -132,6 +133,42 @@ function aliveAppPid() {
   } catch { return null; }
 }
 
+/**
+ * 에디터를 어디에 열까. --app / --preview / --browser 또는 HWPX_EDITOR_MODE 가 먼저다.
+ * 없으면 Claude Code 터미널(CLAUDE_CODE_ENTRYPOINT=cli)이나 사람이 직접 실행한 경우 앱 창,
+ * 그 밖(데스크탑 앱 등)은 미리보기. 데스크탑 앱의 CLAUDE_CODE_ENTRYPOINT 값은 공식 문서에 없어 cli 가 아닌 것으로 가른다.
+ */
+function openMode(args) {
+  for (const m of ['app', 'preview', 'browser']) if (args.includes(`--${m}`)) return m;
+  if (['app', 'preview', 'browser'].includes(process.env.HWPX_EDITOR_MODE)) return process.env.HWPX_EDITOR_MODE;
+  const entry = process.env.CLAUDE_CODE_ENTRYPOINT;
+  return !entry || entry === 'cli' ? 'app' : 'preview';
+}
+
+/**
+ * 데스크탑 앱 미리보기 항목을 작업 폴더의 .claude/launch.json 에 넣는다(다른 항목은 그대로).
+ * 미리보기가 실행하는 것은 `cli.mjs hold <상태 폴더>` — 이미 떠 있는 이 에디터 서버에 붙어 있기만 하므로
+ * 서버가 둘로 늘지 않는다. 서버가 없으면 hold 가 띄운다.
+ */
+function registerPreview(url) {
+  const dir = path.join(process.cwd(), '.claude');
+  const file = path.join(dir, 'launch.json');
+  let cfg = { version: '0.0.1', configurations: [] };
+  try { cfg = JSON.parse(fs.readFileSync(file, 'utf8')); } catch { /* 없거나 깨졌으면 새로 */ }
+  cfg.version ||= '0.0.1';
+  cfg.configurations = (cfg.configurations || []).filter((c) => c?.name !== 'hwpx-editor');
+  cfg.configurations.push({
+    name: 'hwpx-editor',
+    runtimeExecutable: process.execPath,
+    runtimeArgs: [path.join(HERE, 'cli.mjs'), 'hold', STATE_DIR],
+    port: PORT,
+    url,
+  });
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(file, JSON.stringify(cfg, null, 2) + '\n');
+  return file;
+}
+
 function openBrowser(url) {
   if (process.platform === 'win32') spawn('cmd', ['/c', 'start', '', url], { detached: true, stdio: 'ignore' }).unref();
   else spawn(process.platform === 'darwin' ? 'open' : 'xdg-open', [url], { detached: true, stdio: 'ignore' }).unref();
@@ -215,11 +252,17 @@ switch (sub) {
     if (!h.browser && aliveAppPid()) {                // 옛 앱 창이 새 서버에 다시 붙기를 기다린다
       for (let i = 0; i < 20 && !h.browser; i++) { await sleep(500); h = await health(); }
     }
+    const mode = openMode(args);
     if (h.browser) await cmd({ type: 'open' });       // 이미 열린 탭이 있으면 그 탭에 새 문서를 연다
-    else if (!args.includes('--no-browser')) {
+    else if (mode === 'preview') {
+      // 데스크탑 앱: 창을 띄우지 않고 앱 내장 브라우저(미리보기)가 열 항목을 .claude/launch.json 에 둔다
+      const where = registerPreview(`http://localhost:${PORT}/`);
+      out(`에디터: http://localhost:${PORT}/\n미리보기: ${where} 의 "hwpx-editor" — 데스크탑 앱 미리보기 창에서 연다(문서는 그때 열린다)`);
+      process.exit(0);
+    } else if (!args.includes('--no-browser')) {
       const url = `http://localhost:${PORT}/`;
       // 기본은 앱 창(한/글 단축키 전부). --browser 면 브라우저 탭(Ctrl+N 계열은 Ctrl+M 으로 대신).
-      if (args.includes('--browser') || !openAppWindow(url, path.basename(file))) openBrowser(url);
+      if (mode === 'browser' || !openAppWindow(url, path.basename(file))) openBrowser(url);
     }
     // 스킬 파이프라인 산출물은 서버가 한글로 줄 배치를 계산해 보내므로(hancom_layout.py) 넉넉히 기다린다.
     for (let i = 0; i < 180; i++) {
@@ -227,6 +270,15 @@ switch (sub) {
       await sleep(500);
     }
     die('브라우저에서 문서가 열리지 않았다(90초). 탭을 확인한다.');
+    break;
+  }
+  case 'hold': {
+    // 데스크탑 앱 미리보기가 실행한다(registerPreview). 인자로 받은 에디터의 서버에 붙어 있고, 서버가 내려가면 끝난다.
+    if (args[0]) { STATE_DIR = path.resolve(args[0]); PORT = readPort(STATE_DIR) || PORT; BASE = `http://127.0.0.1:${PORT}`; }
+    if (!fs.existsSync(path.join(STATE_DIR, 'session.json'))) die('열린 문서가 없다. 먼저 start <문서>');
+    await ensureServer();
+    out(`에디터 서버: http://localhost:${PORT}/`);
+    while (await health()) await sleep(2000);
     break;
   }
   case 'run': {
