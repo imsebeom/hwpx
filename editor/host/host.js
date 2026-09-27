@@ -189,6 +189,17 @@ setInterval(async () => {
   } catch { /* 문서 교체 중이면 다음 주기에 */ }
 }, 1500);
 
+// 앱 창(app.py)에 저장 안 한 편집이 있는지 알린다. 있으면 창을 닫을 때 확인 대화상자가 뜬다.
+let lastDirty = null;
+setInterval(async () => {
+  const api = window.pywebview?.api;
+  if (!api?.set_dirty) return;
+  try {
+    const dirty = Boolean((await studio.getDocumentState()).dirty);
+    if (dirty !== lastDirty) { lastDirty = dirty; await api.set_dirty(dirty); }
+  } catch { /* 문서 교체 중이면 다음 주기에 */ }
+}, 1000);
+
 setStatus('Claude 연결 대기', '');
 watchFileAccess();
 await openFromServer();

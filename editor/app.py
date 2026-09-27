@@ -18,7 +18,24 @@ state = os.environ.get("HWPX_EDITOR_STATE") or os.path.join(
     os.path.expanduser("~"), ".claude", "cache", "hwpx-editor"
 )
 
+
+class Api:
+    """호스트 페이지(host.js)가 저장 안 한 편집 여부를 알려 온다. 있을 때만 닫기 전에 묻는다."""
+
+    def set_dirty(self, dirty):
+        window.confirm_close = bool(dirty)
+
+
 # 화면보다 큰 고정 크기로 열면 오른쪽 위에 붙는 찾기 창 같은 패널이 화면 밖으로 나간다(2026-09-25 실측). 최대화로 연다.
-webview.create_window(title, url, maximized=True, min_size=(900, 600))
+window = webview.create_window(
+    title, url, maximized=True, min_size=(900, 600), js_api=Api()
+)
 # 두 쪽 보기, 확대 비율 같은 에디터 설정(localStorage)이 다음 실행에도 남도록 저장 공간을 고정한다.
-webview.start(private_mode=False, storage_path=os.path.join(state, "webview"))
+webview.start(
+    private_mode=False,
+    storage_path=os.path.join(state, "webview"),
+    localization={
+        "global.quitConfirmation": "저장하지 않은 편집이 있습니다.\n\n"
+        "확인을 누르면 저장하지 않고 닫습니다. 저장하려면 취소를 누르고 Ctrl+S 로 저장하세요."
+    },
+)
