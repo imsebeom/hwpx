@@ -2,7 +2,7 @@
 // 표 높이가 따라가는지, 쪽 끝을 넘거나 표와 겹치는 글 줄이 생기는지, 되돌린 뒤 원래대로인지 본다.
 //   node editor/tests/edit_flow.mjs <문서.hwpx> [--verbose]
 // 시험 종류: ① 칸 끝에 두 줄 넣기/지우기(미룬 쪽 나누기) ② 칸 Enter 두 번/합치기 ③ 칸 글자 16pt ④ 칸 안 그림 넣기
-//          ⑤ 본문 그림 문단 넣기(문서 전체에서 5곳) ⑥ 마지막 행 아래 행 추가/삭제
+//          ⑤ 본문 그림 문단 넣기(문서 전체에서 5곳) ⑥ 마지막 행 아래 행 추가/삭제 ⑦ 열 추가/삭제 ⑧ 칸 합치기/나누기
 // 판정: 처음에 없던 넘침, 겹침이 생기면 실패. ②는 칸이 표 밖으로 삐져나오면 실패. 글자 없는 줄은 넘침으로 세지 않는다
 // (쪽 끝 빈 문단은 엔진이 높이 0으로 흡수한다).
 // 비례 축소로 처음부터 눌려 그려지던 표는 되돌린 뒤 실제 내용 높이로 커질 수 있다(실패로 치지 않고 「바로잡힘」으로 적는다).
@@ -142,6 +142,32 @@ for (const t of tables(new m.HwpDocument(bytes))) {
     if (!back && h2 > h0) fixed++;
     report('행 추가/삭제', t, r.ok && !worse(p1) && !worse(p2) && h1 > h0 + 1 && s1 <= 1 && (back || h2 > h0),
       `높이 ${h0.toFixed(1)} → ${h1.toFixed(1)} → ${h2.toFixed(1)}${back ? '' : '(바로잡힘)'} 삐짐 ${s1.toFixed(1)} 넘침 ${p1.over}/${p2.over} 겹침 ${p1.overlap}/${p2.overlap}`);
+  }
+  // ⑦ 마지막 열 오른쪽에 열 추가 뒤 지우기 — 칸이 좁아져 줄이 늘어도 표가 따라가는지
+  {
+    const doc = new m.HwpDocument(bytes);
+    const cols = JSON.parse(doc.getTableDimensions(0, t.p, t.c)).colCount;
+    const r = JSON.parse(doc.insertTableColumn(0, t.p, t.c, cols - 1, true));
+    const p1 = problems(doc), s1 = spill(doc, t);
+    doc.deleteTableColumn(0, t.p, t.c, cols);
+    const p2 = problems(doc), s2 = spill(doc, t);
+    report('열 추가/삭제', t, r.ok && !worse(p1) && !worse(p2) && s1 <= 1 && s2 <= 1,
+      `삐짐 ${s1.toFixed(1)}/${s2.toFixed(1)} 넘침 ${p1.over}/${p2.over} 겹침 ${p1.overlap}/${p2.overlap}`);
+  }
+  // ⑧ 첫 두 행의 첫 칸 합치기 뒤 나누기(두 행 이상)
+  {
+    const doc = new m.HwpDocument(bytes);
+    const d = JSON.parse(doc.getTableDimensions(0, t.p, t.c));
+    if (d.rowCount >= 2) {
+      let r;
+      try { r = JSON.parse(doc.mergeTableCells(0, t.p, t.c, 0, 0, 1, 0)); } catch { r = { ok: false }; }
+      const p1 = problems(doc), s1 = spill(doc, t);
+      const r2 = r.ok ? JSON.parse(doc.splitTableCell(0, t.p, t.c, 0, 0)) : { ok: false };
+      const p2 = problems(doc), s2 = spill(doc, t);
+      // 합칠 수 없는 모양(이미 합친 칸 등)은 엔진이 거절한다 — 그때는 넘어간다
+      if (r.ok) report('칸 합치기/나누기', t, r2.ok && !worse(p1) && !worse(p2) && s1 <= 1 && s2 <= 1,
+        `삐짐 ${s1.toFixed(1)}/${s2.toFixed(1)} 넘침 ${p1.over}/${p2.over} 겹침 ${p1.overlap}/${p2.overlap}`);
+    }
   }
 }
 // ⑤ 본문 그림(40mm): 문단마다 뒤에 그림 문단을 넣어 본다(글 있는 문단 가운데 5곳)
