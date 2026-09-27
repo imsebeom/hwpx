@@ -144,6 +144,11 @@ const RUST_PATCHES = [
   }),
   { id: 'caret-axis-insert-flag', file: 'src/model/paragraph.rs', anchor: '\nimpl Paragraph {\n', done: 'static INSERT_AFTER_INLINE_CONTROLS',
     insert: fs.readFileSync(path.join(HERE, 'patches', 'caret-axis-insert-flag.rs'), 'utf8').replace(/\r\n/g, '\n') },
+  // 표 칸 문단에 글을 넣어도 줄 수가 그대로면 입력 전 줄 경계가 복원되어 한 줄에 몰리던 것(patches/cell-reflow-starts.rs)
+  (() => {
+    const [find, replace] = fs.readFileSync(path.join(HERE, 'patches', 'cell-reflow-starts.rs'), 'utf8').replace(/\r\n/g, '\n').split('\n// ==== replace ====\n');
+    return { id: 'cell-reflow-starts', file: 'src/document_core/commands/text_editing.rs', find: find.replace(/^\/\/ ==== find ====\n/, ''), replace, done: '[claude-hwpx cell-reflow-starts]' };
+  })(),
   // 가운데 정렬 문단을 첫 글자부터 고르면 선택 음영이 줄 왼쪽 여백부터 칠해지던 것(patches/sel-left-at-glyph.rs)
   (() => {
     const [find, replace] = fs.readFileSync(path.join(HERE, 'patches', 'sel-left-at-glyph.rs'), 'utf8').replace(/\r\n/g, '\n').split('\n// ==== replace ====\n');
