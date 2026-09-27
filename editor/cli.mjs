@@ -2,7 +2,7 @@
 /**
  * Claude 가 쓰는 에디터 조작 CLI.
  *
- *   node cli.mjs start <문서.hwpx>     서버를 띄우고 앱 창(터미널) 또는 데스크탑 앱 미리보기(.claude/launch.json)에 연다 [--app|--preview|--browser]
+ *   node cli.mjs start [문서.hwpx]     (문서를 빼면 빈 문서 「새 문서.hwpx」를 작업 폴더에 만들어) 서버를 띄우고 앱 창(터미널) 또는 데스크탑 앱 미리보기(.claude/launch.json)에 연다 [--app|--preview|--browser]
  *   node cli.mjs hold <상태 폴더>      미리보기가 실행한다 — 떠 있는 에디터 서버에 붙어 있다
  *   node cli.mjs run <ops.json | ->    JSON 명령 배열을 에디터에 적용 (한 트랜잭션, undo 1스텝)
  *   node cli.mjs text                  현재 본문 텍스트
@@ -231,8 +231,17 @@ function formatChange(c) {
 const [, , sub, ...args] = process.argv;
 switch (sub) {
   case 'start': {
-    const file = args[0] && path.resolve(args[0]);
-    if (!file || !fs.existsSync(file)) die('사용법: start <문서.hwpx|.hwp>');
+    // 문서를 주지 않으면 빈 문서(blank.hwpx)를 작업 폴더에 「새 문서.hwpx」로 복사해 연다(이름이 있으면 번호를 붙인다)
+    const given = args.find((a) => !a.startsWith('--'));
+    let file = given && path.resolve(given);
+    if (!given) {
+      for (let n = 1; ; n++) {
+        file = path.join(process.cwd(), n === 1 ? '새 문서.hwpx' : `새 문서 (${n}).hwpx`);
+        if (!fs.existsSync(file)) break;
+      }
+      fs.copyFileSync(path.join(HERE, 'blank.hwpx'), file);
+    }
+    if (!file || !fs.existsSync(file)) die('사용법: start [문서.hwpx|.hwp] — 문서를 빼면 빈 문서로 연다');
     const blocker = editBlocker(file);
     if (blocker && !args.includes('--force')) die(`열지 않음: ${blocker}. 사용자가 원하면 --force`);
     fs.mkdirSync(STATE_DIR, { recursive: true });
