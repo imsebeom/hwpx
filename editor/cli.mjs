@@ -89,7 +89,14 @@ const OPS_SEEN = path.join(STATE_DIR, 'ops.seen');
 const APP_PID = path.join(STATE_DIR, 'app.pid');
 
 const out = (obj) => process.stdout.write((typeof obj === 'string' ? obj : JSON.stringify(obj, null, 2)) + '\n');
-const die = (msg) => { process.stderr.write(msg + '\n'); process.exit(1); };
+// 에디터 서버에 POST 를 보낸 뒤 process.exit() 를 부르면 Windows Node 24 가 libuv 단언
+// (`!(handle->flags & UV_HANDLE_CLOSING)`, async.c)으로 죽어 종료 코드가 127 이 됐다(2026-09-28, stop 이 저장 안 한 편집을 알릴 때).
+// 그래서 종료 코드만 정하고 예외로 흐름을 끊어, 프로세스가 스스로 끝나게 둔다.
+class Die extends Error {}
+const die = (msg) => { process.stderr.write(msg + '\n'); process.exitCode = 1; throw new Die(msg); };
+const onFatal = (e) => { if (!(e instanceof Die)) { process.stderr.write(String(e?.stack ?? e) + '\n'); process.exitCode = 1; } };
+process.on('uncaughtException', onFatal);
+process.on('unhandledRejection', onFatal);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function health() {
