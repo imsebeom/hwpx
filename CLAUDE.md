@@ -53,6 +53,7 @@
   - 도구: `~/.cache/rhwp-devel/cmp.mjs`(2쪽 글자 줄과 셀 상자), `allpages.mjs <pkg> <a> <b>`(전 쪽 글자 좌표 대조), `variants.py`, `winshot.py`(에디터 창을 앞으로 올리지 않고 PrintWindow 로 캡처 — 사용자 화면을 뺏지 않는다)
 
 ## 컨텍스트 앵커
+- **09-27**: 셀 블록(F5 여러 셀)에서 표/셀 속성, 문단 모양은 첫 칸에만, 글자 모양은 대화상자가 안 열리던 것을 플러그인 `installCellBlockDialogs` 로 고침(스킬 73c4177, hwpx·hwpx2 푸시). 툴바, 단축키, 스타일, 문단 번호, 셀 테두리/배경은 원래 정상(12/12 실측). rhwp devel 도 표/셀 속성 대화상자는 같은 결함 — 보고 여부 미정
 - **intent(09-25 둘째 세션): 문항 3을 에디터로 열었더니 문단이 한 줄로 눌리고 표가 겹친 것(사용자 발견)을 스킬과 rhwp 양쪽에서 끝까지 고쳤다 — 에디터 보정, 실제 줄 배치, 세션별 에디터, 작업 기록, rhwp 엔진 패치와 PR #7433.**
   - **changes_made**(스킬 커밋 a6413e6, 042a754 — hwpx, hwpx2 푸시):
     ⓐ `hwpx-zip.mjs stripDummyLinesegs()` + `server.mjs /api/doc` — 더미 줄 배치를 걷고 보낸다
