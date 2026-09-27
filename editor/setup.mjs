@@ -159,6 +159,13 @@ const RUST_PATCHES = [
     const [find, replace] = fs.readFileSync(path.join(HERE, 'patches', 'tac-host-sync-call.rs'), 'utf8').replace(/\r\n/g, '\n').split('\n// ==== replace ====\n');
     return { id: 'tac-host-sync-call', file: 'src/document_core/commands/text_editing.rs', find: find.replace(/^\/\/ ==== find ====\n/, ''), replace, all: true, done: '[claude-hwpx tac-host-sync] 표 높이가 바뀌었으면' };
   })(),
+  // 칸 안 글자처럼 취급 표의 그림 크기를 바꾸면(자르기 등) 표 높이를 적힌 칸 높이 합으로 다시 세어 다른 칸이 눌리던 것(patches/cell-pic-delta-*.rs)
+  { id: 'cell-pic-delta-before', file: 'src/document_core/commands/object_ops/table.rs', anchor: '        let caption_changed = {',
+    insert: fs.readFileSync(path.join(HERE, 'patches', 'cell-pic-delta-before.rs'), 'utf8').replace(/\r\n/g, '\n'), done: '[claude-hwpx cell-pic-delta] 바꾸기 전' },
+  (() => {
+    const [find, replace] = fs.readFileSync(path.join(HERE, 'patches', 'cell-pic-delta-after.rs'), 'utf8').replace(/\r\n/g, '\n').split('\n// ==== replace ====\n');
+    return { id: 'cell-pic-delta-after', file: 'src/document_core/commands/object_ops/table.rs', find: find.replace(/^\/\/ ==== find ====\n/, ''), replace, done: '[claude-hwpx cell-pic-delta] 위 동기화' };
+  })(),
   // 가운데 정렬 문단을 첫 글자부터 고르면 선택 음영이 줄 왼쪽 여백부터 칠해지던 것(patches/sel-left-at-glyph.rs)
   (() => {
     const [find, replace] = fs.readFileSync(path.join(HERE, 'patches', 'sel-left-at-glyph.rs'), 'utf8').replace(/\r\n/g, '\n').split('\n// ==== replace ====\n');
