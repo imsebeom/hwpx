@@ -2,8 +2,9 @@
 // 표 높이가 따라가는지, 쪽 끝을 넘거나 표와 겹치는 글 줄이 생기는지, 되돌린 뒤 원래대로인지 본다.
 //   node editor/tests/edit_flow.mjs <문서.hwpx> [--verbose]
 // 시험 종류: ① 칸 끝에 두 줄 넣기/지우기(미룬 쪽 나누기) ② 칸 Enter 두 번/합치기 ③ 칸 글자 16pt ④ 칸 안 그림 넣기
-//          ⑤ 본문 그림 문단 넣기(문서 전체에서 5곳)
-// 판정: 처음에 없던 넘침, 겹침이 생기면 실패. ①②는 되돌린 뒤 표 높이가 처음과 1px 안인지도 본다.
+//          ⑤ 본문 그림 문단 넣기(문서 전체에서 5곳) ⑥ 마지막 행 아래 행 추가/삭제
+// 판정: 처음에 없던 넘침, 겹침이 생기면 실패. ②는 칸이 표 밖으로 삐져나오면 실패. 글자 없는 줄은 넘침으로 세지 않는다
+// (쪽 끝 빈 문단은 엔진이 높이 0으로 흡수한다).
 // 비례 축소로 처음부터 눌려 그려지던 표는 되돌린 뒤 실제 내용 높이로 커질 수 있다(실패로 치지 않고 「바로잡힘」으로 적는다).
 import fs from 'node:fs';
 import path from 'node:path';
@@ -28,7 +29,7 @@ function problems(doc) {
     const info = JSON.parse(doc.getPageInfo(pg));
     let l = doc.getPageControlLayout(pg); l = typeof l === 'string' ? JSON.parse(l) : l;
     const boxes = l.controls.filter((c) => c.type === 'table');
-    for (const r of JSON.parse(doc.getPageTextLayout(pg)).runs.filter((r) => !r.cellPath && r.w >= 1)) {
+    for (const r of JSON.parse(doc.getPageTextLayout(pg)).runs.filter((r) => !r.cellPath && r.paraIdx != null && r.w >= 1 && r.text?.trim())) {
       if (r.y + r.h > info.footerArea.y + 1) over++;
       if (boxes.some((t) => r.y + r.h > t.y + 1 && r.y < t.y + t.h - 1 && r.x < t.x + t.w && r.x + r.w > t.x)) overlap++;
     }
@@ -52,6 +53,17 @@ function height(doc, t) {
     try { const b = JSON.parse(doc.getTableBBoxAtPage(0, t.p, t.c, pg)); if (b?.height) return b.height; } catch { /* 이 쪽에 없음 */ }
   }
   return NaN;
+}
+// 칸 상자가 표 상자 아래로 삐져나온 길이(px). 표가 칸 내용을 따라가지 못하면 양수
+function spill(doc, t) {
+  for (let pg = 0; pg < doc.pageCount(); pg++) {
+    let b;
+    try { b = JSON.parse(doc.getTableBBoxAtPage(0, t.p, t.c, pg)); } catch { continue; }
+    if (!b?.height) continue;
+    const cells = JSON.parse(doc.getTableCellBboxes(0, t.p, t.c)).filter((c) => c.pageIndex === pg);
+    return Math.max(0, ...cells.map((c) => c.y + c.h - (b.y + b.height)));
+  }
+  return 0;
 }
 
 const base = problems(new m.HwpDocument(bytes));
@@ -84,11 +96,12 @@ for (const t of tables(new m.HwpDocument(bytes))) {
     const len = doc.getCellParagraphLength(0, t.p, t.c, 0, 0);
     doc.splitParagraphInCell(0, t.p, t.c, 0, 0, len);
     doc.splitParagraphInCell(0, t.p, t.c, 0, 1, 0);
-    const h1 = height(doc, t), p1 = problems(doc);
+    const h1 = height(doc, t), p1 = problems(doc), s1 = spill(doc, t);
     doc.mergeParagraphInCell(0, t.p, t.c, 0, 2);
     doc.mergeParagraphInCell(0, t.p, t.c, 0, 1);
     const h2 = height(doc, t), p2 = problems(doc);
-    report('Enter/합치기', t, !worse(p1) && !worse(p2) && h1 > h0 + 1, `높이 ${h0.toFixed(1)} → ${h1.toFixed(1)} → ${h2.toFixed(1)} 넘침 ${p1.over}/${p2.over}`);
+    // 칸에 남는 자리가 있으면 표는 그대로다 — 칸이 표 밖으로 삐져나올 때만 실패
+    report('Enter/합치기', t, !worse(p1) && !worse(p2) && h1 >= h0 - 0.5 && s1 <= 1, `높이 ${h0.toFixed(1)} → ${h1.toFixed(1)} → ${h2.toFixed(1)} 삐짐 ${s1.toFixed(1)} 넘침 ${p1.over}/${p2.over}`);
   }
   // ③ 글자 16pt
   {
@@ -115,6 +128,20 @@ for (const t of tables(new m.HwpDocument(bytes))) {
     }), PNG));
     const h1 = height(doc, t), p1 = problems(doc);
     report('칸 그림', t, r.ok && !worse(p1) && h1 >= h0, `높이 ${h0.toFixed(1)} → ${h1.toFixed(1)} 넘침 ${p1.over} 겹침 ${p1.overlap}`);
+  }
+  // ⑥ 마지막 행 아래에 행 추가 뒤 지우기
+  {
+    const doc = new m.HwpDocument(bytes);
+    const h0 = height(doc, t);
+    const rows = JSON.parse(doc.getTableDimensions(0, t.p, t.c)).rowCount;
+    const r = JSON.parse(doc.insertTableRow(0, t.p, t.c, rows - 1, true));
+    const h1 = height(doc, t), p1 = problems(doc), s1 = spill(doc, t);
+    doc.deleteTableRow(0, t.p, t.c, rows);
+    const h2 = height(doc, t), p2 = problems(doc);
+    const back = Math.abs(h2 - h0) <= 1;
+    if (!back && h2 > h0) fixed++;
+    report('행 추가/삭제', t, r.ok && !worse(p1) && !worse(p2) && h1 > h0 + 1 && s1 <= 1 && (back || h2 > h0),
+      `높이 ${h0.toFixed(1)} → ${h1.toFixed(1)} → ${h2.toFixed(1)}${back ? '' : '(바로잡힘)'} 삐짐 ${s1.toFixed(1)} 넘침 ${p1.over}/${p2.over} 겹침 ${p1.overlap}/${p2.overlap}`);
   }
 }
 // ⑤ 본문 그림(40mm): 문단마다 뒤에 그림 문단을 넣어 본다(글 있는 문단 가운데 5곳)
