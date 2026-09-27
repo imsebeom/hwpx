@@ -149,6 +149,16 @@ const RUST_PATCHES = [
     const [find, replace] = fs.readFileSync(path.join(HERE, 'patches', 'cell-reflow-starts.rs'), 'utf8').replace(/\r\n/g, '\n').split('\n// ==== replace ====\n');
     return { id: 'cell-reflow-starts', file: 'src/document_core/commands/text_editing.rs', find: find.replace(/^\/\/ ==== find ====\n/, ''), replace, done: '[claude-hwpx cell-reflow-starts]' };
   })(),
+  // 칸 편집으로 글자처럼 취급 표가 커져도 쪽 나누기가 옛 줄 높이만 써서 쪽 끝 줄이 본문 밖으로 나가던 것(patches/tac-host-sync-*.rs)
+  { id: 'tac-host-sync-measure', file: 'src/renderer/height_measurer.rs', anchor: '    /// 재귀적 높이 제한',
+    insert: fs.readFileSync(path.join(HERE, 'patches', 'tac-host-sync-measure.rs'), 'utf8').replace(/\r\n/g, '\n'), done: '[claude-hwpx tac-host-sync] 편집한 표 하나' },
+  { id: 'tac-host-sync-fn', file: 'src/document_core/commands/text_editing.rs', anchor: '    fn reflow_cell_paragraph_after_text_edit(',
+    insert: fs.readFileSync(path.join(HERE, 'patches', 'tac-host-sync-fn.rs'), 'utf8').replace(/\r\n/g, '\n'), done: '[claude-hwpx tac-host-sync] 칸 편집으로' },
+  (() => {
+    // 입력과 삭제 두 경로에 같은 자리가 있어 모두 바꾼다(all)
+    const [find, replace] = fs.readFileSync(path.join(HERE, 'patches', 'tac-host-sync-call.rs'), 'utf8').replace(/\r\n/g, '\n').split('\n// ==== replace ====\n');
+    return { id: 'tac-host-sync-call', file: 'src/document_core/commands/text_editing.rs', find: find.replace(/^\/\/ ==== find ====\n/, ''), replace, all: true, done: '[claude-hwpx tac-host-sync] 표 높이가 바뀌었으면' };
+  })(),
   // 가운데 정렬 문단을 첫 글자부터 고르면 선택 음영이 줄 왼쪽 여백부터 칠해지던 것(patches/sel-left-at-glyph.rs)
   (() => {
     const [find, replace] = fs.readFileSync(path.join(HERE, 'patches', 'sel-left-at-glyph.rs'), 'utf8').replace(/\r\n/g, '\n').split('\n// ==== replace ====\n');
@@ -165,7 +175,7 @@ if (hasRust && RUST_PATCHES.some((p) => !builtIds.includes(p.id))) {
     const eol = (s) => (src.includes('\r\n') ? s.replace(/\r?\n/g, '\r\n') : s);   // 태그 판 소스는 CRLF 다
     const at = eol(p.anchor ?? p.find);
     if (!src.includes(at)) throw new Error(`${p.file} 에서 패치 자리(${p.id})를 못 찾았다 — rhwp 버전이 바뀌었는지 확인`);
-    src = p.anchor ? src.replace(at, eol(p.insert) + at) : src.replace(at, eol(p.replace));
+    src = p.anchor ? src.replace(at, eol(p.insert) + at) : p.all ? src.split(at).join(eol(p.replace)) : src.replace(at, eol(p.replace));
     fs.writeFileSync(f, src);
   }
   const env = { ...process.env, PATH: `${cargoBin}${path.delimiter}${process.env.PATH}` };
