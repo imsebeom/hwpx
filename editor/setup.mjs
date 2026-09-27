@@ -153,7 +153,7 @@ const RUST_PATCHES = [
   { id: 'tac-host-sync-measure', file: 'src/renderer/height_measurer.rs', anchor: '    /// 재귀적 높이 제한',
     insert: fs.readFileSync(path.join(HERE, 'patches', 'tac-host-sync-measure.rs'), 'utf8').replace(/\r\n/g, '\n'), done: '[claude-hwpx tac-host-sync] 편집한 표 하나' },
   { id: 'tac-host-sync-fn', file: 'src/document_core/commands/text_editing.rs', anchor: '    fn reflow_cell_paragraph_after_text_edit(',
-    insert: fs.readFileSync(path.join(HERE, 'patches', 'tac-host-sync-fn.rs'), 'utf8').replace(/\r\n/g, '\n'), done: '[claude-hwpx tac-host-sync] 칸 편집으로' },
+    insert: fs.readFileSync(path.join(HERE, 'patches', 'tac-host-sync-fn.rs'), 'utf8').replace(/\r\n/g, '\n'), done: '쪽 나누기 직전에 부른다. 편집으로 dirty' },
   (() => {
     // 입력과 삭제 두 경로에 같은 자리가 있어 모두 바꾼다(all)
     const [find, replace] = fs.readFileSync(path.join(HERE, 'patches', 'tac-host-sync-call.rs'), 'utf8').replace(/\r\n/g, '\n').split('\n// ==== replace ====\n');
@@ -174,6 +174,34 @@ const RUST_PATCHES = [
   (() => {
     const [find, replace] = fs.readFileSync(path.join(HERE, 'patches', 'tac-table-move-ret.rs'), 'utf8').replace(/\r\n/g, '\n').split('\n// ==== replace ====\n');
     return { id: 'tac-table-move-ret', file: 'src/document_core/commands/table_ops.rs', find: find.replace(/^\/\/ ==== find ====\n/, ''), replace, done: '[claude-hwpx tac-table-move-ret]' };
+  })(),
+  // 표 칸 문단 안에 글자처럼 취급 그림 넣기(엔진은 칸 위에 뜬 그림으로만 넣었다, patches/cell-pic-inline-*.rs)
+  ...['cell-pic-inline-a', 'cell-pic-inline-b', 'cell-pic-inline-c'].map((id) => {
+    const [find, replace] = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n').split('\n// ==== replace ====\n');
+    return { id, file: 'src/document_core/commands/object_ops/picture.rs', find: find.replace(/^\/\/ ==== find ====\n/, ''), replace,
+      done: id === 'cell-pic-inline-a' ? '[claude-hwpx cell-pic-inline] 표 칸' : `[claude-hwpx ${id}]` };
+  }),
+  // 표 칸 문단의 글자처럼 취급 그림 옆 캐럿이 첫 그림 가운데에 서던 것(patches/cell-inline-caret-*.rs)
+  { id: 'cell-inline-caret-fn', file: 'src/document_core/queries/cursor_rect.rs', anchor: '    pub fn get_cursor_rect_in_cell_native(',
+    insert: fs.readFileSync(path.join(HERE, 'patches', 'cell-inline-caret-fn.rs'), 'utf8').replace(/\r\n/g, '\n'), done: '[claude-hwpx cell-inline-caret] 표 칸' },
+  ...['cell-inline-caret-call', 'cell-inline-caret-path'].map((id) => {
+    const [find, replace] = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n').split('\n// ==== replace ====\n');
+    return { id, file: 'src/document_core/queries/cursor_rect.rs', find: find.replace(/^\/\/ ==== find ====\n/, ''), replace, done: `[claude-hwpx ${id}]` };
+  }),
+  (() => {
+    // 칸 문단 나누기와 합치기 두 곳(all)
+    const [find, replace] = fs.readFileSync(path.join(HERE, 'patches', 'tac-host-sync-split.rs'), 'utf8').replace(/\r\n/g, '\n').split('\n// ==== replace ====\n');
+    return { id: 'tac-host-sync-split', file: 'src/document_core/commands/text_editing.rs', find: find.replace(/^\/\/ ==== find ====\n/, ''), replace, all: true, done: '[claude-hwpx tac-host-sync-split]' };
+  })(),
+  // 쪽 나누기 시작에 편집한(dirty) 글자처럼 취급 표를 모두 맞춘다 — 편집 경로마다 부르면 빠지는 곳이 생겼다(patches/tac-host-sync-paginate.rs, -deferred.rs)
+  ...['tac-host-sync-paginate', 'tac-host-sync-deferred'].map((id) => {
+    const [find, replace] = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n').split('\n// ==== replace ====\n');
+    return { id, file: 'src/document_core/queries/rendering.rs', find: find.replace(/^\/\/ ==== find ====\n/, ''), replace, done: `[claude-hwpx ${id}]` };
+  }),
+  // 바꾸기로 칸 글이 바뀌어도 표에 dirty 가 안 켜져 표가 늘지 않던 것(patches/replace-cell-dirty.rs)
+  (() => {
+    const [find, replace] = fs.readFileSync(path.join(HERE, 'patches', 'replace-cell-dirty.rs'), 'utf8').replace(/\r\n/g, '\n').split('\n// ==== replace ====\n');
+    return { id: 'replace-cell-dirty', file: 'src/document_core/queries/search_query.rs', find: find.replace(/^\/\/ ==== find ====\n/, ''), replace, done: '[claude-hwpx replace-cell-dirty]' };
   })(),
   // 가운데 정렬 문단을 첫 글자부터 고르면 선택 음영이 줄 왼쪽 여백부터 칠해지던 것(patches/sel-left-at-glyph.rs)
   (() => {
@@ -285,6 +313,19 @@ for (const p of [{ id: 'caret-axis-bridge', file: 'src/core/wasm-bridge.ts', don
       src = src.replace(eol(find), eol(replace));
     }
     fs.writeFileSync(f, src);
+  }
+}
+
+// Ctrl+방향키 칸/줄 전체 조절에 최소 크기 검사가 없어 줄일 수 없는 크기에서 칸마다 따로 멈추며 어긋나던 것(patches/column-resize-min.ts)
+{
+  const f = path.join(STUDIO, 'src', 'engine', 'table-resize-updates.ts');
+  let src = fs.readFileSync(f, 'utf8');
+  if (!src.includes('[claude-hwpx column-resize-min]')) {
+    const [find, replace] = fs.readFileSync(path.join(HERE, 'patches', 'column-resize-min.ts'), 'utf8').replace(/\r\n/g, '\n')
+      .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== replace ====\n');
+    const eol = (s) => (src.includes('\r\n') ? s.replace(/\r?\n/g, '\r\n') : s);
+    if (src.split(eol(find)).length !== 2) throw new Error('table-resize-updates.ts 에서 패치 자리(column-resize-min)를 하나로 못 찾았다');
+    fs.writeFileSync(f, src.replace(eol(find), eol(replace)));
   }
 }
 

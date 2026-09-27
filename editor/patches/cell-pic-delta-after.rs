@@ -17,6 +17,7 @@
         // 최소값(예: 1000)만 적고 실제로는 여러 줄이면 표가 내용보다 작게 적혀 글자처럼 취급 표 비례 축소가 걸린다
         // (2026-09-27 실측, 그림 아래 50px 자르기 → 그림 칸 106px 줄고 설명 칸 89.1 → 69.5px 눌림).
         // 글자처럼 취급 표는 원래 표 높이와 줄 높이에 그림 높이 변화만 더한다.
+        let mut claude_dh = 0i32;
         if let Some((old_pic_h, old_tbl_h, old_host_lh)) = claude_before {
             let (tci, ci, cpi) = path[0];
             if let Some(para) = section.paragraphs.get_mut(parent_para_idx) {
@@ -45,6 +46,7 @@
                                     / seg.line_height as i64)
                                     as i32;
                             }
+                            claude_dh = lh - seg.line_height;
                             seg.line_height = lh;
                             seg.text_height = lh;
                         }
@@ -52,6 +54,8 @@
                 }
             }
         }
+        // 뒤 문단 저장 vertpos 도 같은 만큼 민다(쪽 나누기의 되감기 방지, tac-host-sync 도우미)
+        Self::claude_shift_following_vpos(&mut section.paragraphs, parent_para_idx, claude_dh);
         section.raw_stream = None;
         // [claude-hwpx cell-pic-delta] 그림이 든 칸 문단의 줄 높이가 옛 그림 높이로 남아 선택 상자가 어긋났다
         if claude_before.is_some() {
