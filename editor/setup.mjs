@@ -203,6 +203,21 @@ const RUST_PATCHES = [
     const [find, replace] = fs.readFileSync(path.join(HERE, 'patches', 'replace-cell-dirty.rs'), 'utf8').replace(/\r\n/g, '\n').split('\n// ==== replace ====\n');
     return { id: 'replace-cell-dirty', file: 'src/document_core/queries/search_query.rs', find: find.replace(/^\/\/ ==== find ====\n/, ''), replace, done: '[claude-hwpx replace-cell-dirty]' };
   })(),
+  // 편집 뒤 표 높이는 처음 쪽을 나눌 때 잰 어긋남(rhwp 측정 − 한글이 적은 높이)을 뺀다 — 칸 안 표 등을 한글보다 크게 재어
+  // 칸을 한 번만 고쳐도 표가 한글보다 9~32px 커지던 것(patches/tac-sync-offset-*.rs, 계산은 tac-host-sync-fn.rs)
+  ...[['tac-sync-offset-field', 'src/model/table.rs', 'tac-sync-offset-field', 'pub claude_measure_offset'],
+    ['tac-sync-offset-sweep', 'src/diagnostics/ir_field_sweep.rs', 'tac-sync-offset-sweep', 'claude_measure_offset: _,'],
+    ['tac-sync-offset-init-a', 'src/document_core/commands/object_ops/table.rs', 'tac-sync-offset-init', 'claude_measure_offset: None'],
+    ['tac-sync-offset-init-b', 'src/document_core/html_table_import.rs', 'tac-sync-offset-init', 'claude_measure_offset: None'],
+    ['tac-sync-offset-init-c', 'src/scaffold/builder.rs', 'tac-sync-offset-init8', 'claude_measure_offset: None']].map(([id, file, f, done]) => {
+    const [find, replace] = fs.readFileSync(path.join(HERE, 'patches', `${f}.rs`), 'utf8').replace(/\r\n/g, '\n').split('\n// ==== replace ====\n');
+    return { id, file, find: find.replace(/^\/\/ ==== find ====\n/, ''), replace: replace.replace(/\n$/, ''), all: true, done };
+  }),
+  // 표 옆 글을 고쳐 줄을 다시 나누면 글자처럼 취급 표 줄에서 바깥 여백이 빠지던 것(patches/tac-line-outer.rs)
+  ...['tac-line-outer', 'tac-line-outer-size'].map((id) => {
+    const [find, replace] = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n').split('\n// ==== replace ====\n');
+    return { id, file: 'src/renderer/composer/line_breaking.rs', find: find.replace(/^\/\/ ==== find ====\n/, ''), replace: replace.replace(/\n$/, ''), done: `[claude-hwpx ${id}]` };
+  }),
   // 칸 크기 조절에 표 높이를 함께 받는다 — Ctrl+위/아래로 고른 행만 키워도 모든 행이 비례로 커지던 것(patches/row-resize-th-*.rs, 스튜디오 row-resize-rendered.ts)
   ...['row-resize-th-parse', 'row-resize-th-apply'].map((id) => {
     const [find, replace] = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n').split('\n// ==== replace ====\n');

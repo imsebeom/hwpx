@@ -12,9 +12,8 @@
         parent_para_idx: usize,
         control_idx: usize,
     ) {
-        use crate::renderer::{hwpunit_to_px, px_to_hwpunit};
+        use crate::renderer::hwpunit_to_px;
         let dpi = self.dpi;
-        let native_hwp5 = self.document.layout_profile().native_hwp5_layout();
         let Some(para) = self
             .document
             .sections
@@ -54,12 +53,10 @@
             return;
         }
         let old_h = table.common.height as i32;
-        let mut probe = table.clone();
-        probe.common.height = 0;
-        let measurer = crate::renderer::height_measurer::HeightMeasurer::new(dpi)
-            .with_native_hwp5(native_hwp5);
-        let new_px = measurer.measure_table_for_edit(&probe, parent_para_idx, control_idx, &self.styles);
-        let new_h = px_to_hwpunit(new_px, dpi);
+        // 셋째 판(2026-09-28): 잰 높이에서 처음 잰 어긋남(claude_measure_offset)을 뺀다. rhwp 는 칸 안 표 등을 한글보다
+        // 크게 재어, 내용이 그대로여도 칸을 한 번 고치면 표가 한글보다 9~32px 커졌다(한글 PDF 대조: 367.1px 표가 399.7px).
+        let new_h = self.claude_raw_table_measure(table, parent_para_idx, control_idx)
+            - table.claude_measure_offset.unwrap_or(0);
         // 글 없는 줄(표만 담은 줄)은 한글처럼 「표 높이 + 바깥 여백」으로 맞춘다. 행 추가, 삭제는 표 높이(hp:sz)를
         // 먼저 바꿔 두어, 표 높이 변화만 보면 줄이 옛 높이로 남았다(2026-09-28: 표 498px, 줄 264px 이라 뒤 문단이 쪽 밖으로).
         let outer = table.outer_margin_top as i32 + table.outer_margin_bottom as i32;
@@ -98,6 +95,7 @@
     /// 편집 경로(바꾸기, 글자 모양, 행/열, 크기 조절, 에이전트 도구 …)마다 따로 부르면 빠지는 곳이 생겼다(2026-09-27:
     /// replaceAll 은 표가 안 늘고, 글자 크기 변경은 표만 커지고 쪽이 넘쳤다). dirty 는 편집만 켜고 쪽 나누기가 끝나면 끈다.
     pub(crate) fn claude_sync_dirty_tac_tables(&mut self) {
+        self.claude_init_measure_offsets();
         let mut targets = Vec::new();
         for (si, section) in self.document.sections.iter().enumerate() {
             for (pi, para) in section.paragraphs.iter().enumerate() {
@@ -112,6 +110,67 @@
         }
         for (si, pi, ci) in targets {
             self.sync_tac_table_host_line(si, pi, ci);
+        }
+    }
+
+    /// [claude-hwpx tac-sync-offset] 표를 적힌 높이 0 인 사본으로 잰 높이(HWPUNIT). 적힌 높이로 재면 글자처럼 취급 표
+    /// 비례 축소가 늘어난 내용을 도로 누른다.
+    pub(crate) fn claude_raw_table_measure(
+        &self,
+        table: &crate::model::table::Table,
+        parent_para_idx: usize,
+        control_idx: usize,
+    ) -> i32 {
+        let mut probe = table.clone();
+        probe.common.height = 0;
+        // 모든 칸의 문단 세로 위치를 rhwp 로 다시 매긴 뒤 잰다. 편집한 칸만 다시 매겨지므로, 저장 위치(한글) 그대로 잰
+        // 기준값과 비교하면 내용이 그대로여도 칸 안 표 때문에 잰 높이가 달라졌다(2026-09-28: 글 하나 넣고 지운 표가 +32px).
+        let hwp3 = self.document.layout_profile().hwp3_layout();
+        for cell in probe.cells.iter_mut() {
+            recalculate_cell_paragraph_vpos(&mut cell.paragraphs, 0, None, &self.styles, self.dpi, hwp3);
+        }
+        let native_hwp5 = self.document.layout_profile().native_hwp5_layout();
+        let px = crate::renderer::height_measurer::HeightMeasurer::new(self.dpi)
+            .with_native_hwp5(native_hwp5)
+            .measure_table_for_edit(&probe, parent_para_idx, control_idx, &self.styles);
+        crate::renderer::px_to_hwpunit(px, self.dpi)
+    }
+
+    /// [claude-hwpx tac-sync-offset] 편집한 표의 새 높이(HWPUNIT) = 잰 높이 − 처음 잰 어긋남. 칸 크기 조절도 쓴다.
+    pub(crate) fn claude_edit_table_height(
+        &self,
+        section_idx: usize,
+        parent_para_idx: usize,
+        control_idx: usize,
+    ) -> Option<i32> {
+        match self.document.sections.get(section_idx)?.paragraphs.get(parent_para_idx)?.controls.get(control_idx)? {
+            Control::Table(t) => Some(
+                self.claude_raw_table_measure(t, parent_para_idx, control_idx) - t.claude_measure_offset.unwrap_or(0),
+            ),
+            _ => None,
+        }
+    }
+
+    /// [claude-hwpx tac-sync-offset] 아직 안 잰 본문 표마다 「잰 높이 − 적힌 높이」를 기억한다. 처음 쪽을 나눌 때(문서를 연 직후)
+    /// 불리므로, 적힌 높이는 한글이 저장한 값이고 그 차이는 rhwp 측정과 한글의 어긋남이다. 편집한(dirty) 표는 건너뛴다.
+    pub(crate) fn claude_init_measure_offsets(&mut self) {
+        let mut found = Vec::new();
+        for (si, section) in self.document.sections.iter().enumerate() {
+            for (pi, para) in section.paragraphs.iter().enumerate() {
+                for (ci, ctrl) in para.controls.iter().enumerate() {
+                    if let Control::Table(t) = ctrl {
+                        if t.claude_measure_offset.is_none() && !t.dirty && t.common.height > 0 {
+                            let off = self.claude_raw_table_measure(t, pi, ci) - t.common.height as i32;
+                            found.push((si, pi, ci, off));
+                        }
+                    }
+                }
+            }
+        }
+        for (si, pi, ci, off) in found {
+            if let Some(Control::Table(t)) = self.document.sections[si].paragraphs[pi].controls.get_mut(ci) {
+                t.claude_measure_offset = Some(off);
+            }
         }
     }
 
