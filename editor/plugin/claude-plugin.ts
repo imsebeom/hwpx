@@ -470,7 +470,40 @@ export function createClaudePlugin(getInputHandler) {
         if (op.tool) return !READ_TOOLS.has(op.tool);
         if (op.m) return isMutating(op.m);
         if (op.doc) return !READ_DOC.test(op.doc);
+        if (op.image) return true;
         return Boolean(op.run);
+      };
+
+      /**
+       * 그림 넣기(cli.mjs image). run 의 JSON 으로는 그림 바이트를 넘길 수 없어 base64 로 받는다.
+       * im: { base64, ext, naturalW, naturalH, at?(p7, T2r0c0), end?, widthMm?, desc? }. 자리를 안 주면 사용자 커서.
+       * 폭을 안 주면 원본 픽셀 크기(1px = 75 HWPUNIT)를 쓰되 본문 150mm, 칸은 칸 폭을 넘지 않게 줄인다.
+       */
+      const insertImage = (doc, im) => {
+        const pos = im.at ? resolveTarget(doc, im.at) : getInputHandler()?.getCursorPosition?.();
+        if (!pos) throw new Error(`그림 넣을 자리를 못 찾음: ${im.at ?? '커서'}`);
+        const inCell = pos.parentParaIndex != null;
+        const charOffset = im.end && pos.length != null ? pos.length : (pos.charOffset ?? 0);
+        let maxW = 42520;
+        if (inCell) {
+          try { maxW = Math.max(2000, JSON.parse(doc.getCellProperties(pos.sectionIndex, pos.parentParaIndex, pos.controlIndex, pos.cellIndex)).width - 1200); } catch { /* 기본값 */ }
+        }
+        const width = im.widthMm ? Math.round((im.widthMm * 7200) / 25.4) : Math.min(im.naturalW * 75, maxW);
+        const height = Math.round((width * im.naturalH) / im.naturalW);
+        const bytes = Uint8Array.from(atob(im.base64), (c) => c.charCodeAt(0));
+        const opts = {
+          sectionIdx: pos.sectionIndex,
+          paraIdx: inCell ? pos.parentParaIndex : pos.paragraphIndex,
+          charOffset,
+          cellPath: inCell ? JSON.stringify([{ controlIndex: pos.controlIndex, cellIndex: pos.cellIndex, cellParaIndex: pos.cellParaIndex ?? 0 }]) : '',
+          width, height, naturalWidthPx: im.naturalW, naturalHeightPx: im.naturalH,
+          extension: im.ext, description: im.desc ?? '',
+        };
+        const r = parseMaybe(doc.insertPictureEx(JSON.stringify(opts), bytes));
+        // 본문은 스튜디오 그림 넣기처럼 글자처럼 취급으로 바꾼다(안 바꾸면 쪽 왼쪽 위 0,0 에 뜬다).
+        // 칸은 엔진이 칸 위에 뜬 그림(표 옆 개체)으로만 넣는다 — 스튜디오도 같다. 칸 문단 안에 넣는 API 는 없다
+        if (r?.ok && !inCell) doc.setPictureProperties(opts.sectionIdx, r.paraIdx, r.controlIdx, JSON.stringify({ treatAsChar: true }));
+        return { ...r, widthMm: +(width * 25.4 / 7200).toFixed(1), heightMm: +(height * 25.4 / 7200).toFixed(1), inCell, floating: inCell };
       };
 
       const step = (doc, op, i) => {
@@ -486,13 +519,14 @@ export function createClaudePlugin(getInputHandler) {
             return fn.apply(ctrl, op.a || []);
           }
           if (op.run) return ctrl.Run(op.run);
+          if (op.image) return insertImage(doc, op.image);
           if (op.doc) {
             const fn = doc[op.doc];
             if (typeof fn !== 'function') throw new Error(`HwpDocument 에 없는 메서드: ${op.doc}`);
             const args = (op.a || []).map((x) => (x !== null && typeof x === 'object' ? JSON.stringify(x) : x));
             return parseMaybe(fn.apply(doc, args));
           }
-          throw new Error('op 에 tool, doc, m, run 중 하나가 있어야 한다');
+          throw new Error('op 에 tool, doc, m, run, image 중 하나가 있어야 한다');
         } catch (e) {
           const err = new Error(`op[${i}] ${JSON.stringify(op).slice(0, 200)} 실패: ${e?.message ?? e}`);
           err.code = 'OP_FAILED';

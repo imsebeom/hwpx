@@ -8,6 +8,8 @@
  *   node cli.mjs text                  현재 본문 텍스트
  *   node cli.mjs outline [시작 끝]      좌표(p12, T1r2c1)가 붙은 문서 개요
  *   node cli.mjs state                 문서 상태와 사용자 커서(셀 좌표, 선택한 글자)
+ *   node cli.mjs image <그림> [좌표] [--end] [--width mm] [--desc 설명]
+ *                                       그림을 좌표(p7, T2r0c0) 앞(--end 면 끝)이나 사용자 커서에 넣는다. undo 1스텝
  *   node cli.mjs goto <좌표>            사용자 화면의 커서를 그 문단이나 셀로 옮긴다
  *   node cli.mjs inspect | slots       행정문서 표기 검수 / 아직 안 채운 칸
  *   node cli.mjs tools                 편집 도구 25종 정의(이름, 설명, 인자)
@@ -65,6 +67,22 @@ async function allocatePort() {
 }
 const SESSION = path.join(STATE_DIR, 'session.json');
 const CHANGES = path.join(STATE_DIR, 'changes.jsonl');
+/** PNG, JPEG, GIF, BMP 머리에서 픽셀 크기를 읽는다. */
+function imageSize(b) {
+  if (b.length > 24 && b.readUInt32BE(0) === 0x89504e47) return { w: b.readUInt32BE(16), h: b.readUInt32BE(20) };
+  if (b.length > 10 && b.toString('latin1', 0, 3) === 'GIF') return { w: b.readUInt16LE(6), h: b.readUInt16LE(8) };
+  if (b.length > 26 && b.toString('latin1', 0, 2) === 'BM') return { w: b.readInt32LE(18), h: Math.abs(b.readInt32LE(22)) };
+  if (b[0] === 0xff && b[1] === 0xd8) {
+    for (let i = 2; i + 9 < b.length;) {
+      if (b[i] !== 0xff) { i++; continue; }
+      const marker = b[i + 1];
+      const len = b.readUInt16BE(i + 2);
+      if (marker >= 0xc0 && marker <= 0xcf && ![0xc4, 0xc8, 0xcc].includes(marker)) return { w: b.readUInt16BE(i + 7), h: b.readUInt16BE(i + 5) };
+      i += 2 + len;
+    }
+  }
+  return null;
+}
 const SEEN = path.join(STATE_DIR, 'changes.seen');
 const OPS = path.join(STATE_DIR, 'ops.jsonl');
 const OPS_SEEN = path.join(STATE_DIR, 'ops.seen');
@@ -295,6 +313,21 @@ switch (sub) {
     // KS X 6101 §5.3: 본문은 NFC. 맥, 웹에서 온 NFD(자모 분리) 글자는 검색과 치환을 조용히 깨뜨린다.
     const ops = JSON.parse(src, (k, v) => (typeof v === 'string' ? v.normalize('NFC') : v));
     out((await cmd({ type: 'run', ops: Array.isArray(ops) ? ops : [ops] })).result);
+    break;
+  }
+  case 'image': {
+    // 그림 넣기: image <그림 파일> [좌표] [--end] [--width mm] [--desc 설명]. 자리를 안 주면 사용자 커서
+    const file = args[0];
+    if (!file || !fs.existsSync(file)) die('image <그림 파일> [좌표] [--end] [--width mm] [--desc 설명]');
+    const buf = fs.readFileSync(file);
+    const ext = path.extname(file).slice(1).toLowerCase();
+    const size = imageSize(buf);
+    if (!size) die(`그림 크기를 못 읽음(PNG, JPEG, GIF, BMP 만): ${file}`);
+    const opt = (name) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : undefined; };
+    const at = args.slice(1).find((a, i, arr) => !a.startsWith('--') && !['--width', '--desc'].includes(arr[i - 1]));
+    const image = { base64: buf.toString('base64'), ext: ext === 'jpeg' ? 'jpg' : ext, naturalW: size.w, naturalH: size.h,
+      at, end: args.includes('--end'), widthMm: opt('--width') ? Number(opt('--width')) : undefined, desc: opt('--desc') };
+    out((await cmd({ type: 'run', ops: [{ image }] })).result);
     break;
   }
   case 'text': out((await cmd({ type: 'text' })).text); break;
