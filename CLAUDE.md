@@ -53,6 +53,14 @@
   - 도구: `~/.cache/rhwp-devel/cmp.mjs`(2쪽 글자 줄과 셀 상자), `allpages.mjs <pkg> <a> <b>`(전 쪽 글자 좌표 대조), `variants.py`, `winshot.py`(에디터 창을 앞으로 올리지 않고 PrintWindow 로 캡처 — 사용자 화면을 뺏지 않는다)
 
 ## 컨텍스트 앵커
+- **intent(09-27 둘째 세션)**: 사용자가 가이드북 원고(2-4절)를 에디터로 고치며 찾은 결함과 요청을 처리했다. 스킬 커밋(푸시 안 함):
+  046aa52 문단 모양 미리보기(줄 간격, 문단 간격 반영) / ffc4fcd **칸 줄 나눔 엔진 패치** `cell-reflow-starts`(HWPX 칸 편집 뒤 후보 줄 수만 보고 저장 줄 배치를 되돌리던 것 → 줄 시작 위치까지 비교) /
+  5dc23de, 91286c0 앱 창 닫을 때 저장 확인(dirty 일 때만, pywebview confirm_close)과 마지막 편집 기록(evaluate_js 는 Promise 를 **콜백으로만** 준다) /
+  0c5b439 **쪽 끝 반 줄 넘침 엔진 패치** `tac-host-sync-*`(칸 편집으로 글자처럼 취급 표가 커져도 hp:sz 와 표를 담은 줄 높이가 그대로라 쪽 나누기가 옛 높이만 셈 → 편집 직후 표를 재어 둘을 맞추고 recompose. 한글 PDF 와 1쪽 끝 줄 동일) /
+  8bf284a 대화상자 Enter 확인, F5 셀 블록 Ctrl+E 지우기 선택(내용/줄/칸), Shift+방향키 경계 이동의 병합 칸 뒤틀림(스튜디오 소스 패치 `boundary-resize-merged.ts`) /
+  5530baf 그림 오른쪽 클릭 「그림 자르기」(손잡이 끌기 자르기, 바로 오른쪽 클릭 선택)
+  - 함정: 쪽 나누기는 `typeset.rs`(TypesetEngine)가 기본, `RHWP_USE_PAGINATOR=1` 이면 옛 `pagination/engine.rs`. 두 경로 다 TAC 표 문단을 **저장 줄 높이**로 자른다 / setup.mjs 는 패치 목록이 같으면 WASM 을 안 다시 빌드한다(`pkg/.claude-patched` 삭제로 강제) / Bash heredoc 로 `\n` 든 JS 를 넣다가 두 번 깨졌다(규칙대로 Write 로 만든 스크립트 사용)
+  - next_steps: ① 사용자 원본(_05 등)은 이미 낡은 표 높이가 저장돼 있어, T2 칸을 한 번 편집해야 새 값이 들어간다 ② 캐럿 축 등 이전 next_steps 유지 ③ 스킬 커밋 푸시는 요청 시
 - **intent(09-27 세션)**: 사용자가 에디터를 직접 시험하며 찾은 결함을 차례로 고쳤다 — 여러 셀 대화상자, 글자 색 선택, 가운데 정렬 음영, 글자처럼 취급 표 선택과 편집 어긋남(엔진), 데스크탑 앱 미리보기 열기.
   - **changes_made**(스킬 커밋, hwpx·hwpx2 푸시):
     ⓐ 73c4177 셀 블록(F5 여러 셀)에서 표/셀 속성, 문단 모양은 첫 칸에만, 글자 모양은 대화상자가 안 열리던 것 — 플러그인 `installCellBlockDialogs`(12/12 실측, 되돌리기 한 번)
