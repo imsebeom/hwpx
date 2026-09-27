@@ -20,6 +20,9 @@ import { modelOf } from './collab-ops.js';
 import { installHancomKeys } from './hancom-keys';
 import { installEditLog } from './edit-log';
 import { TableCreateDialog } from '@/ui/table-create-dialog';
+import { CharShapeDialog } from '@/ui/char-shape-dialog';
+import { ParaShapeDialog } from '@/ui/para-shape-dialog';
+import { TableCellPropsDialog } from '@/ui/table-cell-props-dialog';
 import { installKCommands } from './k-commands';
 import { installLogPanel } from './log-panel';
 
@@ -277,6 +280,93 @@ function installNestedTableCreate(getInputHandler) {
  *  - 수준▲▼: rhwp 는 「개요 N」 스타일 문단만 바꿨다 → 문단 번호, 글머리표 문단은 수준(paraLevel 0~9)을 바꾼다
  *  - 개체 속성: 그림, 표를 개체로 골랐을 때만 됐다 → 표 셀 안이면 표/셀 속성을 연다
  */
+/**
+ * F5 로 여러 셀을 고르고 대화상자로 서식을 바꾸면 첫 칸에만 들어가던 것(2026-09-27 실측, 3×4 표 전체 블록).
+ * 툴바와 단축키는 rhwp 가 셀 블록을 대상으로 잡지만(getSelectedCellBlock) 대화상자 셋은 그 경로를 타지 않았다.
+ *   - 글자 모양: 텍스트 선택이 없다고 대화상자를 열지 않았다 → 블록이면 applyCharFormat 으로
+ *   - 문단 모양: 커서 문단 하나에 적용했다 → 블록이면 applyParaFormat 으로
+ *   - 표/셀 속성: 커서 셀에만 setCellProperties 를 불렀다 → 커서 셀에서 바뀐 항목만 블록의 나머지 셀에도
+ *     (같은 스냅샷 안이라 되돌리기 한 번에 함께 돌아간다)
+ */
+function installCellBlockDialogs(getInputHandler) {
+  const blockOf = (ih) => {
+    const b = ih?.getSelectedCellBlock?.();
+    return b && b.cellIndices.length ? b : null;
+  };
+  const patch = () => {
+    const ih = getInputHandler();
+    const reg = ih?.dispatcher?.registry;
+    const cs = reg?.get?.('format:char-shape');
+    const ps = reg?.get?.('format:para-shape');
+    if (!cs || !ps) return false;
+    if (cs.__cellBlock) return true;
+    const origCs = cs.execute;
+    cs.execute = (services, params) => {
+      const h = services.getInputHandler();
+      if (!blockOf(h)) return origCs.call(cs, services, params);
+      const dialog = new CharShapeDialog(services.wasm, services.eventBus);
+      dialog.onApply = (mods) => {
+        // fontName → fontId (원래 명령과 같게)
+        if (mods.fontName) {
+          const fontId = services.wasm.findOrCreateFontId(mods.fontName);
+          if (fontId >= 0) mods.fontId = fontId;
+          delete mods.fontName;
+        }
+        h.applyCharFormat(mods);
+      };
+      dialog.onClose = () => h.focus();
+      dialog.show(h.getCharProperties());
+    };
+    const origPs = ps.execute;
+    ps.execute = (services, params) => {
+      const h = services.getInputHandler();
+      if (!blockOf(h)) return origPs.call(ps, services, params);
+      const dialog = new ParaShapeDialog(services.wasm, services.eventBus);
+      dialog.onApply = (mods) => h.applyParaFormat(mods);
+      dialog.onClose = () => h.focus();
+      dialog.show(h.getParaProperties());
+    };
+    cs.__cellBlock = true;
+    return true;
+  };
+  if (!patch()) {
+    const t = setInterval(() => { if (patch()) clearInterval(t); }, 200);
+  }
+
+  const proto = TableCellPropsDialog.prototype;
+  if (proto.__cellBlock) return;
+  const origConfirm = proto.onConfirm;
+  proto.onConfirm = function () {
+    const { sec, ppi, ci } = this.tableCtx;
+    const block = blockOf(getInputHandler());
+    const others = block && block.sec === sec && block.ppi === ppi && block.ci === ci
+      ? block.cellIndices.filter((i) => i !== this.cellIdx) : [];
+    if (!others.length) return origConfirm.call(this);
+    const wasm = this.wasm;
+    const base = this.cellProps;
+    const anchor = this.cellIdx;
+    const setOrig = wasm.setCellProperties;
+    wasm.setCellProperties = function (s, p, c, idx, props) {
+      const r = setOrig.call(this, s, p, c, idx, props);
+      if (idx === anchor && s === sec && p === ppi && c === ci) {
+        const diff = {};
+        for (const [k, v] of Object.entries(props)) {
+          if (JSON.stringify(v) !== JSON.stringify(base[k])) diff[k] = v;
+        }
+        if (Object.keys(diff).some((k) => k.startsWith('padding'))) diff.applyInnerMargin = props.applyInnerMargin;
+        if (Object.keys(diff).length) for (const i of others) setOrig.call(this, s, p, c, i, diff);
+      }
+      return r;
+    };
+    try {
+      return origConfirm.call(this);
+    } finally {
+      delete wasm.setCellProperties;   // 인스턴스에 얹은 것만 걷어 프로토타입 메서드로 돌아간다
+    }
+  };
+  proto.__cellBlock = true;
+}
+
 function installToolbarFixes(getInputHandler) {
   let wired = false;
   const wire = () => {
@@ -360,6 +450,7 @@ export function createClaudePlugin(getInputHandler) {
       installNestedTableCreate(getInputHandler);
       installKCommands(host, getInputHandler);
       installToolbarFixes(getInputHandler);
+      installCellBlockDialogs(getInputHandler);
       installLogPanel();
       installEditLog(host, getInputHandler);   // 사용자 편집을 하나하나 /api/ops 로(`$E changes`)
       // 진단용: 디버그 포트로 붙었을 때 입력 처리기를 볼 수 있게(tests/cdp_eval.mjs 의 S.__claudeIH())
