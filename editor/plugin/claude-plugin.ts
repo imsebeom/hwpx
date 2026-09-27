@@ -498,12 +498,13 @@ export function createClaudePlugin(getInputHandler) {
           cellPath: inCell ? JSON.stringify([{ controlIndex: pos.controlIndex, cellIndex: pos.cellIndex, cellParaIndex: pos.cellParaIndex ?? 0 }]) : '',
           width, height, naturalWidthPx: im.naturalW, naturalHeightPx: im.naturalH,
           extension: im.ext, description: im.desc ?? '',
+          // 칸: 엔진 패치 cell-pic-inline 의 약속값. 칸 문단 안에 글자처럼 취급 그림으로 넣고 표 높이를 맞춘다
+          ...(inCell ? { paperOffsetXHu: -2147483648, paperOffsetYHu: 0 } : {}),
         };
         const r = parseMaybe(doc.insertPictureEx(JSON.stringify(opts), bytes));
-        // 본문은 스튜디오 그림 넣기처럼 글자처럼 취급으로 바꾼다(안 바꾸면 쪽 왼쪽 위 0,0 에 뜬다).
-        // 칸은 엔진이 칸 위에 뜬 그림(표 옆 개체)으로만 넣는다 — 스튜디오도 같다. 칸 문단 안에 넣는 API 는 없다
+        // 본문은 스튜디오 그림 넣기처럼 글자처럼 취급으로 바꾼다(안 바꾸면 쪽 왼쪽 위 0,0 에 뜬다)
         if (r?.ok && !inCell) doc.setPictureProperties(opts.sectionIdx, r.paraIdx, r.controlIdx, JSON.stringify({ treatAsChar: true }));
-        return { ...r, widthMm: +(width * 25.4 / 7200).toFixed(1), heightMm: +(height * 25.4 / 7200).toFixed(1), inCell, floating: inCell };
+        return { ...r, widthMm: +(width * 25.4 / 7200).toFixed(1), heightMm: +(height * 25.4 / 7200).toFixed(1), inCell };
       };
 
       const step = (doc, op, i) => {
