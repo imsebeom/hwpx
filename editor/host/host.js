@@ -147,7 +147,7 @@ async function openFromServer() {
   if (!r.ok) { setStatus('열 문서 없음', 'err'); return { ok: false, error: '세션에 문서가 없다' }; }
   const res = await studio.loadFile(fromBase64(r.base64), r.fileName, { skipUnsavedGuard: true });
   bindSourceHandle(r.fileName);
-  $('doc').textContent = r.fileName;
+  $('doc').textContent = r.proxyImages ? `${r.fileName} · 그림 축소 보기(저장하면 원본 그림으로)` : r.fileName;
   document.title = `${r.fileName} · Claude 연결`;
   await snapshot('open');
   return { ok: true, pageCount: res.pageCount };
@@ -230,11 +230,18 @@ window.__claudeFlushForClose = async () => {
 };
 
 // 앱 창(app.py)에 저장 안 한 편집이 있는지 알린다. 있으면 창을 닫을 때 확인 대화상자가 뜬다.
-let lastDirty = null;
+// getDocumentState 는 부를 때마다 문서 전체를 hwpx 로 내보내 해시를 구한다(58MB 문서에서 1.3초 이상).
+// 매초 부르면 큰 문서에서 주 스레드가 쉬지 못해 모든 응답이 수십 초씩 늦었다(2026-09-29).
+// 그래서 편집 카운터가 바뀌었을 때, 그리고 저장으로 풀렸는지 보려고 dirty 인 동안 10초마다만 묻는다.
+let lastDirty = null, dirtyKey = null, dirtyTick = 0;
 setInterval(async () => {
   const api = window.pywebview?.api;
   if (!api?.set_dirty) return;
   try {
+    const key = await mutationKey();
+    dirtyTick++;
+    if (lastDirty !== null && key === dirtyKey && !(lastDirty && dirtyTick % 10 === 0)) return;
+    dirtyKey = key;
     const dirty = Boolean((await studio.getDocumentState()).dirty);
     if (dirty !== lastDirty) { lastDirty = dirty; await api.set_dirty(dirty); }
   } catch { /* 문서 교체 중이면 다음 주기에 */ }
