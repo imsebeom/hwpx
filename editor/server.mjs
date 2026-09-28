@@ -20,7 +20,7 @@ import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { readZip, stripDummyLinesegs } from './hwpx-zip.mjs';
+import { readZip, stripDummyLinesegs, fixHfFields } from './hwpx-zip.mjs';
 import { rhwpLayout } from './rhwp_layout.mjs';
 import { formatLog, formatOp, coalesceOps } from './log-format.mjs';
 
@@ -367,6 +367,25 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/snapshot' && req.method === 'POST') {
       const entry = saveSnapshot(await readBody(req));
       return sendJson(res, 200, { ok: true, diffLines: entry.diff?.length ?? 0 });
+    }
+    if (p === '/api/save-source' && req.method === 'POST') {   // 화면 저장(Ctrl+S, 저장 단추): 연결된 원본에 쓴다
+      const s = readSession();
+      if (!s.source || !/\.hwpx$/i.test(s.source)) return sendJson(res, 400, { ok: false, error: '연결된 hwpx 가 없다' });
+      const { base64, hfMarkers } = await readBody(req);
+      const fix = fixHfFields(Buffer.from(base64, 'base64'), hfMarkers ?? []);
+      // 세션에서 처음 덮어쓸 때 원본을 작업 공간에 한 번 남긴다
+      let backup = s.backup;
+      if (!backup && fs.existsSync(s.source)) {
+        const d = new Date(), two = (n) => String(n).padStart(2, '0');
+        const stamp = `${d.getFullYear()}${two(d.getMonth() + 1)}${two(d.getDate())}_${two(d.getHours())}${two(d.getMinutes())}${two(d.getSeconds())}`;
+        backup = path.join(STATE_DIR, 'backup', `${stamp}_${path.basename(s.source)}`);
+        fs.mkdirSync(path.dirname(backup), { recursive: true });
+        fs.copyFileSync(s.source, backup);
+        writeSession({ backup });
+      }
+      fs.writeFileSync(s.source, fix.buf);
+      logEvent('save', { by: 'user', path: s.source, bytes: fix.buf.length, hfFixed: fix.fixed || undefined, via: '에디터 화면', backup });
+      return sendJson(res, 200, { ok: true, path: s.source, backup });
     }
     if (p === '/api/doc') {       // 브라우저가 처음 열 문서를 받아 간다
       const s = readSession();

@@ -112,10 +112,41 @@ async function snapshot(source) {
   log(`${source === 'user' ? '사용자 수정' : source === 'claude' ? 'Claude 수정' : '열림'} 기록 (${r.diffLines ?? 0}곳 변경)`);
 }
 
+/**
+ * 서버에서 받은 hwpx 에 저장 대상(파일 핸들 흉내)을 붙인다. 스튜디오는 파일 핸들이 없으면 저장할 때마다
+ * 「다른 이름으로 저장」 대화상자를 연다. 이 핸들에 쓰면 서버가 연결된 원본에 쓴다(세션 첫 저장 때 원본 백업).
+ * 「다른 이름으로 저장」은 그대로 대화상자를 연다.
+ */
+function bindSourceHandle(fileName) {
+  if (!/\.hwpx$/i.test(fileName)) return;
+  const wasm = $('editor').querySelector('iframe')?.contentWindow?.__claudeIH?.()?.wasm;
+  if (!wasm) { log('저장 대상 연결 실패: 저장하면 대화상자가 뜬다'); return; }
+  wasm.currentFileHandle = {
+    kind: 'file',
+    name: fileName,
+    async getFile() { throw new Error('연결된 원본은 서버가 읽는다'); },
+    async createWritable() {
+      const parts = [];
+      return {
+        async write(data) { parts.push(new Uint8Array(await (data?.type === 'write' ? data.data : data).arrayBuffer())); },
+        async close() {
+          const bytes = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
+          parts.reduce((at, p) => { bytes.set(p, at); return at + p.length; }, 0);
+          const body = { base64: toBase64(bytes), hfMarkers: await headerFooterTexts() };
+          const r = await fetch('/api/save-source', { method: 'POST', body: JSON.stringify(body) }).then((x) => x.json());
+          if (!r.ok) throw new Error(r.error || '저장 실패');
+          log(`저장: ${r.path}`);
+        },
+      };
+    },
+  };
+}
+
 async function openFromServer() {
   const r = await fetch('/api/doc').then((x) => x.json());
   if (!r.ok) { setStatus('열 문서 없음', 'err'); return { ok: false, error: '세션에 문서가 없다' }; }
   const res = await studio.loadFile(fromBase64(r.base64), r.fileName, { skipUnsavedGuard: true });
+  bindSourceHandle(r.fileName);
   $('doc').textContent = r.fileName;
   document.title = `${r.fileName} · Claude 연결`;
   await snapshot('open');
