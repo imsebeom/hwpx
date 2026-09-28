@@ -53,6 +53,8 @@
   - 도구: `~/.cache/rhwp-devel/cmp.mjs`(2쪽 글자 줄과 셀 상자), `allpages.mjs <pkg> <a> <b>`(전 쪽 글자 좌표 대조), `variants.py`, `winshot.py`(에디터 창을 앞으로 올리지 않고 PrintWindow 로 캡처 — 사용자 화면을 뺏지 않는다)
 
 ## 컨텍스트 앵커
+- **09-29 둘째**: 사용자 지시 「한글 파일을 만들고 나면 마지막엔 에디터로 연다」 → 스킬 ea95324(푸시 안 함). SKILL.md 결정 트리 머리에 「마지막 단계는 에디터로 열기」(묻지 않음, 여럿이면 최종본 하나, 읽기 E 제외), 워크플로 A [9], editor-mode.md 1절.
+  `cli.mjs start` 가 떠 있는 창에 저장 안 한 편집이 있으면 session.json 을 바꾸기 전에 멈춘다(`--force`). 시험 인스턴스로 dirty 차단, 세션 불변, --force, 깨끗한 상태 재열기 확인
 - **09-29**: 화면 저장(Ctrl+S)이 「다른 이름으로 저장」 대화상자를 띄우던 것(사용자 보고) → 스킬 e5adddd. `host.js bindSourceHandle` 이 스튜디오 `wasm.currentFileHandle` 에 핸들 흉내를 붙이고
   서버 `/api/save-source` 가 연결된 원본에 덮어쓴다(사용자 선택 「원본 덮어쓰기」, 세션 첫 저장 전 `<작업 공간>/backup/` 에 원본 사본). `$E save` 의 새 판 규칙은 그대로.
   시험 창에서 저장 두 번: 대화상자 없음, dirty false, 원본에 편집 반영, 백업 1개, verify 통과. 푸시 안 함. 이미 떠 있던 에디터(bonmun, butim, f677b77e)는 옛 서버라 다시 띄워야 적용
