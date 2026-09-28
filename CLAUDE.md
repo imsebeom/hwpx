@@ -53,6 +53,9 @@
   - 도구: `~/.cache/rhwp-devel/cmp.mjs`(2쪽 글자 줄과 셀 상자), `allpages.mjs <pkg> <a> <b>`(전 쪽 글자 좌표 대조), `variants.py`, `winshot.py`(에디터 창을 앞으로 올리지 않고 PrintWindow 로 캡처 — 사용자 화면을 뺏지 않는다)
 
 ## 컨텍스트 앵커
+- **09-29**: 화면 저장(Ctrl+S)이 「다른 이름으로 저장」 대화상자를 띄우던 것(사용자 보고) → 스킬 e5adddd. `host.js bindSourceHandle` 이 스튜디오 `wasm.currentFileHandle` 에 핸들 흉내를 붙이고
+  서버 `/api/save-source` 가 연결된 원본에 덮어쓴다(사용자 선택 「원본 덮어쓰기」, 세션 첫 저장 전 `<작업 공간>/backup/` 에 원본 사본). `$E save` 의 새 판 규칙은 그대로.
+  시험 창에서 저장 두 번: 대화상자 없음, dirty false, 원본에 편집 반영, 백업 1개, verify 통과. 푸시 안 함. 이미 떠 있던 에디터(bonmun, butim, f677b77e)는 옛 서버라 다시 띄워야 적용
 - **intent(09-28 아침)**: 사용자 결함 보고 처리와 kordoc(chrisryugj/kordoc, MIT) 기능 이식. 스킬 커밋(09-28 푸시분 이후 미푸시):
   7c71ba4 칸 안 두 그림 사이 캐럿과 빈칸 입력 / c7d6034 상단 막대 「RHWP + imsebeom」 / 667e01f 표, 그림 끌어 옮기기(끄는 동안 푸른 선, 놓을 때 문단째 이동, `move-control-para*.rs`, `plugin/move-drop.ts`) /
   10856a7 칸 안 그림 크기 바꾸기 뒤 칸 높이 = max(적힌 높이, 내용)(`cell-pic-delta-*`) / 0e1b4d8 `gongmun_lint.py` / 789e338 `seal_hwpx.py` / ab908f2 `chart_hwpx.py`
