@@ -61,9 +61,8 @@
     쪽을 넘는 표 뒤쪽 문구의 도장은 앞 쪽에 걸리거나 사라진다(경고만). `<hp:fwSpace/>` 는 0.25em, PDF 글자 상자 폭은 빈칸 전진 폭이 아니다
   - 차트: 원 3D 는 `firstSliceAng` 을 빼고 `view3D` 를 넣어야 한글이 그린다(kordoc 결함)
   - changes_made(마무리): 스킬 67ee979..ab908f2 를 hwpx, hwpx2 둘 다 푸시. guide4 창을 새 엔진으로 다시 띄움(10:13, `_22`, 포트 7780)
-  - next_steps: ① **guide4 창이 아직 떠 있다** — 다시 띄운 뒤 사용자가 그림 크기 세 번, 표 끌어 옮기기(그림 4-3, 4-4 순서가 바뀜)를 했고 저장하지 않았다.
-    닫으라는 지시를 받았지만 이 편집을 버릴지 확인하려고 멈췄다. 답에 따라 `HWPX_EDITOR_INSTANCE=guide4 node cli.mjs save` 또는 `stop --force`
-    ② md2hwpx 의 ```chart 펜스 연결은 하지 않았다(필요하면 `chart_hwpx.parse_fence` 재사용) ③ 도장: 쪽을 넘는 표 뒤쪽 문구는 자동 해결책 없음(경고만)
+  - guide4 창은 사용자 확인(시험 편집이라 버림) 뒤 `stop --force` 로 닫았다. 떠 있는 에디터 없음
+  - next_steps: ① md2hwpx 의 ```chart 펜스 연결은 하지 않았다(필요하면 `chart_hwpx.parse_fence` 재사용) ③ 도장: 쪽을 넘는 표 뒤쪽 문구는 자동 해결책 없음(경고만)
 - **intent(09-27 셋째 세션 ~ 09-28 밤샘)**: 사용자가 원고를 고치며 찾은 결함(그림 자르기 뒤 칸 눌림, 표 끌기, 칸 그림 옆 캐럿, 그림 넣기 도구, 칸 글에 표가 안 따라감, Ctrl+방향키 크기 조절)을 고치고, 잠든 사이 회귀 시험으로 더 찾았다. 스킬 커밋(푸시 안 함):
   4b29a9f 칸 그림 자르기/크기 바꾸기 뒤 다른 칸 눌림(`cell-pic-delta-*`) / 7acb26f 표 끌어 옮기기(`tac-table-move*`, `table-move-undo.ts`) /
   fdf631c, 93e3872 `cli.mjs image`(좌표나 커서 자리, 되돌리기 한 번) / 4611bf9 칸 글자처럼 취급 그림 옆 캐럿(`cell-inline-caret-*`) / 3656e79 칸 안 그림(`cell-pic-inline-*`, `paperOffsetXHu=i32::MIN` 약속값) /
