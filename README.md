@@ -17,6 +17,8 @@ HWPX(한컴오피스 한글 개방형 문서) 생성, 편집, 병합을 위한 C
 | 외부 검증 도구 | [PolarisOffice/polaris_dvc](https://github.com/PolarisOffice/polaris_dvc) | Apache-2.0 | `bin/polaris-dvc.exe` (v0.1.0 prebuilt) — `verify_hwpx --strict` 의 JID 위반 검출 백엔드 (2026-04-26) |
 | 스크립트 이식 | [airmang/hwpx-skill](https://github.com/airmang/hwpx-skill) | Apache-2.0 (© 2026 airmang) | `scripts/zip_replace_all.py` ZIP-level 전역 치환 + temp 안전 처리 + `mimetype ZIP_STORED` 보존 (2026-05-05). lineSegArray 더미 주입은 자체 보강 |
 | 알고리즘 재구현 | [Canine89/hwpxskill](https://github.com/Canine89/hwpxskill) | 라이선스 미지정 | `scripts/page_guard.py` 레퍼런스 대비 페이지 드리프트 가드 (메트릭 비교 알고리즘 참조 후 다중 섹션·`xpath_local`·zip bomb 상한 추가하여 독립 재구현) (2026-05-05) |
+| 스크립트 이식 | [chrisryugj/kordoc](https://github.com/chrisryugj/kordoc) | MIT (© 2026 chrisryugj) | `scripts/gongmun_lint.py` 공문서 표기법 검수, `scripts/seal_hwpx.py` 도장 날인, `scripts/chart_hwpx.py` 한글 네이티브 차트. TypeScript 를 파이썬 표준 라이브러리로 옮겼고 실행 때 kordoc 이나 네트워크를 쓰지 않는다 (2026-09-28) |
+| 알고리즘 원전 | [DoHyun468/claw-hwp](https://github.com/DoHyun468/claw-hwp) | MIT (© 2026 DoHyun468) | kordoc 이 가져온 차트 조립과 종류 표, 도장 배치 방식의 원전 (2026-09-28) |
 | 스펙 자료 | 한글과컴퓨터 HWP 파일 형식 공개 문서 | 공개 | HWPX XML 스키마 해석 기준 |
 | Python 라이브러리 | `lxml` / `python-hwpx 2.9.1+` / `Pillow` | 각 라이브러리 라이선스 | XML 파싱·편집, HWPX 읽기·`HwpxDocument` API, 이미지 처리 |
 
@@ -101,6 +103,26 @@ Rust(`~/.cargo` 의 cargo, wasm-pack)가 있으면 `editor/patches/` 를 넣어 
 | N | 자동 첨삭 메모 batch 삽입 (학생 작품 평가 자동화) | add_review_memo.py (python-hwpx 2.x) |
 | O | 레퍼런스 99% 복원 + 쪽수 드리프트 가드 | page_guard.py (Canine89 알고리즘 재구현) |
 | 에디터 모드 | 사용자가 에디터 창으로 보며 고치고 Claude 가 같은 문서를 실시간으로 고친다 | `editor/cli.mjs` (설명서 `references/editor-mode.md`) |
+| 표기법 검수 | 공문, 계획서의 날짜, 시간, 금액, 붙임, 쌍점, 물결표, 두음법칙, 외래어, 차별 표현, 「끝.」 누락 | `gongmun_lint.py` (kordoc 이식) |
+| 도장 날인 | 「(인)」, 「(서명)」 위에 도장 그림을 글 앞으로 띄워 넣는다. 칸과 쪽 높이는 그대로 | `seal_hwpx.py` (kordoc 이식) |
+| 네이티브 차트 | JSON, CSV 자료로 막대, 꺾은선, 원, 도넛, 영역, 방사형, 분산 등 20종을 한글에서 고칠 수 있는 차트로 넣는다 | `chart_hwpx.py` (kordoc 이식) |
+
+## kordoc 이식 (2026-09-28)
+
+[chrisryugj/kordoc](https://github.com/chrisryugj/kordoc)(MIT)의 기능 셋을 **파이썬 표준 라이브러리만으로** 옮겼다. 설치할 것이 없다.
+
+```bash
+S=~/.claude/skills/hwpx/scripts
+python $S/gongmun_lint.py 결과.hwpx --document                        # 위반이 있으면 종료 코드 1
+python $S/seal_hwpx.py 서식.hwpx 날인본.hwpx --image 도장.png --anchor "(인)" --occurrence all
+python $S/chart_hwpx.py 문서.hwpx 차트본.hwpx --data 자료.csv --type line --anchor "<그림 1>"
+```
+
+| 파일 | 원본과 다른 점 (한글 PDF 로 확인) |
+|------|------|
+| `gongmun_lint.py` | AI 문체 규칙 두 개(줄표, 굵게 남용)는 옮기지 않았다. 같은 원고에서 나머지 위반 건수는 kordoc 과 같다 |
+| `seal_hwpx.py` | 한글은 칸 안 도장의 세로 위치를 칸이 아니라 **표 위**에서 잰다. 그래서 앞 행 높이와 칸 위 여백을 더하고, 저장된 줄 배치로 문구가 든 줄을 찾는다. 고정폭 빈칸(0.25em), 장평과 자간도 반영했다. 기본은 문구 위에 겹쳐 찍기다. 서식 3종 14곳에서 도장 중심이 문구 중심과 4pt 안에 들었다. 쪽을 넘는 긴 칸 뒤쪽 문구는 한글이 도장을 앞 쪽에 걸어 경고만 낸다 |
+| `chart_hwpx.py` | 원 3D 는 `firstSliceAng` 을 빼고 `view3D` 를 넣어야 한글이 조각을 그린다. JSON, CSV 입력과 문구 앞뒤 삽입을 더했다. 14종을 한글에서 확인했다 |
 
 ## 에디터 모드 (2026-09-25)
 
@@ -123,6 +145,7 @@ $E stop
 | 세션마다 에디터 하나 | 상태 폴더 `~/.claude/cache/hwpx-editor/<세션 ID 앞 8자>/`, 포트 7780 부터 빈 것. 여러 Claude 세션이 동시에 써도 서로의 문서를 덮어쓰지 않는다. `HWPX_EDITOR_INSTANCE` 로 이름을 줄 수 있다 |
 | 작업 기록 | `editor-log.jsonl` 에 비우지 않고 쌓인다. 에디터 화면에서 저장한 것도 파일 이름과 크기로 남는다(브라우저가 전체 경로를 주지 않는다) |
 | 열 때 조판 보정 | 더미 줄 배치나 줄 배치가 빠진 문서는 한글로 줄 배치와 표 높이를 계산해 연다. 한글이 없으면 rhwp 로 표 높이를 재서 적는다(`editor/rhwp_layout.mjs`). 원본 파일은 건드리지 않는다 |
+| 편집 개선 (09-27~28) | 개체 옆 캐럿과 입력, 삭제, 선택 위치 맞춤(캐럿 축), F5 셀 블록에서 표, 셀, 문단, 글자 모양 대화상자, 글자 색 목록, 표와 그림 끌어 옮기기(끄는 동안 푸른 선, 놓을 때 문단째 이동), 그림 자르기, 칸 안 그림 크기 조절 뒤 칸 높이 = max(적힌 높이, 내용), 칸을 고친 뒤 표 높이와 쪽 나누기를 한글 방식(저장 줄 배치 사다리)으로 맞춤, Ctrl+위/아래 행 크기 조절, 창 닫을 때 저장 확인 |
 | 엔진 패치 | `editor/patches/tac-no-ls-*.rs` — 줄 배치 없는 글자처럼 취급 표가 적힌 높이로 눌려 아래 표와 겹치는 rhwp 결함([#7419](https://github.com/edwardkim/rhwp/issues/7419))의 수정 두 가지. 같은 수정을 [PR #7433](https://github.com/edwardkim/rhwp/pull/7433) 으로 보냈다. 받아들여지면 이 패치를 걷고 rhwp 판을 올린다 |
 
 ## airmang/hwpx-skill 이식 + python-hwpx 2.x 활용 (2026-05-05)
