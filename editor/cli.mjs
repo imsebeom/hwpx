@@ -269,6 +269,16 @@ switch (sub) {
     if (!file || !fs.existsSync(file)) die('사용법: start [문서.hwpx|.hwp] — 문서를 빼면 빈 문서로 연다');
     const blocker = editBlocker(file);
     if (blocker && !args.includes('--force')) die(`열지 않음: ${blocker}. 사용자가 원하면 --force`);
+    if (!process.env.HWPX_EDITOR_PORT) { PORT = await allocatePort(); BASE = `http://127.0.0.1:${PORT}`; }
+    // 빌드 끝에 자동으로 열 때 떠 있는 창의 저장 안 한 편집을 덮지 않는다(세션 파일을 바꾸기 전에 본다)
+    if ((await health())?.browser && !args.includes('--force')) {
+      let dirty = false;
+      try {
+        const r = await (await fetch(`${BASE}/api/cmd`, { method: 'POST', body: JSON.stringify({ type: 'state', timeoutMs: 5000 }) })).json();
+        dirty = Boolean(r.ok && r.state?.dirty);
+      } catch { /* 창이 응답하지 않으면 연다 */ }
+      if (dirty) die('에디터에 저장하지 않은 편집이 있다. 사용자에게 저장을 부탁하거나, 버리려면 start --force');
+    }
     fs.mkdirSync(STATE_DIR, { recursive: true });
     fs.writeFileSync(SESSION, JSON.stringify({ source: file, startedAt: new Date().toISOString() }, null, 2));
     fs.writeFileSync(CHANGES, '');
@@ -279,7 +289,6 @@ switch (sub) {
     kept.push({ t: Date.now(), act: 'mark', type: 'open', src: 'system', label: `── 열림 ${path.basename(file)}` });
     fs.writeFileSync(OPS, kept.map((o) => JSON.stringify(o)).join('\n') + '\n');
     fs.writeFileSync(OPS_SEEN, String(kept.length));
-    if (!process.env.HWPX_EDITOR_PORT) { PORT = await allocatePort(); BASE = `http://127.0.0.1:${PORT}`; }
     await ensureServer();
     await postLog('start', { file, instance: path.basename(STATE_DIR), port: PORT });
     let h = await health();

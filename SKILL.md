@@ -101,6 +101,12 @@ pip install python-hwpx lxml --break-system-packages
 
 > **반드시 아래 판단을 따른다.**
 
+> 🔑 **마지막 단계는 언제나 에디터로 열기다**(2026-09-29 사용자 지시). 어느 워크플로든 hwpx 를 만들거나 고쳐 저장하고
+> 검증(`fix_namespaces.py`, `validate.py`/`verify_hwpx.py`)까지 끝나면, 묻지 않고 결과 파일을 에디터로 열어 보여 준다:
+> `node "${CLAUDE_SKILL_DIR}/editor/cli.mjs" start <결과.hwpx>`. 산출물이 여럿이면 최종본 하나(병합 결과, 대표 파일)를 열고 나머지는 경로만 알린다.
+> 떠 있는 에디터에 저장하지 않은 편집이 있으면 `start` 가 멈추므로, 사용자에게 저장을 부탁하고 다시 연다(`--force` 는 사용자가 버리라고 할 때만).
+> 읽기만 하는 일(워크플로 E)과 파일을 만들지 않은 일은 열지 않는다. 열린 뒤의 절차(데스크탑 앱이면 열기 링크 안내 등)는 아래 「에디터 모드」 절.
+
 ```
 사용자 요청
  ├─ 이미 있는 문서를 고치는 일 → 먼저 "에디터로 보면서 작업할까요?" 묻는다 → 예: ★ 에디터 모드 (아래 절)
@@ -158,7 +164,7 @@ pip install python-hwpx lxml --break-system-packages
 - 사용자가 말을 걸면 답하기 전에 `cli.mjs changes` 로 사용자가 에디터에서 고친 내역(좌표 diff, 커서, 선택 글자)부터 읽는다
 - 편집: `cli.mjs run` 에 JSON 배치 — 편집 도구 25종(`tool`) 우선, 없으면 WASM 직접(`doc`). 배치 하나가 undo 1스텝
 - 저장: `cli.mjs save` → 매번 새 판 `<이름>_<YYMMDD>_<NN>.hwpx`, 덮어쓰기 없음. 사용자의 화면 저장(Ctrl+S)은 연결된 원본에 덮어쓴다(첫 저장 전 백업)
-- 하지 않는 일: 새 문서 생성(A), 양식 복제·추출(F/H), 병합(I), 시험지(J), 첨삭 메모(N) — 저장·종료 후 기존 워크플로로
+- 하지 않는 일: 새 문서 생성(A), 양식 복제·추출(F/H), 병합(I), 시험지(J), 첨삭 메모(N) — 저장·종료 후 기존 워크플로로. 그 결과물은 다시 에디터로 연다(위 「마지막 단계」)
 
 ## 워크플로우 A: 콘텐츠 → HWPX (가장 중요!)
 
@@ -181,6 +187,7 @@ pip install python-hwpx lxml --break-system-packages
 [6] 이미지가 있으면 add_images_to_hwpx() + update_content_hpf()
 [7] fix_namespaces.py 후처리 (필수!)
 [8] validate.py 검증
+[9] 에디터로 열기: editor/cli.mjs start <결과.hwpx> (묻지 않는다)
 ```
 
 > **government 표지·섹션 바**: `from hwpx_helpers import *` → `make_cover_page()` → `make_section_bar()` → `make_body_para()`
