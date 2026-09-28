@@ -163,6 +163,7 @@ pip install python-hwpx lxml --break-system-packages
 - 시작: `node "${CLAUDE_SKILL_DIR}/editor/cli.mjs" start <문서.hwpx>` (최초 1회 `node editor/setup.mjs`, 앱 창은 `pip install pywebview`)
 - 사용자가 말을 걸면 답하기 전에 `cli.mjs changes` 로 사용자가 에디터에서 고친 내역(좌표 diff, 커서, 선택 글자)부터 읽는다
 - 편집: `cli.mjs run` 에 JSON 배치 — 편집 도구 25종(`tool`) 우선, 없으면 WASM 직접(`doc`). 배치 하나가 undo 1스텝
+- 큰 문서(150MB 초과)는 그림만 1,200px JPEG 로 줄인 사본을 열고, 저장할 때 원본 그림으로 되돌린다(editor-mode.md 「큰 문서」)
 - 저장: `cli.mjs save` → 매번 새 판 `<이름>_<YYMMDD>_<NN>.hwpx`, 덮어쓰기 없음. 사용자의 화면 저장(Ctrl+S)은 연결된 원본에 덮어쓴다(첫 저장 전 백업)
 - 하지 않는 일: 새 문서 생성(A), 양식 복제·추출(F/H), 병합(I), 시험지(J), 첨삭 메모(N) — 저장·종료 후 기존 워크플로로. 그 결과물은 다시 에디터로 연다(위 「마지막 단계」)
 

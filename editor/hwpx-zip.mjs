@@ -8,8 +8,8 @@
  */
 import zlib from 'node:zlib';
 
-/** [{ name, method, data(압축 해제된 Buffer) }] — 원래 순서 그대로. */
-export function readZip(buf) {
+/** [{ name, method, data(압축 해제된 Buffer) }] — 원래 순서 그대로. want 를 주면 그 이름만 풀어 담는다(큰 파일에서 일부만). */
+export function readZip(buf, want = null) {
   let eocd = buf.length - 22;
   while (eocd >= 0 && buf.readUInt32LE(eocd) !== 0x06054b50) eocd--;
   if (eocd < 0) return null;
@@ -22,7 +22,7 @@ export function readZip(buf) {
     const name = buf.toString('utf8', p + 46, p + 46 + nameLen);
     const start = local + 30 + buf.readUInt16LE(local + 26) + buf.readUInt16LE(local + 28);
     const raw = buf.subarray(start, start + size);
-    out.push({ name, method, data: method === 8 ? zlib.inflateRawSync(raw) : Buffer.from(raw) });
+    if (!want || want(name)) out.push({ name, method, data: method === 8 ? zlib.inflateRawSync(raw) : Buffer.from(raw) });
     p += 46 + nameLen + extra + comment;
   }
   return out;
@@ -110,8 +110,10 @@ const LINESEG_DUMMY = '<hp:linesegarray><hp:lineseg textpos="0" vertpos="0" vert
 
 /** 반환: { buf, removed } — 더미가 없으면 원래 buf 그대로. */
 export function stripDummyLinesegs(buf) {
+  // 본문만 먼저 본다 — 그림이 큰 문서에서 전부 풀면 수십 초가 걸린다
+  const sections = readZip(buf, (n) => /^Contents\/section\d+\.xml$/.test(n));
+  if (!sections || !sections.some((e) => e.data.includes(LINESEG_DUMMY))) return { buf, removed: 0 };
   const entries = readZip(buf);
-  if (!entries) return { buf, removed: 0 };
   let removed = 0;
   for (const e of entries) {
     if (!/^Contents\/section\d+\.xml$/.test(e.name)) continue;

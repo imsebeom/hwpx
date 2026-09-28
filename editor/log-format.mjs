@@ -10,8 +10,9 @@ export function formatLog(e) {
     case 'start': return `${t}  시작      ${e.file}`;
     case 'load': return `${t}  불러옴    ${e.doc} — ${LAYOUT[e.layout] ?? e.layout}${e.tables ? ` ${e.tables}개` : ''}${e.note ? ` (${e.note})` : ''}${e.error ? ` (${e.error})` : ''}`;
     case 'open': return `${t}  열림      ${e.doc} ${kb(e.bytes)}`;
+    case 'proxy': return `${t}  그림 축소 ${e.images}장, ${e.fromMB}MB → ${e.toMB}MB${e.cached ? ' (캐시)' : ''}`;
     case 'edit': return `${t}  ${who} 편집 ${e.formatOnly ? '서식이나 개체만' : `${e.count}곳 ${e.refs.join(' ')}${e.count > e.refs.length ? ' …' : ''}`}${e.at ? ` (커서 ${e.at})` : ''}`;
-    case 'save': return `${t}  ${who} 저장 ${e.path ?? e.name} ${kb(e.bytes)}${e.via ? ` (${e.via})` : ''}`;
+    case 'save': return `${t}  ${who} 저장 ${e.path ?? e.name} ${kb(e.bytes)}${e.via ? ` (${e.via})` : ''}${e.imagesRestored ? ` 그림 원본 ${e.imagesRestored}장 복원` : ''}`;
     case 'open-file': return `${t}  ${who} 다른 파일 열기 ${e.names.join(', ')} (${e.via})`;
     case 'error': return `${t}  오류      ${e.cmd ?? ''} ${e.error}`;
     case 'stop': return `${t}  종료`;

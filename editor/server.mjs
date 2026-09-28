@@ -22,6 +22,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { readZip, stripDummyLinesegs, fixHfFields } from './hwpx-zip.mjs';
 import { rhwpLayout } from './rhwp_layout.mjs';
+import { makeProxy, restoreImages, PROXY_MIN_BYTES } from './image-proxy.mjs';
 import { formatLog, formatOp, coalesceOps } from './log-format.mjs';
 
 const execFileP = promisify(execFile);
@@ -99,9 +100,8 @@ export function logEvent(ev, data = {}) {
  */
 /** 줄 배치(linesegarray)가 없는 문단이 있고 글자처럼 취급하는 표가 있는가. */
 function lacksLinesegsWithTacTable(buf) {
-  const entries = readZip(buf) || [];
+  const entries = readZip(buf, (n) => /^Contents\/section\d+\.xml$/.test(n)) || [];
   for (const e of entries) {
-    if (!/^Contents\/section\d+\.xml$/.test(e.name)) continue;
     const xml = e.data.toString('utf8');
     const paras = (xml.match(/<hp:p\b/g) || []).length;
     const segs = (xml.match(/<hp:linesegarray\b/g) || []).length;
@@ -373,6 +373,8 @@ const server = http.createServer(async (req, res) => {
       if (!s.source || !/\.hwpx$/i.test(s.source)) return sendJson(res, 400, { ok: false, error: '연결된 hwpx 가 없다' });
       const { base64, hfMarkers } = await readBody(req);
       const fix = fixHfFields(Buffer.from(base64, 'base64'), hfMarkers ?? []);
+      const img = s.proxyMap ? restoreImages(fix.buf, s.proxyMap) : null;   // 그림 축소 보기면 원본 그림으로
+      if (img) fix.buf = img.buf;
       // 세션에서 처음 덮어쓸 때 원본을 작업 공간에 한 번 남긴다
       let backup = s.backup;
       if (!backup && fs.existsSync(s.source)) {
@@ -384,14 +386,26 @@ const server = http.createServer(async (req, res) => {
         writeSession({ backup });
       }
       fs.writeFileSync(s.source, fix.buf);
-      logEvent('save', { by: 'user', path: s.source, bytes: fix.buf.length, hfFixed: fix.fixed || undefined, via: '에디터 화면', backup });
+      logEvent('save', { by: 'user', path: s.source, bytes: fix.buf.length, hfFixed: fix.fixed || undefined, via: '에디터 화면', backup, imagesRestored: img?.restored });
       return sendJson(res, 200, { ok: true, path: s.source, backup });
     }
     if (p === '/api/doc') {       // 브라우저가 처음 열 문서를 받아 간다
       const s = readSession();
       if (!s.source || !fs.existsSync(s.source)) return sendJson(res, 404, { ok: false });
-      const buf = await editorBytes(s.source);
-      return sendJson(res, 200, { ok: true, fileName: path.basename(s.source), base64: buf.toString('base64') });
+      let buf = await editorBytes(s.source);
+      let proxy = null;
+      // 큰 문서는 그림만 줄인 사본을 연다(image-proxy.mjs). 저장할 때 원본 그림으로 되돌린다
+      if (PROXY_MIN_BYTES > 0 && buf.length > PROXY_MIN_BYTES && /\.hwpx$/i.test(s.source)) {
+        try {
+          proxy = await makeProxy(s.source, buf, STATE_DIR);
+          logEvent('proxy', { images: proxy.images, fromMB: Math.round(buf.length / 1e6), toMB: Math.round(proxy.buf.length / 1e6), cached: proxy.cached });
+          buf = proxy.buf;
+        } catch (e) {
+          logEvent('error', { where: '그림 축소 보기', error: String(e?.stderr || e?.message || e).slice(0, 300) });
+        }
+      }
+      writeSession({ proxyMap: proxy?.map ?? null });
+      return sendJson(res, 200, { ok: true, fileName: path.basename(s.source), proxyImages: proxy?.images ?? 0, base64: buf.toString('base64') });
     }
     return serveStatic(req, res, p);
   } catch (e) {

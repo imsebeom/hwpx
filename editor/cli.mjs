@@ -28,6 +28,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { readZip, fixHfFields } from './hwpx-zip.mjs';
 import { formatLog, formatOp, coalesceOps, localTime } from './log-format.mjs';
+import { restoreImages } from './image-proxy.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
@@ -380,11 +381,17 @@ switch (sub) {
     if (fs.existsSync(target)) die(`이미 있는 파일은 덮어쓰지 않는다: ${target}`);
     const r = await cmd({ type: 'save' });
     const fix = fixHfFields(Buffer.from(r.base64, 'base64'), r.hfMarkers ?? []);
+    let img = null;
+    if (s.proxyMap) {                               // 그림 축소 보기로 열었으면 원본 그림으로 되돌려 저장한다
+      img = restoreImages(fix.buf, s.proxyMap);
+      fix.buf = img.buf;
+      out(`그림 원본 복원 ${img.restored}/${img.total}`);
+    }
     fs.writeFileSync(target, fix.buf);
     if (fix.fixed) out(`머리말/꼬리말 쪽 번호 ${fix.fixed}개 보정`);
     for (const why of fix.skipped) out(`⚠ 쪽 번호 보정 못 함: ${why}`);
     await cmd({ type: 'saved', fileName: path.basename(target) });
-    await postLog('save', { by: 'claude', path: target, bytes: fix.buf.length, hfFixed: fix.fixed || undefined });
+    await postLog('save', { by: 'claude', path: target, bytes: fix.buf.length, hfFixed: fix.fixed || undefined, imagesRestored: img?.restored });
     out(`저장: ${target}`);
     break;
   }
