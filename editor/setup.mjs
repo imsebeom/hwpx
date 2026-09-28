@@ -164,7 +164,7 @@ const RUST_PATCHES = [
     insert: fs.readFileSync(path.join(HERE, 'patches', 'cell-pic-delta-before.rs'), 'utf8').replace(/\r\n/g, '\n'), done: '[claude-hwpx cell-pic-delta] 바꾸기 전' },
   (() => {
     const [find, replace] = fs.readFileSync(path.join(HERE, 'patches', 'cell-pic-delta-after.rs'), 'utf8').replace(/\r\n/g, '\n').split('\n// ==== replace ====\n');
-    return { id: 'cell-pic-delta-after', file: 'src/document_core/commands/object_ops/table.rs', find: find.replace(/^\/\/ ==== find ====\n/, ''), replace, done: 'claude_old_end = Some(' };
+    return { id: 'cell-pic-delta-after', file: 'src/document_core/commands/object_ops/table.rs', find: find.replace(/^\/\/ ==== find ====\n/, ''), replace, done: 'let mut claude_restored' };
   })(),
   // 글자처럼 취급 표를 끌면 남은 거리를 세로 위치에 적어 표가 다른 문단과 겹치던 것(patches/tac-table-move.rs)
   (() => {
