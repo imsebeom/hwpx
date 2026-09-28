@@ -32,7 +32,12 @@
             3 => axis::split_to_caret_offset(para, off),
             4 => axis::logical_to_text_offset(para, off).1 as usize,
             5 => axis::split_to_caret_offset(para, usize::MAX),
-            _ => return Err(JsValue::from_str("mode 는 0~5")),
+            // [claude-hwpx insert-after-count] 캐럿 앞 인라인 개체 가운데 그 글자 위치에 있는 것의 수
+            6 => {
+                let t = axis::logical_to_text_offset(para, off).0;
+                crate::model::paragraph::claude_inline_before_at(para, off, t)
+            }
+            _ => return Err(JsValue::from_str("mode 는 0~6")),
         };
         Ok(converted as u32)
     }
@@ -42,6 +47,13 @@
     #[wasm_bindgen(js_name = setInsertAfterInline)]
     pub fn set_insert_after_inline(&self, on: bool) {
         crate::model::paragraph::INSERT_AFTER_INLINE_CONTROLS.with(|flag| flag.set(on));
+    }
+
+    /// [claude-hwpx insert-after-count] 표지가 켜졌을 때 같은 글자 위치의 인라인 개체 가운데 앞에 둘 개수(음수면 전부).
+    #[wasm_bindgen(js_name = setInsertAfterInlineCount)]
+    pub fn set_insert_after_inline_count(&self, n: i32) {
+        crate::model::paragraph::INSERT_AFTER_INLINE_COUNT
+            .with(|c| c.set(if n < 0 { usize::MAX } else { n as usize }));
     }
 
     /// [claude-hwpx caret-axis] 캐럿 축 범위 삭제(본문). 범위 안 글자처럼 취급 개체도 지운다.

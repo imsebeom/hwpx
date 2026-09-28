@@ -120,7 +120,10 @@ pub(crate) fn utf16_pos_to_caret_idx(para: &Paragraph, utf16_pos: u32) -> usize 
 pub(crate) fn insert_text_at_caret(para: &mut Paragraph, caret: usize, text: &str) -> usize {
     let (text_offset, after_inline) = logical_to_text_offset(para, caret);
     crate::model::paragraph::INSERT_AFTER_INLINE_CONTROLS.with(|flag| flag.set(after_inline));
+    let n = crate::model::paragraph::claude_inline_before_at(para, caret, text_offset);
+    crate::model::paragraph::INSERT_AFTER_INLINE_COUNT.with(|c| c.set(n));
     para.insert_text_at(text_offset, text);
+    crate::model::paragraph::INSERT_AFTER_INLINE_COUNT.with(|c| c.set(usize::MAX));
     crate::model::paragraph::INSERT_AFTER_INLINE_CONTROLS.with(|flag| flag.set(false));
     text_offset
 }

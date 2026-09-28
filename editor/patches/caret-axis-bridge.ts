@@ -44,11 +44,18 @@
     const t = conv(bridge, sec, para, path, off, 0);
     const after = conv(bridge, sec, para, path, off, 4) === 1;
     const doc = docOf(bridge);
-    if (after) doc.setInsertAfterInline?.(true);
+    if (after) {
+      doc.setInsertAfterInline?.(true);
+      // 같은 글자 위치에 개체가 여럿이면(칸 안 두 그림) 캐럿 앞 개체 수만큼만 뒤에 넣는다(엔진 insert-after-count)
+      doc.setInsertAfterInlineCount?.(conv(bridge, sec, para, path, off, 6));
+    }
     try {
       return run(t);
     } finally {
-      if (after) doc.setInsertAfterInline?.(false);
+      if (after) {
+        doc.setInsertAfterInline?.(false);
+        doc.setInsertAfterInlineCount?.(-1);
+      }
     }
   };
   const graphemes = (text: string): number => [...text].length;
