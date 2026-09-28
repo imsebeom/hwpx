@@ -214,6 +214,23 @@ const RUST_PATCHES = [
     return { id, file, find: find.replace(/^\/\/ ==== find ====\n/, ''), replace: replace.replace(/\n$/, ''), all: true, done };
   }),
   // 표 옆 글을 고쳐 줄을 다시 나누면 글자처럼 취급 표 줄에서 바깥 여백이 빠지던 것(patches/tac-line-outer.rs)
+  // 표, 그림 끌어 옮기기를 놓을 때 개체를 그 문단 자리로 옮긴다(patches/move-control-para*.rs, 스튜디오 move-drop-line.ts)
+  { id: 'move-control-para', file: 'src/document_core/commands/clipboard.rs', anchor: '    /// 컨트롤 객체(표, 이미지, 도형)를 내부 클립보드에 복사한다.\n    pub fn copy_control_native(',
+    insert: fs.readFileSync(path.join(HERE, 'patches', 'move-control-para.rs'), 'utf8').replace(/\r\n/g, '\n'), done: '[claude-hwpx move-control-para] 본문 개체' },
+  { id: 'move-control-para-wasm', file: 'src/wasm_api.rs', anchor: '    /// [claude-hwpx caret-axis] 켜 두는 동안',
+    insert: fs.readFileSync(path.join(HERE, 'patches', 'move-control-para-wasm.rs'), 'utf8').replace(/\r\n/g, '\n'), done: 'js_name = moveControlToParagraph' },
+  // 칸 안 두 그림 사이에 친 글이 둘째 그림 뒤로 가던 것(patches/insert-after-count-pos.rs, 나머지는 caret-axis-insert*, -helpers, -wasm, -bridge 안)
+  (() => {
+    const [find, replace] = fs.readFileSync(path.join(HERE, 'patches', 'insert-after-count-pos.rs'), 'utf8').replace(/\r\n/g, '\n').split('\n// ==== replace ====\n');
+    return { id: 'insert-after-count-pos', file: 'src/model/paragraph.rs', find: find.replace(/^\/\/ ==== find ====\n/, ''), replace: replace.replace(/\n$/, ''), done: '[claude-hwpx insert-after-count-pos]' };
+  })(),
+  // 그림만 있는 칸 문단을 누르면 캐럿이 첫 그림 안쪽에 서던 것(patches/cell-pic-hit-*.rs, 캐럿 좌표는 cell-inline-caret-fn)
+  { id: 'cell-pic-hit-fn', file: 'src/document_core/queries/cursor_rect.rs', anchor: '    /// 페이지 좌표에서 문서 위치 찾기 (네이티브)\n    pub fn hit_test_native(',
+    insert: fs.readFileSync(path.join(HERE, 'patches', 'cell-pic-hit-fn.rs'), 'utf8').replace(/\r\n/g, '\n'), done: '[claude-hwpx cell-pic-hit] 글 없이' },
+  ...[['cell-pic-hit-call', '[claude-hwpx cell-pic-hit] 그림만 있는'], ['cell-pic-hit-cell', '[claude-hwpx cell-pic-hit-cell]']].map(([id, done]) => {
+    const [find, replace] = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n').split('\n// ==== replace ====\n');
+    return { id, file: 'src/document_core/queries/cursor_rect.rs', find: find.replace(/^\/\/ ==== find ====\n/, ''), replace: replace.replace(/\n$/, ''), done };
+  }),
   // 글자처럼 취급 표의 행 높이를 저장 줄 배치 사다리로 정한다(patches/tac-row-ladder.rs)
   (() => {
     const [find, replace] = fs.readFileSync(path.join(HERE, 'patches', 'tac-row-ladder.rs'), 'utf8').replace(/\r\n/g, '\n').split('\n// ==== replace ====\n');
@@ -262,7 +279,7 @@ if (hasRust && RUST_PATCHES.some((p) => !builtIds.includes(p.id))) {
 }
 
 // 3. claude 플러그인 복사와 allowlist 등록
-for (const f of ['claude-plugin.ts', 'hancom-keys.ts', 'edit-log.ts', 'k-commands.ts', 'log-panel.ts', 'color-palette.ts', 'para-preview.ts', 'dialog-enter.ts', 'cell-block-erase.ts', 'picture-crop.ts']) fs.copyFileSync(path.join(HERE, 'plugin', f), path.join(STUDIO, 'src', 'plugin', f));
+for (const f of ['claude-plugin.ts', 'hancom-keys.ts', 'edit-log.ts', 'k-commands.ts', 'log-panel.ts', 'color-palette.ts', 'para-preview.ts', 'dialog-enter.ts', 'cell-block-erase.ts', 'picture-crop.ts', 'move-drop.ts']) fs.copyFileSync(path.join(HERE, 'plugin', f), path.join(STUDIO, 'src', 'plugin', f));
 // 편집 도구 라이브러리(lib/SOURCE.md)도 같은 자리로. 플러그인이 './doc-tools.js' 로 부른다.
 for (const f of ['doc-tools.js', 'doc-rules.js', 'collab-ops.js']) {
   fs.copyFileSync(path.join(HERE, 'plugin', 'lib', f), path.join(STUDIO, 'src', 'plugin', f));
@@ -339,6 +356,22 @@ for (const p of [{ id: 'caret-axis-bridge', file: 'src/core/wasm-bridge.ts', don
     }
     fs.writeFileSync(f, src);
   }
+}
+
+// 표, 그림 끌어 옮기기: 끄는 동안 푸른 선만, 놓을 때 문단 자리로 옮긴다(patches/move-drop-*.ts, plugin/move-drop.ts, 엔진 move-control-para)
+for (const [file, patch] of [['input-handler-table.ts', 'move-drop-table.ts'], ['input-handler-picture.ts', 'move-drop-picture.ts'], ['input-handler-mouse.ts', 'move-drop-mouse.ts']]) {
+  const f = path.join(STUDIO, 'src', 'engine', file);
+  let src = fs.readFileSync(f, 'utf8');
+  if (src.includes('[claude-hwpx move-drop-line]')) continue;
+  const eol = (t) => (src.includes('\r\n') ? t.replace(/\r?\n/g, '\r\n') : t);
+  const blocks = fs.readFileSync(path.join(HERE, 'patches', patch), 'utf8').replace(/\r\n/g, '\n')
+    .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n');
+  for (const b of blocks) {
+    const [find, replace] = b.split('\n// ==== replace ====\n');
+    if (src.split(eol(find)).length !== 2) throw new Error(`${file} 에서 패치 자리(${patch})를 하나로 못 찾았다`);
+    src = src.replace(eol(find), () => eol(replace.replace(/\n$/, '')));
+  }
+  fs.writeFileSync(f, src);
 }
 
 // Ctrl+방향키 칸/줄 전체 조절에 최소 크기 검사가 없어 줄일 수 없는 크기에서 칸마다 따로 멈추며 어긋나던 것(patches/column-resize-min.ts)
