@@ -62,6 +62,8 @@
   - 차트: 원 3D 는 `firstSliceAng` 을 빼고 `view3D` 를 넣어야 한글이 그린다(kordoc 결함)
   - changes_made(마무리): 스킬 67ee979..ab908f2 를 hwpx, hwpx2 둘 다 푸시. guide4 창을 새 엔진으로 다시 띄움(10:13, `_22`, 포트 7780)
   - guide4 창은 사용자 확인(시험 편집이라 버림) 뒤 `stop --force` 로 닫았다. 떠 있는 에디터 없음
+  - 스킬 1b34e75 README 에 kordoc 크레딧(kordoc, claw-hwp), 워크플로 표 세 줄, 「kordoc 이식」 절, 에디터 편집 개선 줄을 넣어 hwpx, hwpx2 푸시
+  - 사용자 질문 「화면 저장을 에이전트가 보고 받나」: 기록(`editor-log.jsonl`)만 남고 알림은 없다. `changes` 에 저장 기록을 함께 보일지 제안해 두었다(답 없음)
   - next_steps: ① md2hwpx 의 ```chart 펜스 연결은 하지 않았다(필요하면 `chart_hwpx.parse_fence` 재사용) ③ 도장: 쪽을 넘는 표 뒤쪽 문구는 자동 해결책 없음(경고만)
 - **intent(09-27 셋째 세션 ~ 09-28 밤샘)**: 사용자가 원고를 고치며 찾은 결함(그림 자르기 뒤 칸 눌림, 표 끌기, 칸 그림 옆 캐럿, 그림 넣기 도구, 칸 글에 표가 안 따라감, Ctrl+방향키 크기 조절)을 고치고, 잠든 사이 회귀 시험으로 더 찾았다. 스킬 커밋(푸시 안 함):
   4b29a9f 칸 그림 자르기/크기 바꾸기 뒤 다른 칸 눌림(`cell-pic-delta-*`) / 7acb26f 표 끌어 옮기기(`tac-table-move*`, `table-move-undo.ts`) /
