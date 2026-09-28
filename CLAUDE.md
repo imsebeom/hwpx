@@ -53,6 +53,14 @@
   - 도구: `~/.cache/rhwp-devel/cmp.mjs`(2쪽 글자 줄과 셀 상자), `allpages.mjs <pkg> <a> <b>`(전 쪽 글자 좌표 대조), `variants.py`, `winshot.py`(에디터 창을 앞으로 올리지 않고 PrintWindow 로 캡처 — 사용자 화면을 뺏지 않는다)
 
 ## 컨텍스트 앵커
+- **intent(09-28 아침)**: 사용자 결함 보고 처리와 kordoc(chrisryugj/kordoc, MIT) 기능 이식. 스킬 커밋(09-28 푸시분 이후 미푸시):
+  7c71ba4 칸 안 두 그림 사이 캐럿과 빈칸 입력 / c7d6034 상단 막대 「RHWP + imsebeom」 / 667e01f 표, 그림 끌어 옮기기(끄는 동안 푸른 선, 놓을 때 문단째 이동, `move-control-para*.rs`, `plugin/move-drop.ts`) /
+  10856a7 칸 안 그림 크기 바꾸기 뒤 칸 높이 = max(적힌 높이, 내용)(`cell-pic-delta-*`) / 0e1b4d8 `gongmun_lint.py` / 789e338 `seal_hwpx.py` / ab908f2 `chart_hwpx.py`
+  - **decisions**: kordoc 은 외부 의존 없이 표준 라이브러리로만 옮긴다(사용자 지시 「외부 의존성은 원치 않는다, 가져올 수 있으면 괜찮다」). reflow(쪽수 예측)는 6개 중 4개 문서에서 더 나빠 넣지 않았다
+  - 🔑 **도장 날인 실측(한글 PDF)**: 칸 문단의 글 앞 그림(flowWithText=0, vertRelTo=PARA)은 세로를 **표 위**에서 잰다(kordoc 은 칸 기준으로 보고 큰 칸에서 도장이 칸 맨 위로 갔다). flowWithText=1 은 쪽수가 54→55 로 바뀐다.
+    쪽을 넘는 표 뒤쪽 문구의 도장은 앞 쪽에 걸리거나 사라진다(경고만). `<hp:fwSpace/>` 는 0.25em, PDF 글자 상자 폭은 빈칸 전진 폭이 아니다
+  - 차트: 원 3D 는 `firstSliceAng` 을 빼고 `view3D` 를 넣어야 한글이 그린다(kordoc 결함)
+  - next_steps: ① guide4 창(사용자 `_22` 문서)은 그림 크기 수정(10856a7) 전 엔진이다 — 사용자 허락 받고 다시 띄우기 ② md2hwpx 의 ```chart 펜스 연결은 하지 않았다(필요하면 `chart_hwpx.parse_fence` 재사용) ③ 푸시는 요청 시
 - **intent(09-27 셋째 세션 ~ 09-28 밤샘)**: 사용자가 원고를 고치며 찾은 결함(그림 자르기 뒤 칸 눌림, 표 끌기, 칸 그림 옆 캐럿, 그림 넣기 도구, 칸 글에 표가 안 따라감, Ctrl+방향키 크기 조절)을 고치고, 잠든 사이 회귀 시험으로 더 찾았다. 스킬 커밋(푸시 안 함):
   4b29a9f 칸 그림 자르기/크기 바꾸기 뒤 다른 칸 눌림(`cell-pic-delta-*`) / 7acb26f 표 끌어 옮기기(`tac-table-move*`, `table-move-undo.ts`) /
   fdf631c, 93e3872 `cli.mjs image`(좌표나 커서 자리, 되돌리기 한 번) / 4611bf9 칸 글자처럼 취급 그림 옆 캐럿(`cell-inline-caret-*`) / 3656e79 칸 안 그림(`cell-pic-inline-*`, `paperOffsetXHu=i32::MIN` 약속값) /
