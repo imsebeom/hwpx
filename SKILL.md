@@ -34,6 +34,7 @@ ${CLAUDE_SKILL_DIR}/
 │   ├── hwp_to_hwpx_hancom.py    # ★ HWP → HWPX 변환 (Workflow K 1차: 한컴 COM SaveAs, Windows 최우선)
 │   ├── convert_hwp.py           # HWP(바이너리) → HWPX 변환 (Workflow K 폴백: jkf87 순수 Python)
 │   ├── writing_optimizer.py     # ★ 공공기관 보고서 글쓰기 자동 변환 (Workflow P, public-doc-to-hwpx 포팅)
+│   ├── gongmun_lint.py          # 공문서 표기법 검수 (행정업무운영 편람, kordoc 규칙 이식, 표준 라이브러리만)
 │   ├── add_equation.py          # ★ 한컴 네이티브 수식 개체 삽입 (본문·표 셀, 규칙 39)
 │   └── office/{unpack,pack}.py
 ├── editor/                    # ★ 에디터 모드: rhwp 에디터로 사용자와 실시간 공동 편집 (references/editor-mode.md)
@@ -351,7 +352,13 @@ python3 "${CLAUDE_SKILL_DIR}/scripts/fix_namespaces.py" result.hwpx
 
 # 4. 검증
 python3 "${CLAUDE_SKILL_DIR}/scripts/validate.py" result.hwpx
+
+# 5. (공문, 계획서, 가정통신문, 보고서) 표기법 검수 — 행정업무운영 편람의 날짜, 시간, 금액, 붙임, 쌍점, 물결표,
+#    두음법칙, 외래어, 차별 표현. 조언용이라 생성을 막지 않는다. 위반은 원고에서 고치고 다시 빌드한다
+python3 "${CLAUDE_SKILL_DIR}/scripts/gongmun_lint.py" result.hwpx --document
 ```
+> 표 칸 글은 서식 라벨이 섞여 쌍점, 하이픈 날짜 규칙에서 뺀다. 원고(md, txt)를 먼저 검사해도 된다(`gongmun_lint.py 원고.md`).
+> 출처: kordoc(MIT) 규칙을 표준 라이브러리로 옮김 — `THIRD_PARTY_NOTICES.md` 7절.
 
 ### 같은 날 여러 번 빌드할 때 (파일명 순번)
 

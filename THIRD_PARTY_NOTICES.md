@@ -199,6 +199,48 @@ SOFTWARE.
 
 ---
 
+## 7. chrisryugj/kordoc
+
+- **저장소**: https://github.com/chrisryugj/kordoc
+- **저작권**: Copyright (c) 2026 chrisryugj
+- **라이선스**: MIT License
+
+### 참조·이식 범위 (2026-09-28, kordoc v4.15.7 기준)
+
+| 스킬 내 파일 | 참조한 kordoc 파일 | 이식 내용 |
+|--------------|--------------------|-----------|
+| `scripts/gongmun_lint.py` | `src/hwpx/gongmun-lint.ts` | 공문서 표기법 규칙(날짜, 시간, 금액, 붙임, 물결표와 까지, 외국어 병기, 쌍점, 금액 한글 병기, 물결표 띄어쓰기, 두음법칙, 외래어, 차별 표현, 「끝.」 누락)과 외래어, 순화어 사전을 파이썬 표준 라이브러리로 옮김. 길이가 바뀌는 뒤 보기는 일치 뒤 앞 글 검사로 바꿈. AI 문체 규칙 두 개(줄표, 굵게 남용)는 옮기지 않음. 규칙의 원전은 2절 jkf87/hwpx-skill 의 gonmun_lint.py 이다. |
+
+> 실행 때 kordoc 패키지나 네트워크를 쓰지 않는다. 같은 원고에 두 구현을 돌려 옮기지 않은 두 규칙 외에는 위반 건수가 같음을 확인했다(교육부 공문 1건 44건, 계획서 1건 7건).
+
+### 라이선스 전문 (MIT License)
+
+```
+MIT License
+
+Copyright (c) 2026 chrisryugj
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+---
+
 ## 문의
 
 추가 고지·수정 요청이 있으면 이슈로 알려주세요.
