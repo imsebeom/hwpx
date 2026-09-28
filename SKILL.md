@@ -35,6 +35,8 @@ ${CLAUDE_SKILL_DIR}/
 │   ├── convert_hwp.py           # HWP(바이너리) → HWPX 변환 (Workflow K 폴백: jkf87 순수 Python)
 │   ├── writing_optimizer.py     # ★ 공공기관 보고서 글쓰기 자동 변환 (Workflow P, public-doc-to-hwpx 포팅)
 │   ├── gongmun_lint.py          # 공문서 표기법 검수 (행정업무운영 편람, kordoc 규칙 이식, 표준 라이브러리만)
+│   ├── seal_hwpx.py             # 도장 날인: 「(인)」, 「(서명)」 위에 도장 그림을 글 앞으로 (kordoc 이식)
+│   ├── chart_hwpx.py            # 한글 네이티브 차트 삽입: JSON, CSV 자료로 막대, 선, 원 등 20종 (kordoc 이식)
 │   ├── add_equation.py          # ★ 한컴 네이티브 수식 개체 삽입 (본문·표 셀, 규칙 39)
 │   └── office/{unpack,pack}.py
 ├── editor/                    # ★ 에디터 모드: rhwp 에디터로 사용자와 실시간 공동 편집 (references/editor-mode.md)
@@ -116,6 +118,8 @@ pip install python-hwpx lxml --break-system-packages
  ├─ "{학교명}/{담당자} 일괄 치환 (양식 표 셀 포함)" → 워크플로우 L (zip-level 전역 치환)
  ├─ "빨간 글씨 일괄 검정으로/스타일별 부분 치환" → 워크플로우 M (스타일 필터 치환)
  ├─ "학생 작품 첨삭 메모 자동 삽입" → 워크플로우 N (자동 첨삭 메모)
+ ├─ "서식에 도장 찍어줘/날인" → 도장 날인 (seal_hwpx.py, 아래 「도장 날인과 차트」)
+ ├─ "표 자료로 차트/그래프 넣어줘" → 네이티브 차트 (chart_hwpx.py, 같은 절)
  ├─ "레퍼런스 양식 그대로/쪽수 동일하게 만들어줘" → 워크플로우 O (레퍼런스 99% 복원 + 쪽수 가드)
  └─ "HWPX 읽어줘" → 워크플로우 E (읽기/추출)
 ```
@@ -325,6 +329,24 @@ os.replace(tmp, str(HWPX))
 # 4. 후처리
 subprocess.run([sys.executable, str(SKILL_DIR/"scripts/fix_namespaces.py"), str(HWPX)], check=True)
 ```
+
+### 도장 날인과 차트 (kordoc 이식, 표준 라이브러리만)
+
+```bash
+# 도장: 문구 위에 글 앞 그림으로 띄운다. 칸과 쪽 높이는 그대로다. 결과(JSON)의 warnings 를 본다
+python3 "${CLAUDE_SKILL_DIR}/scripts/seal_hwpx.py" 서식.hwpx 날인본.hwpx --image 도장.png \
+  --anchor "(인)" --occurrence all        # 0, 0,2, all. --mode right 는 문구 오른쪽, --size mm, --dx/--dy mm
+
+# 차트: 그림이 아니라 한글에서 고칠 수 있는 차트. 자료는 .json, .csv, kordoc 펜스 글
+python3 "${CLAUDE_SKILL_DIR}/scripts/chart_hwpx.py" 문서.hwpx 차트본.hwpx --data 자료.csv \
+  --type line --anchor "<그림 1>" --size 120x60
+```
+> 도장은 투명 배경 PNG 를 쓴다. 세로 위치는 저장된 줄 배치로 잡으므로 한글로 저장한 적 없는 생성본은
+> `fix_namespaces.py`(한글 줄 배치 넣기)를 먼저 거친다. **쪽을 넘는 긴 칸 뒤쪽의 문구는 한글이 도장을 앞 쪽에 걸거나
+> 그리지 않는다**(경고가 뜬다) — PDF 로 확인하고, 필요하면 그 칸을 나누거나 손으로 찍는다.
+> 차트 종류: column, column_stacked, line, bar, bar_stacked, scatter, pie, pie_explode, doughnut, area,
+> area_stacked, radar, bar3d, pie3d(한글 이름 막대, 선, 원, 도넛 등도 된다). 원은 첫 계열만 쓴다.
+> 한글 PDF 로 14종을 확인했다(2026-09-28).
 
 ### section0.xml 핵심 규칙
 

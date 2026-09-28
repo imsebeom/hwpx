@@ -210,8 +210,12 @@ SOFTWARE.
 | 스킬 내 파일 | 참조한 kordoc 파일 | 이식 내용 |
 |--------------|--------------------|-----------|
 | `scripts/gongmun_lint.py` | `src/hwpx/gongmun-lint.ts` | 공문서 표기법 규칙(날짜, 시간, 금액, 붙임, 물결표와 까지, 외국어 병기, 쌍점, 금액 한글 병기, 물결표 띄어쓰기, 두음법칙, 외래어, 차별 표현, 「끝.」 누락)과 외래어, 순화어 사전을 파이썬 표준 라이브러리로 옮김. 길이가 바뀌는 뒤 보기는 일치 뒤 앞 글 검사로 바꿈. AI 문체 규칙 두 개(줄표, 굵게 남용)는 옮기지 않음. 규칙의 원전은 2절 jkf87/hwpx-skill 의 gonmun_lint.py 이다. |
+| `scripts/seal_hwpx.py` | `src/form/seal.ts` | 도장 날인. 문구 위에 글 앞 그림(treatAsChar=0, flowWithText=0, allowOverlap=1)을 띄우는 방식, 글자 폭 어림(한글 1em, ASCII 0.5em), 정렬 이동, 앞 칸 폭 더하기, 이미지 형식 확인을 옮김. 한글 PDF 실측으로 고친 곳: 칸 문단은 세로를 표 위에서 재므로 앞 행 높이와 칸 위 여백을 더함, 저장된 줄 배치로 문구 줄을 찾음, 고정폭 빈칸 0.25em, 장평과 자간 반영, 쪽을 넘는 표 경고, 기본값을 문구 위 겹치기로. |
+| `scripts/chart_hwpx.py` | `src/hwpx/chart-gen.ts` | 한글 네이티브 차트(Chart/chartN.xml 의 OOXML chartSpace, content.hpf 등록, 본문 hp:chart). 종류 20가지 표, 펜스 파싱, 계열 조립을 옮김. 원 3D 는 firstSliceAng 을 빼고 view3D 를 넣어야 한글이 그려 고쳤다. JSON, CSV 입력과 문구 뒤 삽입은 새로 넣음. |
 
 > 실행 때 kordoc 패키지나 네트워크를 쓰지 않는다. 같은 원고에 두 구현을 돌려 옮기지 않은 두 규칙 외에는 위반 건수가 같음을 확인했다(교육부 공문 1건 44건, 계획서 1건 7건).
+>
+> kordoc 의 차트 조립과 종류 표, 날인 방식은 DoHyun468/claw-hwp(https://github.com/DoHyun468/claw-hwp, MIT License, Copyright (c) 2026 DoHyun468)의 hwpx-edit.js(buildChartSpace, opInsertChart, placeSeal)를 옮긴 것이다. 두 스크립트는 그 파생물이므로 claw-hwp 의 저작권도 함께 밝힌다(라이선스 문구는 아래 MIT 전문과 같고 저작권자만 다르다).
 
 ### 라이선스 전문 (MIT License)
 
