@@ -75,15 +75,13 @@
                     || (style.page_break_before && !starts_band)
             })
 // ==== next ====
-    let reached_end = edit_context && host_index + line_segs.len() == paragraphs.len();
-    (!line_segs.is_empty() && (frame.top >= exclusion_end || ended_at_break || reached_end))
+    (!line_segs.is_empty() && (frame.top >= exclusion_end || ended_at_break))
         .then_some(PictureBandLayout {
         paragraph_range: host_index..host_index + line_segs.len(),
 // ==== replace ====
-    let reached_end = edit_context && band_start + line_segs.len() == paragraphs.len();
     // 띠가 호스트에 닿기 전에 끝나면(앞 문단만 걸친 경우도 호스트는 띠에 넣어야 한다) 호스트까지 이어진 경우만 받는다
     (!line_segs.is_empty()
         && band_start + line_segs.len() > host_index
-        && (frame.top >= exclusion_end || ended_at_break || reached_end))
+        && (frame.top >= exclusion_end || ended_at_break))
         .then_some(PictureBandLayout {
         paragraph_range: band_start..band_start + line_segs.len(),
