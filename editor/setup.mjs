@@ -270,6 +270,11 @@ const RUST_PATCHES = [
     ['wrap-behind-advance', 'src/renderer/layout.rs'],
     ['wrap-band-host-ladder', 'src/renderer/layout.rs'],
     ['wrap-band-owner-pub', 'src/document_core/commands/text_editing.rs'],
+    ['wrap-band-page-end', 'src/renderer/composer/line_breaking.rs'],
+    ['wrap-split-follower', 'src/renderer/layout/paragraph_layout.rs'],
+    ['wrap-margin-box', 'src/renderer/float_placement.rs'],
+    ['wrap-props-release', 'src/document_core/commands/object_ops/picture.rs'],
+    ['wrap-tab-empty-host', 'src/renderer/composer/line_breaking.rs'],
     ['wrap-text-flow-props', 'src/document_core/commands/object_ops/picture.rs'],
   ].flatMap(([id, file]) => fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
     .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b, i) => {

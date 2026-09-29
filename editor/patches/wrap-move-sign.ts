@@ -31,14 +31,20 @@
       if (p0.horzAlign === 'Right' || p0.horzAlign === 'Outside') signH = -1;
       if (p0.vertAlign === 'Bottom' || p0.vertAlign === 'Outside') signV = -1;
     }
+    // 한글은 문단 기준 개체의 음수 세로 거리를 0 으로 눌러 그린다(한글 PDF 실측 7건) — 끄는 동안 0 아래로 내려가지 않게 한다.
+    // 실제로 바뀐 만큼만 쌓아 되돌리기 기록과 맞춘다
+    let appliedV = deltaV * signV;
     for (const ref of targets) {
       const props = getObjectProperties.call(this, ref);
+      let nextV = props.vertOffset + deltaV * signV;
+      if (!this.pictureMoveState.multiRefs && props.vertRelTo === 'Para' && nextV < 0) nextV = 0;
+      if (!this.pictureMoveState.multiRefs) appliedV = nextV - props.vertOffset;
       setObjectProperties.call(this, ref, {
         horzOffset: props.horzOffset + deltaH * signH,
-        vertOffset: props.vertOffset + deltaV * signV,
+        vertOffset: nextV,
       });
     }
     this.pictureMoveState.lastPageX = px;
     this.pictureMoveState.lastPageY = py;
     this.pictureMoveState.totalDeltaH += deltaH * signH;
-    this.pictureMoveState.totalDeltaV += deltaV * signV;
+    this.pictureMoveState.totalDeltaV += appliedV;
