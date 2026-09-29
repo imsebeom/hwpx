@@ -400,6 +400,19 @@ for (const [file, patch] of [['input-handler-table.ts', 'move-drop-table.ts'], [
   }
 }
 
+// 그림 속성의 「본문과의 배치」 단추를 아이콘 대신 글자로(patches/wrap-text-labels.ts)
+{
+  const f = path.join(STUDIO, 'src', 'ui', 'picture-props-dialog.ts');
+  let src = fs.readFileSync(f, 'utf8');
+  if (!src.includes('[claude-hwpx wrap-text-labels]')) {
+    const [find, replace] = fs.readFileSync(path.join(HERE, 'patches', 'wrap-text-labels.ts'), 'utf8').replace(/\r\n/g, '\n')
+      .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== replace ====\n');
+    const eol = (s) => (src.includes('\r\n') ? s.replace(/\r?\n/g, '\r\n') : s);
+    if (src.split(eol(find)).length !== 2) throw new Error('picture-props-dialog.ts 에서 패치 자리(wrap-text-labels)를 하나로 못 찾았다');
+    fs.writeFileSync(f, src.replace(eol(find), eol(replace.replace(/\n$/, ''))));
+  }
+}
+
 // 4. 빌드
 if (!fs.existsSync(path.join(STUDIO, 'node_modules'))) sh('npm ci --no-audit --no-fund', STUDIO);
 const nodeBin = (rel, ...args) => exec(process.execPath, [path.join(STUDIO, 'node_modules', rel), ...args], { cwd: STUDIO });
