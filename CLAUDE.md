@@ -66,7 +66,10 @@
     검증: 관련 단위 시험 91건, 전체 `cargo test --lib` 3,889 통과(빠른 경로 패치 전 기준), 실제 창에서 타이핑/Backspace/본문 위치 오른쪽/되돌리기, 저장본 verify 통과와 한글 PDF 동일,
     실사용 8개 문서 열기 SVG 7개 바이트 동일(c5 글 뒤로 두 쪽만 바뀜, 한글 PDF 쪽으로), edit_flow 실패(c2 패닉, c4 1, c8 3)는 패치 걷은 기준 WASM 에서도 같음
     도구(scratchpad `wrap/`): build.py·build_ref.py(시험 문서), grid.py(한글|열기|편집), apply.mjs, wrapswap.mjs off|on, patchcheck.mjs(깨끗한 v0.8.6 에 패치 목록 재적용 대조), 예제 `.build/rhwp/examples/claude_wrap_edit.rs`
-  - 남은 것: ① 한글은 그림을 바깥 여백(보통 1mm)만큼 안쪽에 그리는데 rhwp 는 여백 없이 그려 모든 비TAC 그림이 3.8px 높다(표, 도형 공용 계산이라 범위 밖) ② 줄 배치 없는 문서(한글을 안 거친 산출물)를 열 때의 어울림은 손대지 않음(에디터 서버가 한글 줄 배치로 보정) ③ `.build/rhwp/pkg-base`(기준 WASM) 삭제가 권한에 막혀 남아 있음 ④ rhwp 이슈로 올릴지 미정
+  - 남은 것: ① 한글은 그림을 바깥 여백(보통 1mm)만큼 안쪽에 그리는데 rhwp 는 여백 없이 그려 모든 비TAC 그림이 3.8px 높다(표, 도형 공용 계산이라 범위 밖) ② 줄 배치 없는 문서(한글을 안 거친 산출물)를 열 때의 어울림은 손대지 않음(에디터 서버가 한글 줄 배치로 보정) ③ `.build/rhwp/pkg-base`(기준 WASM) 삭제가 권한에 막혀 남아 있음
+  - 마무리: 스킬 f082aa1..4f48723 을 hwpx, hwpx2 에 푸시. **rhwp 이슈 #7484** 게시(재현 파일 base64 포함, md5 074e1ca4 대조, 원인 7가지와 devel 0e8fd49fb 줄 번호, 우회 패치 링크, 관련 #7282 #6970 #7481).
+    게시 전 기준 WASM(`pkg-base`)으로 재현 파일이 결함을 내는지 확인: 왼쪽/오른쪽/쪽 기준 조각 20, 18 → 15, `replaceBodyTextLocal` 18 → 15. 본문 사본 scratchpad `wrap/issue_body.md`
+  - next_steps: `gh issue view 7484 -R edwardkim/rhwp --comments` 로 답 확인. 받아들여져 릴리스되면 `patches/wrap-*` 를 걷고 RHWP_VERSION 올려 재빌드
 - **09-29 둘째**: 사용자 지시 「한글 파일을 만들고 나면 마지막엔 에디터로 연다」 → 스킬 ea95324(푸시 안 함). SKILL.md 결정 트리 머리에 「마지막 단계는 에디터로 열기」(묻지 않음, 여럿이면 최종본 하나, 읽기 E 제외), 워크플로 A [9], editor-mode.md 1절.
   `cli.mjs start` 가 떠 있는 창에 저장 안 한 편집이 있으면 session.json 을 바꾸기 전에 멈춘다(`--force`). 시험 인스턴스로 dirty 차단, 세션 불변, --force, 깨끗한 상태 재열기 확인
 - **09-29 셋째**: 한국문화 교재 통합본(567MB, 그림 486장)이 에디터에서 안 열렸다 — `/api/doc` 의 base64 가 V8 문자열 상한 초과. 스킬 fe5bee5, 394b83b(푸시 안 함).
