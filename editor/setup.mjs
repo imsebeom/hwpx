@@ -250,6 +250,27 @@ const RUST_PATCHES = [
     const [find, replace] = fs.readFileSync(path.join(HERE, 'patches', 'sel-left-at-glyph.rs'), 'utf8').replace(/\r\n/g, '\n').split('\n// ==== replace ====\n');
     return { id: 'sel-left-at-glyph', file: 'src/document_core/queries/cursor_nav.rs', find: find.replace(/^\/\/ ==== find ====\n/, ''), replace, done: '[claude-hwpx sel-left-at-glyph]' };
   })(),
+  // 글자처럼 취급하지 않는 그림의 본문 배치 — 편집 뒤에도 글이 그림을 비키게(patches/wrap-*.rs).
+  // 파일 하나에 조각 여럿(// ==== next ====). 이미 들어간 조각은 바꾼 글이 소스에 있는지로 안다
+  ...[
+    ['wrap-band-fragment', 'src/renderer/height_measurer.rs'],
+    ['wrap-side-policy', 'src/renderer/layout_frame.rs'],
+    ['wrap-exclusion', 'src/renderer/float_placement.rs'],
+    ['wrap-exclusion-tests', 'src/renderer/float_placement.rs'],
+    ['wrap-page-exclusion', 'src/renderer/float_placement.rs'],
+    ['wrap-page-band', 'src/renderer/composer/line_breaking.rs'],
+    ['wrap-band-lead', 'src/document_core/commands/text_editing.rs'],
+    ['wrap-page-edit', 'src/document_core/commands/text_editing.rs'],
+    ['wrap-local-edit', 'src/document_core/commands/text_editing.rs'],
+    ['wrap-para-offset', 'src/renderer/layout.rs'],
+    ['wrap-behind-advance', 'src/renderer/layout.rs'],
+    ['wrap-text-flow-props', 'src/document_core/commands/object_ops/picture.rs'],
+  ].flatMap(([id, file]) => fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
+    .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b, i) => {
+      const [find, replace] = b.split('\n// ==== replace ====\n');
+      const r = replace.replace(/\n$/, '');
+      return { id: i ? `${id}-${i}` : id, file, find, replace: r, done: r };
+    })),
 ];
 const builtMark = path.join(pkgDir, '.claude-patched');
 const builtIds = fs.existsSync(builtMark) ? fs.readFileSync(builtMark, 'utf8') : '';
@@ -257,7 +278,7 @@ if (hasRust && RUST_PATCHES.some((p) => !builtIds.includes(p.id))) {
   for (const p of RUST_PATCHES) {
     const f = path.join(RHWP, p.file);
     let src = fs.readFileSync(f, 'utf8');
-    if (src.includes(p.done)) continue;
+    if (src.replace(/\r\n/g, '\n').includes(p.done)) continue;
     const eol = (s) => (src.includes('\r\n') ? s.replace(/\r?\n/g, '\r\n') : s);   // 태그 판 소스는 CRLF 다
     const at = eol(p.anchor ?? p.find);
     if (!src.includes(at)) throw new Error(`${p.file} 에서 패치 자리(${p.id})를 못 찾았다 — rhwp 버전이 바뀌었는지 확인`);
@@ -400,17 +421,20 @@ for (const [file, patch] of [['input-handler-table.ts', 'move-drop-table.ts'], [
   }
 }
 
-// 그림 속성의 「본문과의 배치」 단추를 아이콘 대신 글자로(patches/wrap-text-labels.ts)
-{
+// 그림 속성의 「본문과의 배치」 단추를 아이콘 대신 글자로(patches/wrap-text-labels.ts), 「본문 위치」 고르기(wrap-text-flow.ts)
+for (const id of ['wrap-text-labels', 'wrap-text-flow']) {
   const f = path.join(STUDIO, 'src', 'ui', 'picture-props-dialog.ts');
   let src = fs.readFileSync(f, 'utf8');
-  if (!src.includes('[claude-hwpx wrap-text-labels]')) {
-    const [find, replace] = fs.readFileSync(path.join(HERE, 'patches', 'wrap-text-labels.ts'), 'utf8').replace(/\r\n/g, '\n')
-      .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== replace ====\n');
-    const eol = (s) => (src.includes('\r\n') ? s.replace(/\r?\n/g, '\r\n') : s);
-    if (src.split(eol(find)).length !== 2) throw new Error('picture-props-dialog.ts 에서 패치 자리(wrap-text-labels)를 하나로 못 찾았다');
-    fs.writeFileSync(f, src.replace(eol(find), eol(replace.replace(/\n$/, ''))));
+  if (src.includes(`[claude-hwpx ${id}]`)) continue;
+  const eol = (s) => (src.includes('\r\n') ? s.replace(/\r?\n/g, '\r\n') : s);
+  const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.ts`), 'utf8').replace(/\r\n/g, '\n')
+    .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n');
+  for (const b of blocks) {
+    const [find, replace] = b.split('\n// ==== replace ====\n');
+    if (src.split(eol(find)).length !== 2) throw new Error(`picture-props-dialog.ts 에서 패치 자리(${id})를 하나로 못 찾았다`);
+    src = src.replace(eol(find), () => eol(replace.replace(/\n$/, '')));
   }
+  fs.writeFileSync(f, src);
 }
 
 // 4. 빌드
