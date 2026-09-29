@@ -26,19 +26,25 @@
                     .picture_band_owning_body_paragraph(section_idx, parent_para_idx)
                     .filter(|(owner, _, _)| *owner == parent_para_idx)
                     .map(|(_, range, _)| range);
-                let from = new_band.as_ref().map_or(old.start, |range| range.end.max(old.start + 1));
-                if from < old.end {
+                // 띠 앞쪽(쪽 기준 그림이 내려가 빠진 앞 문단, wrap-band-backward)과 뒤쪽에서 빠진 문단
+                let released: Vec<usize> = match &new_band {
+                    Some(new) => (old.start..new.start.min(old.end))
+                        .chain(new.end.max(old.start)..old.end)
+                        .collect(),
+                    None => (old.start..old.end).collect(),
+                };
+                if let (Some(&first), Some(&last)) = (released.first(), released.last()) {
                     let stored_end = crate::renderer::composer::paragraph_flow_end(
-                        &self.document.sections[section_idx].paragraphs[from],
+                        &self.document.sections[section_idx].paragraphs[first],
                     );
-                    for idx in from..old.end {
+                    for &idx in &released {
                         self.reflow_paragraph(section_idx, idx);
                     }
                     let hwp3 = self.document.layout_profile().hwp3_layout();
                     crate::renderer::composer::recalculate_section_vpos(
                         &mut self.document.sections[section_idx].paragraphs,
-                        from,
-                        Some(from..old.end),
+                        first,
+                        Some(first..(last + 1).max(old.end)),
                         stored_end,
                         &self.styles,
                         self.dpi,

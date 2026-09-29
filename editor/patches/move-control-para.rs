@@ -100,7 +100,8 @@
         // 옛 띠의 호스트 뒤 문단들: 옮긴 뒤 번호로 바꿔 폭 전체로 다시 나눈다(새 띠에 드는 문단은 아래 재투영이 다시 좁힌다)
         let mut released = Vec::new();
         if let Some(range) = old_band {
-            for old in range.start + 1..range.end {
+            // 띠는 호스트보다 앞 문단에서 시작할 수 있다(wrap-band-backward) — 호스트만 빼고 모두 푼다
+            for old in (range.start..range.end).filter(|&index| index != para_idx) {
                 let shifted = if sole && old > para_idx { old - 1 } else { old };
                 let now = if shifted >= insert_at { shifted + 1 } else { shifted };
                 if now < self.document.sections[section_idx].paragraphs.len() {
