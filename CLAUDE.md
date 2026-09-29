@@ -57,7 +57,16 @@
   한글 저장본을 열면 7/9 맞음(문단 기준 세로 거리 그림은 약 2줄 아래, 글 뒤로는 다음 문단이 겹침). **그림 문단을 편집하면 어울림 큰 쪽과 글 앞으로만 맞고** 자리 차지, 양쪽, 왼쪽만, 오른쪽만, 쪽 기준은 글이 그림 밑으로 겹친다
   (`float_placement.rs resolve_picture_exclusion` 이 LeftOnly/RightOnly 를 빼고, 줄 배치를 다시 짜면 나머지도 비키지 않음). 배치 속성은 저장 시 보존돼 한글에서는 정상. 대화상자 「본문 위치」 목록은 스튜디오가 잠가 둠.
   사용자 지적 「아이콘을 이해 못 하겠다, 글자로」 → 스킬 f082aa1(푸시 안 함) `patches/wrap-text-labels.ts`: 단추를 글자로, 본문 위치는 다음 줄. 시험 창 캡처로 확인
-  - next_steps: 엔진 결함 넷(글 뒤로 겹침, 편집 뒤 비키기, 문단 기준 세로 위치, 본문 위치 목록 잠김) 중 무엇을 고칠지, rhwp 이슈로 올릴지 사용자 답 대기
+  - **이어서 「엔진고쳐」**(스킬 d7251aa, 4f48723, 푸시 안 함, `patches/wrap-*` 13개): 시험 9가지가 편집 뒤에도 한글 PDF 와 같은 모양
+    ① `wrap-band-fragment` 엔진이 새로 짠 좌우 조각(구현 비트)도 한 줄로 그림(FIRST/LAST 조각 표시로 판별) ② `wrap-side-policy`, `wrap-exclusion(-tests)` 자리 차지(단 폭 전체 제외), 왼쪽/오른쪽 정책
+    ③ `wrap-band-lead` recalculate_section_vpos 가 버리던 첫 줄 간격(그림 아래로 내려간 줄) 복원 ④ `wrap-page-*` 쪽/종이 기준 — 띠 함수 서명을 안 바꾸려고 thread_local 로 쪽 기하 전달
+    ⑤ 🔑 `wrap-local-edit` **스튜디오는 8자 이하 입력을 `replaceBodyTextLocal` 빠른 경로로 보낸다** — 노드 재현(insertText)은 통과했는데 실제 창 타이핑만 겹쳐서 찾음. 띠 문단이면 일반 삭제, 삽입으로 돌림
+    ⑥ `wrap-para-offset` 좁아진 첫 줄 추정에 세로 거리를 또 더하던 것(세로 거리 0 이면 종전대로) ⑦ `wrap-behind-advance` 글 뒤로 그림이 흐름을 문단 시작으로 되감던 것(빈 문단은 종전대로)
+    ⑧ `wrap-text-flow-props` + `wrap-text-flow.ts` 본문 위치 목록 풀기(엔진 JSON textFlow, 변경 감지에 text_flow)
+    검증: 관련 단위 시험 91건, 전체 `cargo test --lib` 3,889 통과(빠른 경로 패치 전 기준), 실제 창에서 타이핑/Backspace/본문 위치 오른쪽/되돌리기, 저장본 verify 통과와 한글 PDF 동일,
+    실사용 8개 문서 열기 SVG 7개 바이트 동일(c5 글 뒤로 두 쪽만 바뀜, 한글 PDF 쪽으로), edit_flow 실패(c2 패닉, c4 1, c8 3)는 패치 걷은 기준 WASM 에서도 같음
+    도구(scratchpad `wrap/`): build.py·build_ref.py(시험 문서), grid.py(한글|열기|편집), apply.mjs, wrapswap.mjs off|on, patchcheck.mjs(깨끗한 v0.8.6 에 패치 목록 재적용 대조), 예제 `.build/rhwp/examples/claude_wrap_edit.rs`
+  - 남은 것: ① 한글은 그림을 바깥 여백(보통 1mm)만큼 안쪽에 그리는데 rhwp 는 여백 없이 그려 모든 비TAC 그림이 3.8px 높다(표, 도형 공용 계산이라 범위 밖) ② 줄 배치 없는 문서(한글을 안 거친 산출물)를 열 때의 어울림은 손대지 않음(에디터 서버가 한글 줄 배치로 보정) ③ `.build/rhwp/pkg-base`(기준 WASM) 삭제가 권한에 막혀 남아 있음 ④ rhwp 이슈로 올릴지 미정
 - **09-29 둘째**: 사용자 지시 「한글 파일을 만들고 나면 마지막엔 에디터로 연다」 → 스킬 ea95324(푸시 안 함). SKILL.md 결정 트리 머리에 「마지막 단계는 에디터로 열기」(묻지 않음, 여럿이면 최종본 하나, 읽기 E 제외), 워크플로 A [9], editor-mode.md 1절.
   `cli.mjs start` 가 떠 있는 창에 저장 안 한 편집이 있으면 session.json 을 바꾸기 전에 멈춘다(`--force`). 시험 인스턴스로 dirty 차단, 세션 불변, --force, 깨끗한 상태 재열기 확인
 - **09-29 셋째**: 한국문화 교재 통합본(567MB, 그림 486장)이 에디터에서 안 열렸다 — `/api/doc` 의 base64 가 V8 문자열 상한 초과. 스킬 fe5bee5, 394b83b(푸시 안 함).
