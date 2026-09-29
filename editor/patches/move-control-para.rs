@@ -44,7 +44,29 @@
             let p = self.clipboard.take().and_then(|c| c.paragraphs.into_iter().next());
             self.clipboard = saved;
             copied?;
-            let p = p.ok_or_else(|| HwpError::RenderError("개체 복사 실패".to_string()))?;
+            let mut p = p.ok_or_else(|| HwpError::RenderError("개체 복사 실패".to_string()))?;
+            // [claude-hwpx move-float-line] 떠 있는 그림, 도형은 줄을 차지하지 않는다. 복사가 줄 높이를 개체 높이로
+            // 적어 두면 자리 차지 그림은 렌더러가 그림 높이만큼 흐름을 또 내려 그림 아래에 그림 높이만큼 빈 자리가 생겼다
+            // (2026-09-29 사용자 발견). 한글은 이 문단 줄을 보통 글자 줄로 적는다 — 원래 문단 첫 줄의 글자 규격을 옮긴다
+            let floating = match p.controls.first() {
+                Some(Control::Picture(pic)) => !pic.common.treat_as_char,
+                Some(Control::Shape(shape)) => !shape.common().treat_as_char,
+                _ => false,
+            };
+            if floating {
+                if let Some(line) = self.document.sections[section_idx].paragraphs[para_idx]
+                    .line_segs
+                    .first()
+                    .cloned()
+                {
+                    for seg in &mut p.line_segs {
+                        seg.line_height = line.line_height;
+                        seg.text_height = line.text_height;
+                        seg.baseline_distance = line.baseline_distance;
+                        seg.line_spacing = line.line_spacing;
+                    }
+                }
+            }
             self.delete_control_native(section_idx, para_idx, control_idx)?;
             (p, 0, dst)
         };
@@ -82,6 +104,10 @@
             self.dpi,
             hwp3,
         );
+        // [claude-hwpx move-band] 떠 있는 그림을 옮긴 새 문단은 뒤 문단들과 그림 띠를 이룬다. 다시 계산하지 않으면
+        // 어울림 그림 옆으로 흘러야 할 다음 문단이 폭 전체로 남아 그림 위에 겹쳤다. 그림 속성 변경과 같은 재투영을 탄다
+        // (띠를 만들 수 없는 배치면 조용히 지나간다)
+        let _ = self.apply_body_edit_through_picture_band(section_idx, insert_at, |_| {});
         self.recompose_section(section_idx);
         self.paginate_if_needed();
         Ok(format!("{{\"ok\":true,\"ppi\":{},\"ci\":{},\"moved\":true}}", insert_at, new_ci))

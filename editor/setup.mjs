@@ -217,6 +217,9 @@ const RUST_PATCHES = [
   // 표, 그림 끌어 옮기기를 놓을 때 개체를 그 문단 자리로 옮긴다(patches/move-control-para*.rs, 스튜디오 move-drop-line.ts)
   { id: 'move-control-para', file: 'src/document_core/commands/clipboard.rs', anchor: '    /// 컨트롤 객체(표, 이미지, 도형)를 내부 클립보드에 복사한다.\n    pub fn copy_control_native(',
     insert: fs.readFileSync(path.join(HERE, 'patches', 'move-control-para.rs'), 'utf8').replace(/\r\n/g, '\n'), done: '[claude-hwpx move-control-para] 본문 개체' },
+  // move-control-para.rs 안에 들어 있는 수정(떠 있는 그림, 도형 문단의 줄 높이). 이름을 목록에 두어 이 수정 전에 빌드한 WASM 을 다시 빌드하게 한다
+  { id: 'move-float-line', file: 'src/document_core/commands/clipboard.rs', find: '[claude-hwpx move-float-line]', replace: '', done: '[claude-hwpx move-float-line]' },
+  { id: 'move-band', file: 'src/document_core/commands/clipboard.rs', find: '[claude-hwpx move-band]', replace: '', done: '[claude-hwpx move-band]' },
   { id: 'move-control-para-wasm', file: 'src/wasm_api.rs', anchor: '    /// [claude-hwpx caret-axis] 켜 두는 동안',
     insert: fs.readFileSync(path.join(HERE, 'patches', 'move-control-para-wasm.rs'), 'utf8').replace(/\r\n/g, '\n'), done: 'js_name = moveControlToParagraph' },
   // 칸 안 두 그림 사이에 친 글이 둘째 그림 뒤로 가던 것(patches/insert-after-count-pos.rs, 나머지는 caret-axis-insert*, -helpers, -wasm, -bridge 안)
