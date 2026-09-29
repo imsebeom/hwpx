@@ -278,12 +278,16 @@ const RUST_PATCHES = [
     ['wrap-band-backward', 'src/renderer/composer/line_breaking.rs'],
     ['wrap-band-backward-edit', 'src/document_core/commands/text_editing.rs'],
     ['wrap-text-flow-props', 'src/document_core/commands/object_ops/picture.rs'],
-  ].flatMap(([id, file]) => fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
-    .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b, i) => {
-      const [find, replace] = b.split('\n// ==== replace ====\n');
-      const r = replace.replace(/\n$/, '');
-      return { id: i ? `${id}-${i}` : id, file, find, replace: r, done: r };
-    })),
+  ].flatMap(([id, file]) => {
+    const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
+      .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));
+    // 뒤 패치가 앞 패치의 코드를 고쳐 쓰기도 해서 「바꾼 글이 소스에 있는가」로는 이미 넣었는지 알 수 없다(다시 넣다가 멈추거나
+    // 두 번 넣었다). 첫 조각의 표식([claude-hwpx …])이 소스에 있으면 그 파일의 조각을 모두 넣은 것으로 본다
+    // 조각들은 한 묶음(blocks)으로 넣는다 — 조각마다 판단하면 첫 조각이 표식을 넣은 뒤 나머지 조각을 건너뛰었다
+    const marker = (blocks[0][1].match(/\[claude-hwpx [\w-]+\]/) ?? [])[0];
+    const parts = blocks.map(([find, replace]) => ({ find, replace: replace.replace(/\n$/, '') }));
+    return [{ id, file, blocks: parts, done: marker ?? parts[0].replace }];
+  }),
 ];
 const builtMark = path.join(pkgDir, '.claude-patched');
 const builtIds = fs.existsSync(builtMark) ? fs.readFileSync(builtMark, 'utf8') : '';
@@ -293,6 +297,14 @@ if (hasRust && RUST_PATCHES.some((p) => !builtIds.includes(p.id))) {
     let src = fs.readFileSync(f, 'utf8');
     if (src.replace(/\r\n/g, '\n').includes(p.done)) continue;
     const eol = (s) => (src.includes('\r\n') ? s.replace(/\r?\n/g, '\r\n') : s);   // 태그 판 소스는 CRLF 다
+    if (p.blocks) {
+      for (const [i, b] of p.blocks.entries()) {
+        if (src.split(eol(b.find)).length !== 2) throw new Error(`${p.file} 에서 패치 자리(${p.id} 조각 ${i + 1})를 하나로 못 찾았다 — rhwp 버전이 바뀌었거나 옛 패치가 남았다면 --clean`);
+        src = src.replace(eol(b.find), () => eol(b.replace));
+      }
+      fs.writeFileSync(f, src);
+      continue;
+    }
     const at = eol(p.anchor ?? p.find);
     if (!src.includes(at)) throw new Error(`${p.file} 에서 패치 자리(${p.id})를 못 찾았다 — rhwp 버전이 바뀌었는지 확인`);
     src = p.anchor ? src.replace(at, eol(p.insert) + at) : p.all ? src.split(at).join(eol(p.replace)) : src.replace(at, eol(p.replace));
