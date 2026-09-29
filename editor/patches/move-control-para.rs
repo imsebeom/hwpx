@@ -28,6 +28,12 @@
             _ => return Err(HwpError::RenderError("옮길 수 있는 개체가 아니다".to_string())),
         }
         let sole = host.controls.len() == 1 && host.text.trim().is_empty();
+        // [claude-hwpx move-release-band] 떠 있는 그림이 떠나면 그 그림 띠로 좁혀 둔 뒤 문단들이 옛 자리를 비운 채 남았다
+        // (두 번 옮기면 빈 자리와 흩어진 글자가 생겼다). 옮기기 전에 옛 띠 범위를 기억해 두었다가 옮긴 뒤 폭 전체로 다시 나눈다
+        let old_band = self
+            .picture_band_owning_body_paragraph(section_idx, para_idx)
+            .filter(|(owner, _, _)| *owner == para_idx)
+            .map(|(_, range, _)| range);
         if sole && (dst == para_idx || dst == para_idx + 1) {
             return Ok(format!("{{\"ok\":true,\"ppi\":{},\"ci\":{},\"moved\":false}}", para_idx, control_idx));
         }
@@ -91,14 +97,29 @@
         let insert_at = insert_at.min(paras.len());
         paras.insert(insert_at, moved);
         self.insert_composed_paragraph(section_idx, insert_at);
+        // 옛 띠의 호스트 뒤 문단들: 옮긴 뒤 번호로 바꿔 폭 전체로 다시 나눈다(새 띠에 드는 문단은 아래 재투영이 다시 좁힌다)
+        let mut released = Vec::new();
+        if let Some(range) = old_band {
+            for old in range.start + 1..range.end {
+                let shifted = if sole && old > para_idx { old - 1 } else { old };
+                let now = if shifted >= insert_at { shifted + 1 } else { shifted };
+                if now < self.document.sections[section_idx].paragraphs.len() {
+                    released.push(now);
+                }
+            }
+        }
+        for &idx in &released {
+            self.reflow_paragraph(section_idx, idx);
+        }
         self.document.sections[section_idx].raw_stream = None;
         // 옮긴 문단과 그 뒤 문단의 저장 세로 위치를 다시 매긴다. 옮긴 문단에 남은 옛 쪽 경계(vpos 0)는 무시한다
-        let from = insert_at.min(para_idx);
+        let from = released.iter().copied().fold(insert_at.min(para_idx), usize::min);
+        let touched_end = released.iter().copied().fold(insert_at + 1, |end, idx| end.max(idx + 1));
         let hwp3 = self.document.layout_profile().hwp3_layout();
         crate::renderer::composer::recalculate_section_vpos(
             &mut self.document.sections[section_idx].paragraphs,
             from,
-            Some(insert_at..insert_at + 1),
+            Some(insert_at.min(from)..touched_end),
             None,
             &self.styles,
             self.dpi,

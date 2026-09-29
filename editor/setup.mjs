@@ -220,6 +220,7 @@ const RUST_PATCHES = [
   // move-control-para.rs 안에 들어 있는 수정(떠 있는 그림, 도형 문단의 줄 높이). 이름을 목록에 두어 이 수정 전에 빌드한 WASM 을 다시 빌드하게 한다
   { id: 'move-float-line', file: 'src/document_core/commands/clipboard.rs', find: '[claude-hwpx move-float-line]', replace: '', done: '[claude-hwpx move-float-line]' },
   { id: 'move-band', file: 'src/document_core/commands/clipboard.rs', find: '[claude-hwpx move-band]', replace: '', done: '[claude-hwpx move-band]' },
+  { id: 'move-release-band', file: 'src/document_core/commands/clipboard.rs', find: '[claude-hwpx move-release-band]', replace: '', done: '[claude-hwpx move-release-band]' },
   { id: 'move-control-para-wasm', file: 'src/wasm_api.rs', anchor: '    /// [claude-hwpx caret-axis] 켜 두는 동안',
     insert: fs.readFileSync(path.join(HERE, 'patches', 'move-control-para-wasm.rs'), 'utf8').replace(/\r\n/g, '\n'), done: 'js_name = moveControlToParagraph' },
   // 칸 안 두 그림 사이에 친 글이 둘째 그림 뒤로 가던 것(patches/insert-after-count-pos.rs, 나머지는 caret-axis-insert*, -helpers, -wasm, -bridge 안)
@@ -267,6 +268,8 @@ const RUST_PATCHES = [
     ['wrap-local-edit', 'src/document_core/commands/text_editing.rs'],
     ['wrap-para-offset', 'src/renderer/layout.rs'],
     ['wrap-behind-advance', 'src/renderer/layout.rs'],
+    ['wrap-band-host-ladder', 'src/renderer/layout.rs'],
+    ['wrap-band-owner-pub', 'src/document_core/commands/text_editing.rs'],
     ['wrap-text-flow-props', 'src/document_core/commands/object_ops/picture.rs'],
   ].flatMap(([id, file]) => fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
     .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b, i) => {
@@ -424,9 +427,10 @@ for (const [file, patch] of [['input-handler-table.ts', 'move-drop-table.ts'], [
   }
 }
 
-// 그림 속성의 「본문과의 배치」 단추를 아이콘 대신 글자로(patches/wrap-text-labels.ts), 「본문 위치」 고르기(wrap-text-flow.ts)
-for (const id of ['wrap-text-labels', 'wrap-text-flow']) {
-  const f = path.join(STUDIO, 'src', 'ui', 'picture-props-dialog.ts');
+// 그림 속성의 「본문과의 배치」 단추를 아이콘 대신 글자로(patches/wrap-text-labels.ts), 「본문 위치」 고르기(wrap-text-flow.ts),
+// 오른쪽/아래 정렬 개체를 끄는 방향대로 옮기기(wrap-move-sign.ts)
+for (const [id, rel] of [['wrap-text-labels', 'ui/picture-props-dialog.ts'], ['wrap-text-flow', 'ui/picture-props-dialog.ts'], ['wrap-move-sign', 'engine/input-handler-picture.ts']]) {
+  const f = path.join(STUDIO, 'src', ...rel.split('/'));
   let src = fs.readFileSync(f, 'utf8');
   if (src.includes(`[claude-hwpx ${id}]`)) continue;
   const eol = (s) => (src.includes('\r\n') ? s.replace(/\r?\n/g, '\r\n') : s);
@@ -434,7 +438,7 @@ for (const id of ['wrap-text-labels', 'wrap-text-flow']) {
     .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n');
   for (const b of blocks) {
     const [find, replace] = b.split('\n// ==== replace ====\n');
-    if (src.split(eol(find)).length !== 2) throw new Error(`picture-props-dialog.ts 에서 패치 자리(${id})를 하나로 못 찾았다`);
+    if (src.split(eol(find)).length !== 2) throw new Error(`${rel} 에서 패치 자리(${id})를 하나로 못 찾았다`);
     src = src.replace(eol(find), () => eol(replace.replace(/\n$/, '')));
   }
   fs.writeFileSync(f, src);
