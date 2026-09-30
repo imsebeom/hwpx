@@ -30,6 +30,34 @@ class LayoutError(RuntimeError):
     pass
 
 
+def _pid_alive(pid):
+    """Windows 에서 os.kill(pid, 0) 은 프로세스를 끝내 버리므로 OpenProcess 로 살핀다."""
+    if os.name != "nt":
+        try:
+            os.kill(pid, 0)
+            return True
+        except OSError:
+            return False
+    import ctypes
+
+    k = ctypes.windll.kernel32
+    h = k.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+    if not h:
+        return False
+    code = ctypes.c_ulong()
+    ok = k.GetExitCodeProcess(h, ctypes.byref(code))
+    k.CloseHandle(h)
+    return bool(ok) and code.value == 259  # STILL_ACTIVE
+
+
+def _lock_owner_dead():
+    try:
+        pid = int(open(LOCK, encoding="ascii").read().strip() or 0)
+    except (OSError, ValueError):
+        return False
+    return pid > 0 and not _pid_alive(pid)
+
+
 def _acquire_lock(timeout=180):
     """한글 COM 을 한 번에 하나만 쓴다. 병렬 빌드가 동시에 부르면 인스턴스끼리 충돌한다."""
     start = time.time()
@@ -41,9 +69,9 @@ def _acquire_lock(timeout=180):
             return
         except FileExistsError:
             try:
-                if (
-                    time.time() - os.path.getmtime(LOCK) > 300
-                ):  # 죽은 프로세스가 남긴 잠금
+                # 죽은 프로세스가 남긴 잠금. 주인 PID 가 없으면 바로, 읽지 못하면 5분 뒤 지운다
+                # (2026-10-01 중단된 빌드가 남긴 잠금에 다음 빌드가 3분 넘게 멈췄다)
+                if _lock_owner_dead() or time.time() - os.path.getmtime(LOCK) > 300:
                     os.remove(LOCK)
                     continue
             except OSError:
