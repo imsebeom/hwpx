@@ -237,9 +237,12 @@ def style_section(s, ids, cp):
             r'(<hp:tc\b[^>]*?)borderFillIDRef="\d+"', rf'\1borderFillIDRef="{v}"', x
         )
 
+    name_ids = iter(range(980000, 989999))
+
     def fix_name(m):
         p = m.group(0).replace("§R ", "", 1)
-        return re.sub(r'paraPrIDRef="\d+"', f'paraPrIDRef="{cp["right_pp"]}"', p, count=1)
+        p = re.sub(r'paraPrIDRef="\d+"', f'paraPrIDRef="{cp["right_pp"]}"', p, count=1)
+        return p + empty.format(next(name_ids))  # 이름 줄 아래 한 줄 비움(사용자 확인)
 
     s = re.sub(r"<hp:p (?:(?!<hp:p )[\s\S])*?§R [\s\S]*?</hp:p>", fix_name, s)
 
