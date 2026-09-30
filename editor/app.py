@@ -7,9 +7,12 @@ pywebview 는 브라우저 단축키(Ctrl+F 찾기, Ctrl+P 인쇄, Ctrl+R 새로
     python app.py http://localhost:7780/ [창 제목]
 """
 
+import json
 import os
 import sys
 import threading
+import urllib.request
+from urllib.parse import urljoin
 
 import webview
 
@@ -82,3 +85,16 @@ webview.start(
         "확인을 누르면 저장하지 않고 닫습니다. 저장하려면 취소를 누르고 Ctrl+S 로 저장하세요."
     },
 )
+
+# 창이 닫히면 이 창이 붙어 있던 브리지 서버도 내린다(cli stop 과 같은 shutdown). 다시 열 때는 start 가 서버를 새로 띄운다
+try:
+    urllib.request.urlopen(
+        urllib.request.Request(
+            urljoin(url, "/api/cmd"),
+            data=json.dumps({"type": "shutdown"}).encode(),
+            method="POST",
+        ),
+        timeout=3,
+    )
+except OSError:
+    pass  # 서버가 이미 내려갔다
