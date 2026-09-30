@@ -60,7 +60,8 @@
   - 검증: 교재 폴더와 시험 문서 40개를 기준 WASM 과 대조, 1단원 두 판의 덧그림 2개만 빠짐. `cargo test --lib` 3,889 통과
   - ②번은 devel b19eb36c4 빌드(`~/.cache/rhwp-devel/latest`, worktree)에서도 재현 → **rhwp 이슈 #7492** 게시(재현 파일 base64, md5 dec6c6d4, 원인 줄 번호, 제안 코드)
   - 사용자 요청 「에디터가 닫힐 때 가상서버도 종료」 → 스킬 723d704: app.py 가 창이 닫혀 webview.start 가 돌아오면 서버에 shutdown. 시험 인스턴스 WM_CLOSE(scratchpad `closewin.py`)로 3초 안 종료 확인
-  - next_steps: ① #7492, #7484 답 확인 ② 스킬 43de199, 723d704 푸시 안 함 ③ 이미 떠 있던 에디터(옛 app.py)는 닫아도 서버가 남는다 — 342dcfbb(7782), 5d5551bf(7780)가 창 없이 떠 있었다
+  - 사용자 지시로 창 없이 남아 있던 서버를 모두 닫았다(5d5551bf 7780 은 `stop`, 342dcfbb 7782 는 이미 내려가 있었음). 떠 있는 에디터 없음
+  - next_steps: ① `gh issue view 7492 -R edwardkim/rhwp --comments`(#7484 도) 답 확인. 받아들여져 릴리스되면 `patches/cell-pic-split-dup.rs` 를 걷는다 ② 스킬 43de199, 723d704 를 hwpx, hwpx2 에 푸시할지 사용자에게 묻기 ③ `~/.cache/rhwp-devel/latest`(devel b19eb36c4 worktree)는 이슈 확인용이라 필요 없으면 `git worktree remove`
 - **09-29 ~ 09-30 밤샘(사용자 지시 「다른 사례들도 다 옮겨가면서 문제 해결해봐」)**: 떠 있는 그림 끌기, 옮기기 결함을 사례 대조로 잡았다. 스킬 5e17116..abea249(푸시 안 함)
   - 사용자가 찾은 것: 자리 차지 그림 한 문단 내리면 빈 자리(`move-float-line`), 어울림 그림 옮기면 겹침(`move-band`, `move-release-band`, `wrap-band-host-ladder`), 7쪽 끄는 방향 반대(`wrap-move-sign.ts`), 2쪽 아래 문단까지 끌면 겹침(`wrap-band-page-end`, `wrap-split-follower`)
   - 대조로 찾은 것: 거리/정렬을 바깥 여백 상자로(`wrap-margin-box`), 속성 변경 전 옛 띠 기억(`wrap-props-release`), 빈 문단 자리 차지는 띠 제외(`wrap-tab-empty-host`), 쪽 기준 그림을 제 문단 위로 올리면 앞 문단도 비킴(`wrap-band-backward*`), **저장본을 다시 열면 겹침**(`wrap-save-mark` 편집 줄에 비트 30 표시 + `wrap-save-band` 저장기가 표시 줄을 비트 떼고 남김)
