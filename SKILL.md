@@ -27,6 +27,7 @@ ${CLAUDE_SKILL_DIR}/
 │   ├── verify_hwpx.py         # ★ 서브에이전트 검수 도구 (+ zip bomb·secPr 완전성·글자 테두리 버그)
 │   ├── text_extract.py        # 텍스트 추출
 │   ├── md2hwpx.py             # 마크다운→HWPX 자동 변환
+│   ├── md2hwpx_design.py      # ★ 마크다운→디자인 입힌 HWPX (새 문서 기본, references/design-basics.md)
 │   ├── hwpx_modifier.py       # ★ 양식 세밀 수정 (+ collect_all_fields)
 │   ├── hwpx_form_filler.py    # ★ 양식 부분 추출/표 조작 (Workflow H)
 │   ├── hwpx_writer.py         # 줄간격 XML 생성 유틸리티
@@ -70,6 +71,7 @@ ${CLAUDE_SKILL_DIR}/
     ├── equation-syntax.md     # ★ 한컴 수식 스크립트 문법 — 검증한 토큰과 함정 3종 (규칙 39)
     ├── gaejosik-munche.md     # ★ 개조식 실측 — 층별 길이·종결 분포 (교육청 공문 16건 494줄)
     ├── writing-principles.md  # ★ 공공기관 보고서 작성 원칙 (개조식·두괄식·적의것들, public-doc-to-hwpx 포팅)
+    ├── design-basics.md       # ★ 기본 디자인 원칙: 절제된 한 가지 색, 위계 네 단계, 쓰기 칸, 이름 줄, 적용 범위, 알릴 것
     └── layout-rules.md        # ★ 레이아웃 최적화 규칙 + 자동 변환 표 (§8-1 장르 게이트, public-doc-to-hwpx 포팅)
 ```
 
@@ -110,7 +112,7 @@ pip install python-hwpx lxml --break-system-packages
 ```
 사용자 요청
  ├─ 이미 있는 문서를 고치는 일 → 먼저 "에디터로 보면서 작업할까요?" 묻는다 → 예: ★ 에디터 모드 (아래 절)
- ├─ "마크다운/텍스트/URL → HWPX" → 워크플로우 A (콘텐츠→HWPX)
+ ├─ "마크다운/텍스트/URL → HWPX" → 워크플로우 A (콘텐츠→HWPX). 학습지, 안내문 같은 한두 쪽 인쇄물은 ★ 기본 디자인(md2hwpx_design.py)
  ├─ "양식에 내용 채워줘" → ★ 양식 채우기 3단계 (템플릿 제작 → 사용자 확인 → 채우기)
  │                          그 다음 워크플로우 B/F/H/L 중 선택
  ├─ "HWPX 수정해줘" → 워크플로우 C (기존 문서 편집)
@@ -193,6 +195,25 @@ pip install python-hwpx lxml --break-system-packages
 
 > **government 표지·섹션 바**: `from hwpx_helpers import *` → `make_cover_page()` → `make_section_bar()` → `make_body_para()`
 > **본문만 필요한 경우(6개 템플릿 전부)**: `python3 md2hwpx.py input.md --template report --output out.hwpx` 직접 사용 가능
+
+### ★ 기본 디자인: md2hwpx_design.py (새 문서는 이것이 기본, 2026-10-01)
+
+> 🔑 **서식 규범이나 사용자 양식이 없는 새 문서(학습지, 평가지, 활동지, 안내문, 연수 자료 요약, 체크리스트)는
+> 맨 md2hwpx 표가 아니라 이 스크립트로 만든다**(사용자: 「늘 만드는 기본 표보다 예쁘다」). 원칙, 적용 범위, 쓰기 칸 작성법은
+> **[references/design-basics.md](references/design-basics.md) 를 먼저 읽는다.**
+> 🔴 **사용자는 알록달록한 것을 좋아하지 않는다.** 기본 `ink`(먹색) 한 가지 색이다. 과목별 색 구분은 요청할 때만.
+
+```bash
+python3 "${CLAUDE_SKILL_DIR}/scripts/md2hwpx_design.py" 학습지.md -o 학습지.hwpx            # 기본 ink
+python3 "${CLAUDE_SKILL_DIR}/scripts/md2hwpx_design.py" 학습지.md -o 학습지.hwpx --theme slate
+```
+
+- 입히는 것: `#` 제목 → 강조색 배너, `##` 절 → 옅은 색 띠와 왼쪽 굵은 선, 표 머리 옅은 색, 회색 표 선, 맑은 고딕, 절 앞 빈 줄
+- 저절로 처리하는 것: 이름 줄(학년, 반, 번, 이름) 오른쪽 정렬과 쓸 자리 확보, 표 셀 `<br>` 연쇄를 쓰기 칸 빈 줄로,
+  절 제목이 쪽 끝에 홀로 남지 않게, 짧은 표(15행 이하)는 나누지 않고 본문 순서 고정, 긴 표는 표 단위로 나누고 머리 행 반복
+- `fix_namespaces.py`(한글 줄 배치 포함)와 `validate.py` 까지 스스로 돌린다. 그 뒤 PDF 로 렌더해 눈으로 확인하고 에디터로 연다
+- **결과를 전할 때 디자인을 한두 줄로 알린다**(테마, 입힌 요소, 바꿀 수 있는 선택지) — 사용자가 고르고 고칠 수 있게
+- 공문, 기안문, 계획서(행정 서식 규범)와 사용자 양식 채우기에는 쓰지 않는다. 한 칸 표로 제목을 만들어 개요 번호와 차례에 잡히지 않으므로 긴 보고서에도 쓰지 않는다
 
 ### md2hwpx.py 사용법 (report/base 등 일반 템플릿)
 
