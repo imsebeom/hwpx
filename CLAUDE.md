@@ -58,7 +58,9 @@
   ② 문단이 쪽 경계에서 갈라져 그림 줄이 뒷조각에 있으면 앞조각도 그림 — devel 09-25 빌드에도 남음(재현 scratchpad `mkrepro.py` 채움 34줄). 원본 npm 0.8.6 에서도 재현, 우리 패치 탓 아님
   - 🔴 setup 은 패치 id 목록(`pkg/.claude-patched`)이 같으면 WASM 을 다시 빌드하지 않는다 — 이미 들어간 패치 내용만 고쳤으면 그 파일을 지우고 돌린다
   - 검증: 교재 폴더와 시험 문서 40개를 기준 WASM 과 대조, 1단원 두 판의 덧그림 2개만 빠짐. `cargo test --lib` 3,889 통과
-  - next_steps: ① 열린 에디터(포트 7781, 저장 안 한 편집 있음)는 옛 WASM — 사용자 저장 뒤 다시 띄워야 반영 ② ②번 결함을 최신 devel 에서 확인 후 rhwp 이슈 여부
+  - ②번은 devel b19eb36c4 빌드(`~/.cache/rhwp-devel/latest`, worktree)에서도 재현 → **rhwp 이슈 #7492** 게시(재현 파일 base64, md5 dec6c6d4, 원인 줄 번호, 제안 코드)
+  - 사용자 요청 「에디터가 닫힐 때 가상서버도 종료」 → 스킬 723d704: app.py 가 창이 닫혀 webview.start 가 돌아오면 서버에 shutdown. 시험 인스턴스 WM_CLOSE(scratchpad `closewin.py`)로 3초 안 종료 확인
+  - next_steps: ① #7492, #7484 답 확인 ② 스킬 43de199, 723d704 푸시 안 함 ③ 이미 떠 있던 에디터(옛 app.py)는 닫아도 서버가 남는다 — 342dcfbb(7782), 5d5551bf(7780)가 창 없이 떠 있었다
 - **09-29 ~ 09-30 밤샘(사용자 지시 「다른 사례들도 다 옮겨가면서 문제 해결해봐」)**: 떠 있는 그림 끌기, 옮기기 결함을 사례 대조로 잡았다. 스킬 5e17116..abea249(푸시 안 함)
   - 사용자가 찾은 것: 자리 차지 그림 한 문단 내리면 빈 자리(`move-float-line`), 어울림 그림 옮기면 겹침(`move-band`, `move-release-band`, `wrap-band-host-ladder`), 7쪽 끄는 방향 반대(`wrap-move-sign.ts`), 2쪽 아래 문단까지 끌면 겹침(`wrap-band-page-end`, `wrap-split-follower`)
   - 대조로 찾은 것: 거리/정렬을 바깥 여백 상자로(`wrap-margin-box`), 속성 변경 전 옛 띠 기억(`wrap-props-release`), 빈 문단 자리 차지는 띠 제외(`wrap-tab-empty-host`), 쪽 기준 그림을 제 문단 위로 올리면 앞 문단도 비킴(`wrap-band-backward*`), **저장본을 다시 열면 겹침**(`wrap-save-mark` 편집 줄에 비트 30 표시 + `wrap-save-band` 저장기가 표시 줄을 비트 떼고 남김)
