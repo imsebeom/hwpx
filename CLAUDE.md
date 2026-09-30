@@ -53,6 +53,12 @@
   - 도구: `~/.cache/rhwp-devel/cmp.mjs`(2쪽 글자 줄과 셀 상자), `allpages.mjs <pkg> <a> <b>`(전 쪽 글자 좌표 대조), `variants.py`, `winshot.py`(에디터 창을 앞으로 올리지 않고 PrintWindow 로 캡처 — 사용자 화면을 뺏지 않는다)
 
 ## 컨텍스트 앵커
+- **09-30 ~ 10-01**: 한국문화 1단원 마지막 쪽 그림이 두 번 보이던 것(사용자 보고) → 스킬 43de199(푸시 안 함) `patches/cell-pic-split-dup.rs`.
+  원인은 rhwp `table_partial.rs`(쪽을 넘는 표): ① 문단 끝 글자처럼 취급 그림이 `abs_pos < line_chars` 판정에 빠져 칸 왼쪽에 덧그려짐 — devel d5fbe8b5d(#7171)가 이미 같은 방식(`get_inline_shape_position`)으로 고침
+  ② 문단이 쪽 경계에서 갈라져 그림 줄이 뒷조각에 있으면 앞조각도 그림 — devel 09-25 빌드에도 남음(재현 scratchpad `mkrepro.py` 채움 34줄). 원본 npm 0.8.6 에서도 재현, 우리 패치 탓 아님
+  - 🔴 setup 은 패치 id 목록(`pkg/.claude-patched`)이 같으면 WASM 을 다시 빌드하지 않는다 — 이미 들어간 패치 내용만 고쳤으면 그 파일을 지우고 돌린다
+  - 검증: 교재 폴더와 시험 문서 40개를 기준 WASM 과 대조, 1단원 두 판의 덧그림 2개만 빠짐. `cargo test --lib` 3,889 통과
+  - next_steps: ① 열린 에디터(포트 7781, 저장 안 한 편집 있음)는 옛 WASM — 사용자 저장 뒤 다시 띄워야 반영 ② ②번 결함을 최신 devel 에서 확인 후 rhwp 이슈 여부
 - **09-29 ~ 09-30 밤샘(사용자 지시 「다른 사례들도 다 옮겨가면서 문제 해결해봐」)**: 떠 있는 그림 끌기, 옮기기 결함을 사례 대조로 잡았다. 스킬 5e17116..abea249(푸시 안 함)
   - 사용자가 찾은 것: 자리 차지 그림 한 문단 내리면 빈 자리(`move-float-line`), 어울림 그림 옮기면 겹침(`move-band`, `move-release-band`, `wrap-band-host-ladder`), 7쪽 끄는 방향 반대(`wrap-move-sign.ts`), 2쪽 아래 문단까지 끌면 겹침(`wrap-band-page-end`, `wrap-split-follower`)
   - 대조로 찾은 것: 거리/정렬을 바깥 여백 상자로(`wrap-margin-box`), 속성 변경 전 옛 띠 기억(`wrap-props-release`), 빈 문단 자리 차지는 띠 제외(`wrap-tab-empty-host`), 쪽 기준 그림을 제 문단 위로 올리면 앞 문단도 비킴(`wrap-band-backward*`), **저장본을 다시 열면 겹침**(`wrap-save-mark` 편집 줄에 비트 30 표시 + `wrap-save-band` 저장기가 표시 줄을 비트 떼고 남김)
