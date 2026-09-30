@@ -39,6 +39,10 @@
                     );
                     for &idx in &released {
                         self.reflow_paragraph(section_idx, idx);
+                        // 저장기가 남기게 표시(wrap-save-mark)
+                        for seg in &mut self.document.sections[section_idx].paragraphs[idx].line_segs {
+                            seg.tag |= 1 << 30;
+                        }
                     }
                     let hwp3 = self.document.layout_profile().hwp3_layout();
                     crate::renderer::composer::recalculate_section_vpos(

@@ -218,6 +218,18 @@ const RUST_PATCHES = [
   { id: 'move-control-para', file: 'src/document_core/commands/clipboard.rs', anchor: '    /// 컨트롤 객체(표, 이미지, 도형)를 내부 클립보드에 복사한다.\n    pub fn copy_control_native(',
     insert: fs.readFileSync(path.join(HERE, 'patches', 'move-control-para.rs'), 'utf8').replace(/\r\n/g, '\n'), done: '[claude-hwpx move-control-para] 본문 개체' },
   // move-control-para.rs 안에 들어 있는 수정(떠 있는 그림, 도형 문단의 줄 높이). 이름을 목록에 두어 이 수정 전에 빌드한 WASM 을 다시 빌드하게 한다
+  // 편집 줄 표시 비트(1 << 30, wrap-save-mark)는 저장 판단용이라 그림 띠 시험의 줄 비교에서 뺀다(여러 곳을 한꺼번에)
+  ...[32, 16].map((n) => {
+    const pad = ' '.repeat(n);
+    return {
+      id: `wrap-save-mark-tests-${n}`, file: 'src/document_core/commands/text_editing.rs', all: true,
+      find: `${pad}line.segment_width,\n${pad}line.tag,\n`,
+      // 표식 이름을 wrap-save-mark 와 다르게 둔다 — 같으면 이 조각이 먼저 들어가 본 패치(wrap-save-mark)가 건너뛰어졌다
+      replace: `${pad}line.segment_width,\n${pad}line.tag & !(1 << 30), // [claude-hwpx wrap-save-mark-tests] 표시 비트는 비교에서 뺀다\n`,
+      // 줄머리 줄바꿈까지 넣는다 — 짧은 들여쓰기 판이 긴 판의 부분 글이 되어 건너뛰지 않게
+      done: `\n${pad}line.tag & !(1 << 30), // [claude-hwpx wrap-save-mark-tests]`,
+    };
+  }),
   { id: 'move-float-line', file: 'src/document_core/commands/clipboard.rs', find: '[claude-hwpx move-float-line]', replace: '', done: '[claude-hwpx move-float-line]' },
   { id: 'move-band', file: 'src/document_core/commands/clipboard.rs', find: '[claude-hwpx move-band]', replace: '', done: '[claude-hwpx move-band]' },
   { id: 'move-release-band', file: 'src/document_core/commands/clipboard.rs', find: '[claude-hwpx move-release-band]', replace: '', done: '[claude-hwpx move-release-band]' },
@@ -277,6 +289,8 @@ const RUST_PATCHES = [
     ['wrap-tab-empty-host', 'src/renderer/composer/line_breaking.rs'],
     ['wrap-band-backward', 'src/renderer/composer/line_breaking.rs'],
     ['wrap-band-backward-edit', 'src/document_core/commands/text_editing.rs'],
+    ['wrap-save-band', 'src/serializer/hwpx/section.rs'],
+    ['wrap-save-mark', 'src/document_core/commands/text_editing.rs'],
     ['wrap-text-flow-props', 'src/document_core/commands/object_ops/picture.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')

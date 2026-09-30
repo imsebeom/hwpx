@@ -111,6 +111,10 @@
         }
         for &idx in &released {
             self.reflow_paragraph(section_idx, idx);
+            // 저장기가 남기게 표시(wrap-save-mark)
+            for seg in &mut self.document.sections[section_idx].paragraphs[idx].line_segs {
+                seg.tag |= 1 << 30;
+            }
         }
         self.document.sections[section_idx].raw_stream = None;
         // 옮긴 문단과 그 뒤 문단의 저장 세로 위치를 다시 매긴다. 옮긴 문단에 남은 옛 쪽 경계(vpos 0)는 무시한다
