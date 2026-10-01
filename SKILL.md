@@ -812,7 +812,11 @@ with HwpxModifier("양식.hwpx") as doc:
     doc.replace_text_by_index(5, "인덱스5의 새 텍스트")  # 인덱스 지정
     doc.replace_by_pattern(r'\d{4}년', '2026년')        # 정규식
 
-    # 들여쓰기 (한글 "왼쪽 10" = 1000 HWPUNIT)
+    # 🔑 개조식 본문(협의록, 보고서 회의 내용)은 수준마다 왼쪽 여백 10pt씩(2026-10-01 사용자 지시)
+    #    1. → 0, 가. → 10, - → 20, → → 30. [결정 사항] 아래 항목은 한 수준 들어간다
+    doc.set_outline_indent(10, table_index=0, row_index=5)
+
+    # 패턴을 직접 정할 때 (한글 "왼쪽 10" = 1000 HWPUNIT)
     doc.set_indent_rules({
         r'^[가-힣]\.': 1000,   # "가." "나." 등: 왼쪽 10
         r'^-': 2000,           # 하이픈 항목: 왼쪽 20
@@ -840,7 +844,8 @@ modify_hwpx_template(
 | `replace_text_by_index(idx, new)` | 특정 인덱스 위치 수정 |
 | `replace_by_pattern(pattern, repl)` | 정규식 패턴 기반 치환 |
 | `batch_replace(dict)` | 여러 텍스트 일괄 치환 |
-| `set_indent_rules(rules)` | 정규식 패턴별 들여쓰기 일괄 적용 |
+| `set_outline_indent(step_pt=10)` | **개조식 수준별 왼쪽 여백 기본값.** 1./가./1)/가) 번호와 -, → 를 읽어 수준마다 10pt씩 |
+| `set_indent_rules(rules)` | 정규식 패턴별 들여쓰기 일괄 적용(앞 공백 패턴 `^  -` 도 맞는다, 2026-10-01 전에는 `strip()` 때문에 안 맞았다) |
 | `set_paragraph_indent(text, left)` | 특정 텍스트 포함 문단 들여쓰기 |
 
 > **들여쓰기 단위**: 한글 "왼쪽 10" = 1000 HWPUNIT, 1mm = 283 HWPUNIT

@@ -416,11 +416,66 @@ class HwpxModifier:
             if not t:
                 continue
             for regex, prid in compiled:
-                if regex.match(t):
+                # 앞 공백으로 수준을 표시한 패턴(r'^  -')도 맞도록 원문과 둘 다 본다
+                if regex.match(texts) or regex.match(t):
                     if p.get('paraPrIDRef') != prid:
                         p.set('paraPrIDRef', prid)
                         modified += 1
                     break
+        return modified
+
+    OUTLINE_LABELS = [
+        (re.compile(r'^\[.+\]$'), 'bracket'),     # [결정 사항] [향후 계획]
+        (re.compile(r'^\d+\.'), 0),               # 1.
+        (re.compile(r'^[가-하]\.'), 1),            # 가.
+        (re.compile(r'^\d+\)'), 2),               # 1)
+        (re.compile(r'^[가-하]\)'), 3),            # 가)
+    ]
+
+    def set_outline_indent(self, step_pt: float = 10, table_index: int = -1,
+                           row_index: int = -1) -> int:
+        """
+        개조식 본문의 수준마다 왼쪽 여백을 step_pt(기본 10pt)씩 더한다(2026-10-01 사용자 지시, 20pt는 너무 넓어 10pt로).
+
+        수준: 「1.」 0, 「가.」 1, 「1)」 2, 「가)」 3. 「-」 항목은 바로 앞 번호 문단보다 한 수준,
+        「→」 부연은 그보다 한 수준 더 들어간다. 「[결정 사항]」 같은 대괄호 머리는 0이고,
+        그 아래 번호와 「-」는 한 수준 들어간다. 문단 앞 공백은 보지 않는다.
+        값은 _create_indent_style 단위(한글 UI 1pt = 100)로 넘긴다. 그 함수가 한글이 읽는 default 분기에 두 배를 넣는다(2026-10-01 한글 PDF 실측).
+
+        Returns:
+            변경된 문단 수
+        """
+        if self.header_tree is None:
+            raise RuntimeError("header.xml이 없습니다")
+        base = self._find_base_parapr()
+        base_id = base.get('id') if base is not None else '0'
+        unit = int(round(step_pt * 100))
+
+        modified, last, in_bracket = 0, 0, False
+        for p in self._get_all_paragraphs(table_index, row_index):
+            t = ''.join(x.text or '' for x in p.findall(f'.//{{{self.HP}}}t')).strip()
+            if not t:
+                continue
+            level = None
+            for regex, lv in self.OUTLINE_LABELS:
+                if regex.match(t):
+                    if lv == 'bracket':
+                        level, in_bracket, last = 0, True, 0
+                    else:
+                        level = lv + (1 if in_bracket else 0)
+                        last = level
+                    break
+            if level is None:
+                if t.startswith('-'):
+                    level = last + 1
+                elif t.startswith('→'):
+                    level = last + 2
+                else:
+                    level = 0
+            prid = base_id if level <= 0 else self._create_indent_style(level * unit)
+            if p.get('paraPrIDRef') != prid:
+                p.set('paraPrIDRef', prid)
+                modified += 1
         return modified
 
     def set_paragraph_indent(self, search_text: str, left_value: int) -> int:
