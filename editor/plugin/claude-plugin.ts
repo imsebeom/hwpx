@@ -143,7 +143,8 @@ function installTableClickSelect(host, getInputHandler) {
     c.exitCellSelectionMode?.();
     ih.cellSelectionRenderer?.clear();
     ih.exitPictureObjectSelectionIfNeeded?.();
-    c.enterTableObjectSelectionDirect(ref.sec, ref.ppi, ref.ci);
+    // 끌기 상태의 표 참조가 표 속 표 경로(깊이 2 이상)를 들고 있으면 그 안쪽 표를 고른다(엔진, 스튜디오 패치 nested-table-*)
+    c.enterTableObjectSelectionDirect(ref.sec, ref.ppi, ref.ci, ref.path?.length > 1 ? ref.path : undefined);
     ih.active = true;
     ih.caret?.hide();
     ih.fieldMarker?.hide();

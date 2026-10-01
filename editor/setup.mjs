@@ -271,6 +271,9 @@ const RUST_PATCHES = [
     const [find, replace] = fs.readFileSync(path.join(HERE, 'patches', 'cell-pic-split-dup.rs'), 'utf8').replace(/\r\n/g, '\n').split('\n// ==== replace ====\n');
     return { id: 'cell-pic-split-dup', file: 'src/renderer/layout/table_partial.rs', find: find.replace(/^\/\/ ==== find ====\n/, ''), replace: replace.replace(/\n$/, ''), done: '[claude-hwpx cell-pic-split-dup]' };
   })(),
+  // 표 속 표: 테두리 위 hitTest 가 바깥 칸을 돌려주던 것, 칸 경로로 크기 조절과 칸 속성 조회(patches/nested-table-*.rs, 스튜디오 nested-table-*.ts)
+  { id: 'nested-table-wasm', file: 'src/wasm_api.rs', anchor: '    /// 여러 셀의 width/height를 한 번에 조절한다 (배치).\n',
+    insert: fs.readFileSync(path.join(HERE, 'patches', 'nested-table-wasm.rs'), 'utf8').replace(/\r\n/g, '\n'), done: '[claude-hwpx nested-table-wasm]' },
   // 글자처럼 취급하지 않는 그림의 본문 배치 — 편집 뒤에도 글이 그림을 비키게(patches/wrap-*.rs).
   // 파일 하나에 조각 여럿(// ==== next ====). 이미 들어간 조각은 바꾼 글이 소스에 있는지로 안다
   ...[
@@ -297,6 +300,12 @@ const RUST_PATCHES = [
     ['wrap-save-band', 'src/serializer/hwpx/section.rs'],
     ['wrap-save-mark', 'src/document_core/commands/text_editing.rs'],
     ['wrap-text-flow-props', 'src/document_core/commands/object_ops/picture.rs'],
+    ['nested-table-hit', 'src/document_core/queries/cursor_rect.rs'],
+    ['nested-table-path', 'src/document_core/commands/table_ops.rs'],
+    // 표 속 표 칸에 글자처럼 취급 그림 넣기의 줄 배치, 칸 안 그림 끌어 옮기기용 캐럿 칸 찾기(플러그인 installCellPicMove)
+    ['cell-pic-nested', 'src/document_core/commands/object_ops/picture.rs'],
+    ['cell-pic-caret', 'src/document_core/helpers.rs'],
+    ['cell-pic-caret-wasm', 'src/wasm_api.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));
@@ -480,6 +489,58 @@ for (const [id, rel] of [['wrap-text-labels', 'ui/picture-props-dialog.ts'], ['w
     src = src.replace(eol(find), () => eol(replace.replace(/\n$/, '')));
   }
   fs.writeFileSync(f, src);
+}
+
+// 표 속 표를 마우스로 고르거나 크기를 바꿀 수 없던 것(patches/nested-table-*.ts, 엔진 nested-table-*.rs).
+// 상류 devel #7214, #7442 를 v0.8.6 에 옮긴 것: 칸 경로를 캐시, 테두리 클릭, 끌기, 키보드 조절까지 싣는다
+for (const [id, rel, tail] of [['nested-table-cache', 'engine/table-bbox-cache.ts'], ['nested-table-cursor', 'engine/cursor.ts'],
+  ['nested-table-handler', 'engine/input-handler.ts'], ['nested-table-mouse', 'engine/input-handler-mouse.ts'],
+  // 칸 안 그림: 그림 넣기와 파일 끌어 놓기를 칸 문단 안 글자처럼 취급으로, 글자처럼 취급 칸 그림 끌어 옮기기(cell-pic-*.ts)
+  ['cell-pic-place', 'engine/input-handler-table.ts'], ['cell-pic-drop', 'engine/input-handler.ts'],
+  ['cell-pic-move', 'engine/input-handler-picture.ts', 'cell-pic-move-fn'], ['cell-pic-move-start', 'engine/input-handler-mouse.ts']]) {
+  const f = path.join(STUDIO, 'src', ...rel.split('/'));
+  let src = fs.readFileSync(f, 'utf8');
+  if (src.includes(`[claude-hwpx ${id}]`)) continue;
+  const eol = (s) => (src.includes('\r\n') ? s.replace(/\r?\n/g, '\r\n') : s);
+  const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.ts`), 'utf8').replace(/\r\n/g, '\n')
+    .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n');
+  for (const b of blocks) {
+    const [find, replace] = b.split('\n// ==== replace ====\n');
+    if (src.split(eol(find)).length !== 2) throw new Error(`${rel} 에서 패치 자리(${id})를 하나로 못 찾았다`);
+    src = src.replace(eol(find), () => eol(replace.replace(/\n$/, '')));
+  }
+  // 세 번째 항목이 있으면 그 파일(함수 모음)을 끝에 붙인다
+  if (tail) src = src.replace(/\n*$/, '\n') + fs.readFileSync(path.join(HERE, 'patches', `${tail}.ts`), 'utf8').replace(/\r\n/g, '\n');
+  fs.writeFileSync(f, src);
+}
+{
+  // 연결층: caret-axis-bridge 가 제 표식 뒤를 잘라 다시 붙이므로 그 뒤에 매번 확인해 붙인다
+  const f = path.join(STUDIO, 'src', 'core', 'wasm-bridge.ts');
+  const src = fs.readFileSync(f, 'utf8');
+  if (!src.includes('[claude-hwpx nested-table-bridge]')) {
+    fs.writeFileSync(f, src.replace(/\n*$/, '\n') + fs.readFileSync(path.join(HERE, 'patches', 'nested-table-bridge.ts'), 'utf8').replace(/\r\n/g, '\n'));
+  }
+}
+{
+  // 크기 조절(끌기, Ctrl/Alt+방향키)의 평면 호출을 경로 대응 함수(patches/nested-table-table.ts)로 바꾼다
+  const f = path.join(STUDIO, 'src', 'engine', 'input-handler-table.ts');
+  let src = fs.readFileSync(f, 'utf8');
+  if (!src.includes('[claude-hwpx nested-table-table]')) {
+    const edits = [
+      [/\b((?:this\.)?wasm)\.getCellProperties\(\s*((?:state\.)?tableRef|ctx)\.sec,\s*\2\.ppi,\s*\2\.ci,\s*/g, 'claudeCellProps($1, $2, ', 9],
+      [/\bthis\.wasm\.getTableCellBboxes\(ctx\.sec, ctx\.ppi, ctx\.ci\)/g, 'claudeTableBboxes(this.wasm, ctx)', 2],
+      [/\bwasm\.resizeTableCells\(ctx\.sec, ctx\.ppi, ctx\.ci, updates\)/g, 'claudeResizeCells(wasm, ctx, updates)', 2],
+      [/\bwasm\.resizeTableCells\(\s*state\.tableRef\.sec,\s*state\.tableRef\.ppi,\s*state\.tableRef\.ci,\s*updates,?\s*\)/g, 'claudeResizeCells(wasm, state.tableRef, updates)', 1],
+      [/(function selectTableObjectFromResize\(this: any, tableRef: \{ sec: number; ppi: number; ci: number)( \}\): void \{[\s\S]*?this\.cursor\.enterTableObjectSelectionDirect\(tableRef\.sec, tableRef\.ppi, tableRef\.ci)\)/g,
+        '$1; path?: any[]$2, claudeNestedPath(tableRef))', 1],
+    ];
+    for (const [re, to, n] of edits) {
+      const count = (src.match(re) ?? []).length;
+      if (count !== n) throw new Error(`input-handler-table.ts 에서 nested-table-table 자리 수가 다르다(${re}: ${count}, 기대 ${n})`);
+      src = src.replace(re, to);
+    }
+    fs.writeFileSync(f, src.replace(/\n*$/, '\n') + fs.readFileSync(path.join(HERE, 'patches', 'nested-table-table.ts'), 'utf8').replace(/\r\n/g, '\n'));
+  }
 }
 
 // 4. 빌드
