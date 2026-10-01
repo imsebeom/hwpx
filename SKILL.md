@@ -122,7 +122,7 @@ pip install python-hwpx lxml --break-system-packages
  ├─ "붙임 추출/표 행 추가/셀 채우기" → 워크플로우 H (표 조작)
  ├─ "여러 HWPX를 하나로 합쳐줘" → 워크플로우 I (병합)
  ├─ "시험 문제지/PDF 시험지 → HWPX" → 워크플로우 J (시험 문제지)
- ├─ ".hwp(바이너리) → HWPX 변환" → 워크플로우 K (1차 한컴 COM SaveAs / 폴백 순수 Python)
+ ├─ ".hwp(바이너리) → HWPX 변환" → 워크플로우 K (1차 rhwp, 실패 시 한컴 COM SaveAs / 폴백 순수 Python)
  ├─ "{학교명}/{담당자} 일괄 치환 (양식 표 셀 포함)" → 워크플로우 L (zip-level 전역 치환)
  ├─ "빨간 글씨 일괄 검정으로/스타일별 부분 치환" → 워크플로우 M (스타일 필터 치환)
  ├─ "학생 작품 첨삭 메모 자동 삽입" → 워크플로우 N (자동 첨삭 메모)
@@ -1262,11 +1262,11 @@ xml = build_section_xml(data)
 > **rhwp 가 먼저 변환한다(2026-10-02).** 공문 HWP 4건(그림, 표 포함)에서 한컴 COM 변환본과 구조가 같고, 두 변환본을 한글 PDF 로 뽑으면 픽셀까지 같았다. 한글을 띄우지 않으니 1초 안쪽이고 포커스도 빼앗지 않는다. rhwp 가 실패한 파일만 한컴 COM 으로 넘기며, 그때 한글은 숨은 데스크톱에서 돈다(`scripts/hidden_desktop.py`). **한글 COM 을 새로 쓰는 스크립트도 반드시 이 모듈을 거친다** — 그냥 띄우면 한글이 뜰 때와 끝날 때 전경을 가져가 사용자 창이 직전 창으로 튕기고, `Visible=False` 로는 막히지 않는다.
 | 폴백 | 순수 Python (jkf87) | `convert_hwp.py` | 한컴·LibreOffice 無 (서버·리눅스) | ⚠️ 표·이미지 손실 (아래 한계 참조) |
 
-> **한컴이 설치돼 있으면 무조건 1차 경로를 쓴다.** 방금 실측(2026-07-06): 교과 평가계획 .hwp 6개를 `SaveAs(HWPX)`로 무손실 일괄 변환 성공. `HWPFrame.HwpObject` COM 자동화가 정공법이고, LibreOffice `--convert-to` 는 hwpx 출력을 지원하지 않는다.
+> **순수 Python(jkf87)보다 무조건 1차 경로를 쓴다.** 방금 실측(2026-07-06): 교과 평가계획 .hwp 6개를 `SaveAs(HWPX)`로 무손실 일괄 변환 성공. `HWPFrame.HwpObject` COM 자동화가 정공법이고, LibreOffice `--convert-to` 는 hwpx 출력을 지원하지 않는다.
 
 > **⚠️ 확장자 위장 함정 (2026-07-06 실측)**: `.hwp` 확장자여도 **내용이 이미 HWPX(ZIP)** 인 파일이 섞여 있을 수 있다(GUI 저장·이관 과정에서 발생). 이때 `hwp.Open(경로, "HWP", ...)` 로 **바이너리 HWP라고 못박아 열면 열기 실패(False) → 빈 문서 → 표 통째 소실**된다. 반드시 **파일 시그니처로 실제 포맷을 먼저 판별**하라: 선두 4바이트가 `50 4B 03 04`(=`PK`, ZIP)이면 이미 hwpx이므로 **복사만** 하고, `D0 CF 11 E0`(OLE)이면 COM 변환한다. `hwp_to_hwpx_hancom.py` 는 이 판별을 내장했다. 또한 `Open` 의 반환값(False)을 반드시 체크할 것 — 조용히 빈 문서가 만들어지는 것을 막는다.
 
-### 1차: 한컴 COM SaveAs (Windows 최우선)
+### 1차: `hwp_to_hwpx_hancom.py` (rhwp, 실패 시 한컴 COM SaveAs)
 
 ```bash
 # 파일 하나 또는 폴더(폴더 내 *.hwp 전부) 또는 여러 파일 나열
