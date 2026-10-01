@@ -53,19 +53,20 @@
   - 도구: `~/.cache/rhwp-devel/cmp.mjs`(2쪽 글자 줄과 셀 상자), `allpages.mjs <pkg> <a> <b>`(전 쪽 글자 좌표 대조), `variants.py`, `winshot.py`(에디터 창을 앞으로 올리지 않고 PrintWindow 로 캡처 — 사용자 화면을 뺏지 않는다)
 
 ## 컨텍스트 앵커
-- **10-02 둘째**: 사용자 화면 「그림이 엉뚱한 데 가 있고 문단이 다 어그러짐」(아궁이 문항카드, <자료 1> 그림을 <자료 2> 여러 줄 문단 끝으로 옮김) → 스킬 6eb9ff3(푸시 안 함). 원인 셋: 줄 나누기가 문단 끝 글자처럼 취급 개체 높이를 첫 줄에 붙임(`tac-end-line`), 칸 붙여넣기, 그림 넣기 뒤 칸 안 뒤 문단 vpos 안 매김(`cell-paste-vpos`, `cell-pic-nested`), 표 높이 맞추기가 맨 바깥 표만 다뤄 표 속 표가 비례 축소(`tac-nested-sync`). 한글 PDF 와 같은 모양, `cargo test --lib` 3,889 통과
+- **10-02 둘째**: 사용자 화면 「그림이 엉뚱한 데 가 있고 문단이 다 어그러짐」(아궁이 문항카드, <자료 1> 그림을 <자료 2> 여러 줄 문단 끝으로 옮김) → 스킬 6eb9ff3. 원인 셋: 줄 나누기가 문단 끝 글자처럼 취급 개체 높이를 첫 줄에 붙임(`tac-end-line`), 칸 붙여넣기, 그림 넣기 뒤 칸 안 뒤 문단 vpos 안 매김(`cell-paste-vpos`, `cell-pic-nested`), 표 높이 맞추기가 맨 바깥 표만 다뤄 표 속 표가 비례 축소(`tac-nested-sync`). 한글 PDF 와 같은 모양, `cargo test --lib` 3,889 통과
   - 🔴 **사고**: 시험 스크립트가 시작 전마다 `stop --force` 했는데, cli 는 stop 이 포트 파일을 지운 인스턴스에 기본 포트 7780 으로 명령을 보냈다 → 교육력제고 실적 창(60ded568)의 서버를 내렸고, 그 창이 내 시험 서버에 붙어 `save` 가 그 문서를 내보냈다(scratchpad m5.hwpx, 그 창 내용 사본). 60ded568 서버를 `hold` 로 다시 띄워 창이 붙음(dirty false, 6쪽). 스킬 b732cb2: 그 포트 서버의 stateDir 이 이 인스턴스가 아니면 stop 은 아무것도 안 내리고 다른 명령은 멈춘다
   - 이산화탄소(card3), 아궁이(card2) 창은 각각 언제인가 닫혔다(창 프로세스 없음, card2 는 02:10 종료 기록). 내가 닫은 흔적은 못 찾음. 아궁이는 새 빌드로 다시 열었다(card2, 7781)
   - 다른 세션이 스킬에서 한글 COM 의존을 걷어 냄(85bab48, `scripts/hidden_desktop.py` 삭제). 한글 PDF 확인은 지운 판을 scratchpad 에 꺼내 썼다
-  - next_steps: ① 스킬 6eb9ff3, b732cb2 푸시 여부 ② 시험 스크립트는 scratchpad `run_agung.sh`(mv|place), `mouse.mjs`, `shot.mjs`
-- **10-02**: 사용자 보고 둘 ① 「표 속 표는 클릭, 크기 조절 등 마우스로 할 수 없다」 ② 「표 속, 표 속 표 속 그림의 삽입, 크기 조절, 이동이 안 된다」 → 스킬 6149e29, 9b705eb(푸시 안 함). 설명은 `references/editor-mode.md` 6절 두 항목
+  - 푸시: 스킬 b732cb2 까지 hwpx, hwpx2(hwpx2 에는 다른 세션의 85bab48, c238ea9 도 함께)
+  - next_steps: ① 사용자가 아궁이 문항카드(card2, 7781)로 표 속 표, 칸 그림 조작을 다시 써 보고 남은 결함을 알려 주면 그것부터 ② 시험 도구는 scratchpad `run_agung.sh`(mv|place), `mouse.mjs`(CDP 9333 실제 마우스), `shot.mjs`, `place.sh` — 시험 인스턴스는 nesttest, 띄울 때 `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9333` ③ 한글 PDF 대조는 스킬에서 hidden_desktop.py 가 빠졌으니 `git show 85bab48^:scripts/hidden_desktop.py` 로 꺼내 쓴다
+- **10-02**: 사용자 보고 둘 ① 「표 속 표는 클릭, 크기 조절 등 마우스로 할 수 없다」 ② 「표 속, 표 속 표 속 그림의 삽입, 크기 조절, 이동이 안 된다」 → 스킬 6149e29, 9b705eb. 설명은 `references/editor-mode.md` 6절 두 항목
   - ①: 상류 devel #7214(9/17, #7237 통합에 섞임), #7442(9/27)를 v0.8.6 에 옮김. 엔진 `nested-table-hit/-path/-wasm.rs`(경로 크기 조절은 thread_local 로 대상 표만 바꿔 끼워 row-resize-th 와 공존), 스튜디오 `nested-table-*.ts` 6개, 플러그인 `installTableClickSelect` 가 경로를 버리던 것. 상류에 없는 보완: 안쪽 표 테두리 바깥쪽 0.5px 부터 hitTest 가 바깥 칸이라 둘레 ±4px 를 찔러 판정
   - ②: 그림 넣기, 파일 끌어 놓기가 칸이면 본문의 떠 있는 그림(표 위에 얹힘)으로 들어가던 것 → 칸 문단 안 글자처럼 취급(`cell-pic-place/-drop.ts`, 표 속 표 칸 줄 배치 `cell-pic-nested.rs`). 칸 안 글자처럼 취급 그림은 끌기가 시작조차 안 되던 것 → 놓은 글자 자리로 잘라 붙이기(`cell-pic-move*.ts`, `convertCaretOffset` 모드 7 `cell-pic-caret*.rs`). 크기 조절은 원래 됐다
   - 🔑 결정(사용자 확인 「그래」): 칸에 그림을 넣으면 「글자처럼 취급」으로 칸 안에 넣는다(한글 기본 동작 기준). 상류 #1151 의 「표 옆 떠 있는 그림(종이 기준)」은 따르지 않는다
   - 푸시: 스킬 9b705eb 까지 hwpx, hwpx2. 다른 세션(에디터 외 작업, 사용자가 「참고하라」고 알림)의 커밋 5371e78 과 hwpx2 쪽 a20fe18..68b44df 도 함께 올라갔다
   - 검증: 문항카드 사본과 상류 시험 문서(18×9 표 속 표)로 CDP 실제 마우스, 되돌리기, 저장본 verify 통과, 한글 PDF 4쪽 같은 모양, `cargo test --lib` 3,889 통과
   - 🔴 시험 도구 함정: scratchpad `mouse.mjs` 가 한 점 클릭에서 x2 가 undefined 라 NaN 좌표로 이동, 놓기를 보내 CDP 가 거절 → mouseup 이 안 와 텍스트 선택 끌기가 남았다. 한동안 이것을 에디터 결함으로 오해했다(`Number.isNaN(undefined)` 은 false). CDP 응답의 error 를 찍게 고쳤다
-  - next_steps: ① 사용자가 띄워 둔 에디터(q2 7782, q3 7781, 60ded568 7780)는 옛 빌드라 **다시 띄워야** 적용된다 ② 스킬 저장소는 다른 세션도 커밋하므로 푸시 전에 `git log <원격>/main..HEAD` 로 남의 커밋이 섞였는지 보고 알린다
+  - 🔑 스킬 저장소는 다른 세션도 커밋하므로 푸시 전에 `git log <원격>/main..HEAD` 로 남의 커밋이 섞였는지 보고 알린다
 - **09-30 ~ 10-01**: 한국문화 1단원 마지막 쪽 그림이 두 번 보이던 것(사용자 보고) → 스킬 43de199(푸시 안 함) `patches/cell-pic-split-dup.rs`.
   원인은 rhwp `table_partial.rs`(쪽을 넘는 표): ① 문단 끝 글자처럼 취급 그림이 `abs_pos < line_chars` 판정에 빠져 칸 왼쪽에 덧그려짐 — devel d5fbe8b5d(#7171)가 이미 같은 방식(`get_inline_shape_position`)으로 고침
   ② 문단이 쪽 경계에서 갈라져 그림 줄이 뒷조각에 있으면 앞조각도 그림 — devel 09-25 빌드에도 남음(재현 scratchpad `mkrepro.py` 채움 34줄). 원본 npm 0.8.6 에서도 재현, 우리 패치 탓 아님
