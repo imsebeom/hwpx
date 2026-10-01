@@ -83,6 +83,8 @@ op 는 네 가지다. **먼저 `tool` 을 쓰고, 도구에 없는 일만 `doc` 
 
 **위치는 추측하지 않는다. 먼저 읽는다.** 문단 번호는 0부터, 구역도 0부터다. 글자 오프셋은 문단 안 글자 수 기준이다.
 
+⚠ **서식 JSON 을 문자열로 미리 만들어 넘길 때는 공백을 빼라**(2026-10-02 실측). rhwp 의 `json_str` 은 `"headType":"Bullet"` 처럼 쌍점 뒤 공백이 없는 꼴만 찾아, 파이썬 `json.dumps` 기본값(`": "`)으로 만든 `applyParaFormatInCell` 인자는 문자열 키(`headType`, `alignment` 등)가 **오류 없이 무시된다**(숫자 키는 적용됨). `separators=(",", ":")` 를 주거나, 객체 그대로 넘겨 CLI 가 직렬화하게 한다. 표 칸에 글머리표를 다는 값은 본문 예시 프롬프트 상자와 같은 `{"headType":"Bullet","numberingId":1,"paraLevel":0}` 이다.
+
 ```json
 [{"doc":"getParagraphCount","a":[0]},
  {"doc":"getStructure","a":["summary"]},
