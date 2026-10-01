@@ -306,6 +306,11 @@ const RUST_PATCHES = [
     ['cell-pic-nested', 'src/document_core/commands/object_ops/picture.rs'],
     ['cell-pic-caret', 'src/document_core/helpers.rs'],
     ['cell-pic-caret-wasm', 'src/wasm_api.rs'],
+    // 표 속 표의 내용이 바뀌면 그 표 높이와 담은 줄 높이를 맞춘다(바깥 표만 맞춰 안쪽 표가 눌리고 칸 밖으로 나갔다)
+    ['tac-nested-sync', 'src/document_core/commands/text_editing.rs'],
+    // 문단 끝 글자처럼 취급 개체를 마지막 줄(안 들어가면 새 줄)에, 칸 붙여넣기 뒤 칸 안 뒤 문단 세로 위치
+    ['tac-end-line', 'src/renderer/composer/line_breaking.rs'],
+    ['cell-paste-vpos', 'src/document_core/commands/clipboard.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));
