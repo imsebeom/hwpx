@@ -32,7 +32,7 @@ ${CLAUDE_SKILL_DIR}/
 │   ├── hwpx_form_filler.py    # ★ 양식 부분 추출/표 조작 (Workflow H)
 │   ├── hwpx_writer.py         # 줄간격 XML 생성 유틸리티
 │   ├── exam_builder.py          # ★ 시험 문제지 생성 (Workflow J)
-│   ├── hwp_to_hwpx_hancom.py    # ★ HWP → HWPX 변환 (Workflow K 1차: 한컴 COM SaveAs, Windows 최우선)
+│   ├── hwp_to_hwpx_hancom.py    # ★ HWP → HWPX 변환 (Workflow K 1차: rhwp, 실패 시 한컴 COM SaveAs)
 │   ├── convert_hwp.py           # HWP(바이너리) → HWPX 변환 (Workflow K 폴백: jkf87 순수 Python)
 │   ├── writing_optimizer.py     # ★ 공공기관 보고서 글쓰기 자동 변환 (Workflow P, public-doc-to-hwpx 포팅)
 │   ├── gongmun_lint.py          # 공문서 표기법 검수 (행정업무운영 편람, kordoc 규칙 이식, 표준 라이브러리만)
@@ -1253,11 +1253,13 @@ xml = build_section_xml(data)
 > **레거시 .hwp 바이너리 파일을 .hwpx 개방형 XML로 변환.**
 > **.hwp 는 어떤 작업이든 먼저 이 워크플로우로 .hwpx 로 변환하고 시작한다.** 이후 다른 워크플로우(F 양식 복제, C 편집, E 추출 등)는 변환된 .hwpx 를 대상으로 수행한다.
 
-### 경로 선택 (★ 한컴 COM 최우선)
+### 경로 선택 (★ `hwp_to_hwpx_hancom.py` 최우선)
 
 | 순위 | 방법 | 스크립트 | 조건 | 품질 |
 |------|------|----------|------|------|
-| **1차** | 한컴 COM `SaveAs(HWPX)` | `hwp_to_hwpx_hancom.py` | Windows + 한컴오피스 설치 | ★★★ 표·이미지·서식 100% 보존 |
+| **1차** | rhwp 엔진 → 실패 시 한컴 COM `SaveAs(HWPX)` | `hwp_to_hwpx_hancom.py` | node + 에디터 엔진(`editor/studio-dist/node`), 폴백은 Windows + 한컴오피스 | ★★★ 표·이미지·서식 100% 보존 |
+
+> **rhwp 가 먼저 변환한다(2026-10-02).** 공문 HWP 4건(그림, 표 포함)에서 한컴 COM 변환본과 구조가 같고, 두 변환본을 한글 PDF 로 뽑으면 픽셀까지 같았다. 한글을 띄우지 않으니 1초 안쪽이고 포커스도 빼앗지 않는다. rhwp 가 실패한 파일만 한컴 COM 으로 넘기며, 그때 한글은 숨은 데스크톱에서 돈다(`scripts/hidden_desktop.py`). **한글 COM 을 새로 쓰는 스크립트도 반드시 이 모듈을 거친다** — 그냥 띄우면 한글이 뜰 때와 끝날 때 전경을 가져가 사용자 창이 직전 창으로 튕기고, `Visible=False` 로는 막히지 않는다.
 | 폴백 | 순수 Python (jkf87) | `convert_hwp.py` | 한컴·LibreOffice 無 (서버·리눅스) | ⚠️ 표·이미지 손실 (아래 한계 참조) |
 
 > **한컴이 설치돼 있으면 무조건 1차 경로를 쓴다.** 방금 실측(2026-07-06): 교과 평가계획 .hwp 6개를 `SaveAs(HWPX)`로 무손실 일괄 변환 성공. `HWPFrame.HwpObject` COM 자동화가 정공법이고, LibreOffice `--convert-to` 는 hwpx 출력을 지원하지 않는다.

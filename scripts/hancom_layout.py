@@ -82,10 +82,16 @@ def _acquire_lock(timeout=180):
 
 
 def hancom_resave(src, dst):
-    try:
-        import win32com.client as w
-    except ImportError as e:
-        raise LayoutError("pywin32 가 없다(한글 COM 불가)") from e
+    import hidden_desktop
+
+    # 한글이 사용자 창의 포커스를 빼앗지 않게 숨은 데스크톱의 자식 프로세스에서 연다(hidden_desktop.py).
+    hidden = hidden_desktop.available()
+    w = None
+    if not hidden:
+        try:
+            import win32com.client as w
+        except ImportError as e:
+            raise LayoutError("pywin32 가 없다(한글 COM 불가)") from e
     src, dst = os.path.abspath(src), os.path.abspath(dst)
     _acquire_lock()
     try:
@@ -94,7 +100,14 @@ def hancom_resave(src, dst):
         last = None
         for _ in range(3):
             try:
-                _resave_once(w, src, dst)
+                if hidden:
+                    # 에디터 서버가 이 스크립트를 120초에 끊으므로 두 번은 시도할 수 있게 45초로 둔다.
+                    # 끊기면 손자 프로세스는 남아 대화상자에 영영 막힐 수 있다.
+                    hidden_desktop.delegate(
+                        __file__, "--resave-once", src, dst, timeout=45
+                    )
+                else:
+                    _resave_once(w, src, dst)
                 return
             except Exception as e:  # COM 오류 종류가 여럿이라 모두 다시 시도한다
                 last = e
@@ -201,6 +214,11 @@ def apply_hancom_layout(src, out=None):
 
 
 if __name__ == "__main__":
+    if sys.argv[1:2] == ["--resave-once"]:  # hancom_resave 가 숨은 데스크톱에서 부른다
+        import win32com.client
+
+        _resave_once(win32com.client, *map(os.path.abspath, sys.argv[2:4]))
+        sys.exit(0)
     if len(sys.argv) not in (2, 3):
         print(__doc__.splitlines()[0])
         sys.exit(2)

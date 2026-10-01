@@ -1,8 +1,9 @@
-"""HWP(바이너리) → HWPX 변환 — 한컴오피스 COM SaveAs 방식 (Windows 전용, 최우선 경로).
+"""HWP(바이너리) → HWPX 변환 — rhwp 엔진 1차, 한컴오피스 COM SaveAs 폴백 (최우선 경로).
 
-한컴오피스가 설치된 Windows에서 표·이미지·서식을 100% 보존하며 변환한다.
-jkf87 순수 Python 변환기(convert_hwp.py)는 표·이미지 손실이 크므로,
-한컴이 있으면 반드시 이 경로를 먼저 쓴다.
+rhwp(에디터의 WASM 엔진)가 한글 없이 변환한다. 공문 HWP 4건에서 한글 COM 변환본과 한글 PDF 가
+픽셀까지 같았다(2026-10-02). rhwp 가 실패한 파일만 한글 COM 으로 넘기고, 그때는 한글이
+사용자 창의 포커스를 빼앗지 않게 숨은 데스크톱에서 돌린다(hidden_desktop.py).
+jkf87 순수 Python 변환기(convert_hwp.py)는 표·이미지 손실이 크므로 쓰지 않는다.
 
     python hwp_to_hwpx_hancom.py <파일 또는 폴더> [파일2 ...]
 
@@ -61,22 +62,53 @@ def convert(paths):
         print("COPY(내용이 이미 hwpx):", os.path.basename(out))
         ok += 1
 
-    # (2) 진짜 바이너리 HWP → 한컴 COM SaveAs
+    # (2) 진짜 바이너리 HWP → rhwp. 한글을 띄우지 않으니 포커스도 뺏지 않는다.
+    #     실패한 파일만 한컴 COM 으로 넘긴다(숨은 데스크톱에서).
+    from rhwp_convert import hwp_to_hwpx
+
+    com_files = []
+    for f in ole_files:
+        out = os.path.splitext(os.path.abspath(f))[0] + ".hwpx"
+        if hwp_to_hwpx(f, out):
+            print("OK(rhwp):", os.path.basename(out))
+            ok += 1
+        else:
+            com_files.append(f)
+    if com_files:
+        import hidden_desktop
+
+        if hidden_desktop.available():
+            try:
+                hidden_desktop.delegate(
+                    __file__, "--com", *map(os.path.abspath, com_files), timeout=300
+                )
+            except RuntimeError as e:
+                print("FAIL(한컴 COM):", e)
+        else:
+            _com_convert(com_files)
+        ok += sum(
+            os.path.isfile(os.path.splitext(os.path.abspath(f))[0] + ".hwpx")
+            for f in com_files
+        )
+
+    for f in bad:
+        print("SKIP(알 수 없는 포맷):", os.path.basename(f))
+
+    print(f"\n완료: {ok}/{len(files)}")
+    return 0 if ok == len(files) else 2
+
+
+def _com_convert(ole_files):
+    """한컴 COM SaveAs. 숨은 데스크톱의 자식 프로세스(--com)에서 부른다."""
     if ole_files:
         import win32com.client as win32
+
         hwp = win32.gencache.EnsureDispatch("HWPFrame.HwpObject")
         try:
             try:
                 hwp.RegisterModule("FilePathCheckDLL", "FilePathCheckerModule")
             except Exception as e:
                 print("보안 모듈 등록 생략(팝업이 뜰 수 있음):", e)
-            # 한글 창이 떠서 사용자가 쓰던 창의 포커스를 빼앗는 것을 막는다.
-            # 다른 문서가 이미 열려 있으면(Count>1) 남의 창을 숨길 수 있으므로 건드리지 않는다.
-            try:
-                if hwp.XHwpWindows.Count == 1:
-                    hwp.XHwpWindows.Active_XHwpWindow.Visible = False
-            except Exception:
-                pass
             for f in ole_files:
                 out = os.path.splitext(os.path.abspath(f))[0] + ".hwpx"
                 try:
@@ -89,8 +121,7 @@ def convert(paths):
                     hwp.SaveAs(out, "HWPX", "")
                     if not os.path.isfile(out) or os.path.getsize(out) == 0:
                         raise RuntimeError("SaveAs 후 출력 파일이 없거나 0바이트")
-                    print("OK:", os.path.basename(out))
-                    ok += 1
+                    print("OK(한컴 COM):", os.path.basename(out))
                 except Exception as e:
                     print("FAIL:", os.path.basename(f), e)
                 hwp.Clear(1)
@@ -101,14 +132,11 @@ def convert(paths):
             except Exception:
                 pass
 
-    for f in bad:
-        print("SKIP(알 수 없는 포맷):", os.path.basename(f))
-
-    print(f"\n완료: {ok}/{len(files)}")
-    return 0 if ok == len(files) else 2
-
 
 if __name__ == "__main__":
+    if sys.argv[1:2] == ["--com"]:
+        _com_convert(sys.argv[2:])
+        sys.exit(0)
     if len(sys.argv) < 2:
         print(__doc__)
         sys.exit(1)

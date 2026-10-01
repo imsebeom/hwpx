@@ -271,18 +271,23 @@ def _pdftoppm() -> Optional[str]:
 
 def _hancom_to_pdf(src: str, pdf_path: str) -> None:
     """한컴 COM 으로 HWPX 를 PDF 로 저장한다 (경로는 반드시 절대 경로)."""
+    import hidden_desktop
+
+    # 한글이 사용자 창의 포커스를 빼앗지 않게 숨은 데스크톱의 자식 프로세스에서 연다(hidden_desktop.py).
+    if hidden_desktop.available():
+        hidden_desktop.delegate(__file__, "--hancom-pdf", src, pdf_path, timeout=120)
+    else:
+        _hancom_to_pdf_here(src, pdf_path)
+    if not os.path.isfile(pdf_path) or os.path.getsize(pdf_path) == 0:
+        raise RuntimeError("PDF 가 생성되지 않았다")
+
+
+def _hancom_to_pdf_here(src: str, pdf_path: str) -> None:
     import win32com.client as win32  # 한컴 COM (Windows 전용)
 
     hwp = win32.gencache.EnsureDispatch("HWPFrame.HwpObject")
     try:
         hwp.RegisterModule("FilePathCheckDLL", "FilePathCheckerModule")
-        # 한글 창이 떠서 사용자가 쓰던 창의 포커스를 빼앗는 것을 막는다.
-        # 다른 문서가 이미 열려 있으면(Count>1) 남의 창을 숨길 수 있으므로 건드리지 않는다.
-        try:
-            if hwp.XHwpWindows.Count == 1:
-                hwp.XHwpWindows.Active_XHwpWindow.Visible = False
-        except Exception:
-            pass
         if not hwp.Open(src, "", "forceopen:true"):
             raise RuntimeError(f"한글이 파일을 열지 못했다: {src}")
         hwp.SaveAs(pdf_path, "PDF", "")
@@ -491,4 +496,7 @@ def main(argv: Optional[List[str]] = None) -> int:
 
 
 if __name__ == "__main__":
+    if sys.argv[1:2] == ["--hancom-pdf"]:  # _hancom_to_pdf 가 숨은 데스크톱에서 부른다
+        _hancom_to_pdf_here(*sys.argv[2:4])
+        sys.exit(0)
     sys.exit(main())
