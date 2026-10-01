@@ -100,6 +100,19 @@ process.on('uncaughtException', onFatal);
 process.on('unhandledRejection', onFatal);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// 그 포트의 서버가 다른 인스턴스 것이면 멈춘다. stop 이 포트 파일을 지운 인스턴스에 다시 stop, save 를 내리면 기본 포트 7780 으로
+// 가서 남의 에디터 서버를 내리고 그 문서를 내보냈다(2026-10-02, 교육력제고 창의 서버를 내렸다)
+if (process.argv[2] && !['start', 'list', 'hold'].includes(process.argv[2])) {
+  const h = await probe(PORT);
+  if (h?.stateDir && path.resolve(h.stateDir) !== path.resolve(STATE_DIR)) {
+    if (process.argv[2] === 'stop') {
+      out(`이 인스턴스(${path.basename(STATE_DIR)})의 서버는 떠 있지 않다. 포트 ${PORT} 는 다른 에디터(${path.basename(h.stateDir)})다`);
+      throw new Die('');
+    }
+    die(`포트 ${PORT} 는 다른 에디터(${path.basename(h.stateDir)})다. 이 인스턴스(${path.basename(STATE_DIR)})는 떠 있지 않다 — start 로 연다`);
+  }
+}
+
 async function health() {
   try { return await (await fetch(`${BASE}/api/health`)).json(); } catch { return null; }
 }
