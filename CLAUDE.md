@@ -53,6 +53,11 @@
   - 도구: `~/.cache/rhwp-devel/cmp.mjs`(2쪽 글자 줄과 셀 상자), `allpages.mjs <pkg> <a> <b>`(전 쪽 글자 좌표 대조), `variants.py`, `winshot.py`(에디터 창을 앞으로 올리지 않고 PrintWindow 로 캡처 — 사용자 화면을 뺏지 않는다)
 
 ## 컨텍스트 앵커
+- **10-02 둘째**: 사용자 화면 「그림이 엉뚱한 데 가 있고 문단이 다 어그러짐」(아궁이 문항카드, <자료 1> 그림을 <자료 2> 여러 줄 문단 끝으로 옮김) → 스킬 6eb9ff3(푸시 안 함). 원인 셋: 줄 나누기가 문단 끝 글자처럼 취급 개체 높이를 첫 줄에 붙임(`tac-end-line`), 칸 붙여넣기, 그림 넣기 뒤 칸 안 뒤 문단 vpos 안 매김(`cell-paste-vpos`, `cell-pic-nested`), 표 높이 맞추기가 맨 바깥 표만 다뤄 표 속 표가 비례 축소(`tac-nested-sync`). 한글 PDF 와 같은 모양, `cargo test --lib` 3,889 통과
+  - 🔴 **사고**: 시험 스크립트가 시작 전마다 `stop --force` 했는데, cli 는 stop 이 포트 파일을 지운 인스턴스에 기본 포트 7780 으로 명령을 보냈다 → 교육력제고 실적 창(60ded568)의 서버를 내렸고, 그 창이 내 시험 서버에 붙어 `save` 가 그 문서를 내보냈다(scratchpad m5.hwpx, 그 창 내용 사본). 60ded568 서버를 `hold` 로 다시 띄워 창이 붙음(dirty false, 6쪽). 스킬 b732cb2: 그 포트 서버의 stateDir 이 이 인스턴스가 아니면 stop 은 아무것도 안 내리고 다른 명령은 멈춘다
+  - 이산화탄소(card3), 아궁이(card2) 창은 각각 언제인가 닫혔다(창 프로세스 없음, card2 는 02:10 종료 기록). 내가 닫은 흔적은 못 찾음. 아궁이는 새 빌드로 다시 열었다(card2, 7781)
+  - 다른 세션이 스킬에서 한글 COM 의존을 걷어 냄(85bab48, `scripts/hidden_desktop.py` 삭제). 한글 PDF 확인은 지운 판을 scratchpad 에 꺼내 썼다
+  - next_steps: ① 스킬 6eb9ff3, b732cb2 푸시 여부 ② 시험 스크립트는 scratchpad `run_agung.sh`(mv|place), `mouse.mjs`, `shot.mjs`
 - **10-02**: 사용자 보고 둘 ① 「표 속 표는 클릭, 크기 조절 등 마우스로 할 수 없다」 ② 「표 속, 표 속 표 속 그림의 삽입, 크기 조절, 이동이 안 된다」 → 스킬 6149e29, 9b705eb(푸시 안 함). 설명은 `references/editor-mode.md` 6절 두 항목
   - ①: 상류 devel #7214(9/17, #7237 통합에 섞임), #7442(9/27)를 v0.8.6 에 옮김. 엔진 `nested-table-hit/-path/-wasm.rs`(경로 크기 조절은 thread_local 로 대상 표만 바꿔 끼워 row-resize-th 와 공존), 스튜디오 `nested-table-*.ts` 6개, 플러그인 `installTableClickSelect` 가 경로를 버리던 것. 상류에 없는 보완: 안쪽 표 테두리 바깥쪽 0.5px 부터 hitTest 가 바깥 칸이라 둘레 ±4px 를 찔러 판정
   - ②: 그림 넣기, 파일 끌어 놓기가 칸이면 본문의 떠 있는 그림(표 위에 얹힘)으로 들어가던 것 → 칸 문단 안 글자처럼 취급(`cell-pic-place/-drop.ts`, 표 속 표 칸 줄 배치 `cell-pic-nested.rs`). 칸 안 글자처럼 취급 그림은 끌기가 시작조차 안 되던 것 → 놓은 글자 자리로 잘라 붙이기(`cell-pic-move*.ts`, `convertCaretOffset` 모드 7 `cell-pic-caret*.rs`). 크기 조절은 원래 됐다
