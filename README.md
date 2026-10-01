@@ -83,6 +83,10 @@ node ~/.claude/skills/hwpx/editor/setup.mjs   # rhwp v0.8.6 받기 → 패치 �
 
 Rust(`~/.cargo` 의 cargo, wasm-pack)가 있으면 `editor/patches/` 를 넣어 WASM 을 직접 빌드하고, 없으면 npm 의 공식 WASM 을 쓴다(그때는 아래 「에디터 모드」의 엔진 패치가 빠진다).
 
+**HWP → HWPX 변환은 한글이 없어도 된다.** `scripts/hwp_to_hwpx_hancom.py` 가 rhwp 엔진으로 먼저 변환하는데, `setup.mjs` 를 돌리지 않은 PC 에서는 처음 한 번 npm 의 `@rhwp/core`(약 4MB)를 `~/.cache/rhwp-core/<버전>` 에 받아 쓴다. 그래서 Node.js(npm 포함)만 있으면 된다. 공문 HWP 3건에서 이 엔진과 에디터 빌드 엔진의 변환 결과가 바이트까지 같았다. rhwp 가 실패하면 한컴 COM(Windows + 한컴오피스)으로 넘어간다.
+
+한컴 COM 을 쓰는 작업(한글 줄 배치, 미리보기 PDF)은 `scripts/hidden_desktop.py` 로 보이지 않는 데스크톱에서 돌려, 한글이 사용자 창의 포커스를 빼앗지 않게 한다(Windows + pywin32).
+
 ## 워크플로우 요약
 
 | 워크플로우 | 용도 | 주요 도구 |

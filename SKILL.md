@@ -1257,7 +1257,7 @@ xml = build_section_xml(data)
 
 | 순위 | 방법 | 스크립트 | 조건 | 품질 |
 |------|------|----------|------|------|
-| **1차** | rhwp 엔진 → 실패 시 한컴 COM `SaveAs(HWPX)` | `hwp_to_hwpx_hancom.py` | node + 에디터 엔진(`editor/studio-dist/node`), 폴백은 Windows + 한컴오피스 | ★★★ 표·이미지·서식 100% 보존 |
+| **1차** | rhwp 엔진 → 실패 시 한컴 COM `SaveAs(HWPX)` | `hwp_to_hwpx_hancom.py` | Node.js(npm). 엔진은 에디터 빌드가 없으면 첫 실행 때 `@rhwp/core`를 `~/.cache/rhwp-core`에 받는다. 폴백은 Windows + 한컴오피스 | ★★★ 표·이미지·서식 100% 보존 |
 
 > **rhwp 가 먼저 변환한다(2026-10-02).** 공문 HWP 4건(그림, 표 포함)에서 한컴 COM 변환본과 구조가 같고, 두 변환본을 한글 PDF 로 뽑으면 픽셀까지 같았다. 한글을 띄우지 않으니 1초 안쪽이고 포커스도 빼앗지 않는다. rhwp 가 실패한 파일만 한컴 COM 으로 넘기며, 그때 한글은 숨은 데스크톱에서 돈다(`scripts/hidden_desktop.py`). **한글 COM 을 새로 쓰는 스크립트도 반드시 이 모듈을 거친다** — 그냥 띄우면 한글이 뜰 때와 끝날 때 전경을 가져가 사용자 창이 직전 창으로 튕기고, `Visible=False` 로는 막히지 않는다.
 | 폴백 | 순수 Python (jkf87) | `convert_hwp.py` | 한컴·LibreOffice 無 (서버·리눅스) | ⚠️ 표·이미지 손실 (아래 한계 참조) |
