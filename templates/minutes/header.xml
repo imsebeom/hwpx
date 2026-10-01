@@ -4,58 +4,58 @@
   <hh:refList>
     <hh:fontfaces itemCnt="7">
       <hh:fontface lang="HANGUL" fontCnt="2">
-        <hh:font id="0" face="함초롬돋움" type="TTF" isEmbedded="0">
+        <hh:font id="0" face="Pretendard" type="TTF" isEmbedded="0">
           <hh:typeInfo familyType="FCAT_GOTHIC" weight="6" proportion="4" contrast="0" strokeVariation="1" armStyle="1" letterform="1" midline="1" xHeight="1"/>
         </hh:font>
-        <hh:font id="1" face="함초롬바탕" type="TTF" isEmbedded="0">
+        <hh:font id="1" face="Pretendard" type="TTF" isEmbedded="0">
           <hh:typeInfo familyType="FCAT_GOTHIC" weight="6" proportion="4" contrast="0" strokeVariation="1" armStyle="1" letterform="1" midline="1" xHeight="1"/>
         </hh:font>
       </hh:fontface>
       <hh:fontface lang="LATIN" fontCnt="2">
-        <hh:font id="0" face="함초롬돋움" type="TTF" isEmbedded="0">
+        <hh:font id="0" face="Pretendard" type="TTF" isEmbedded="0">
           <hh:typeInfo familyType="FCAT_GOTHIC" weight="6" proportion="4" contrast="0" strokeVariation="1" armStyle="1" letterform="1" midline="1" xHeight="1"/>
         </hh:font>
-        <hh:font id="1" face="함초롬바탕" type="TTF" isEmbedded="0">
+        <hh:font id="1" face="Pretendard" type="TTF" isEmbedded="0">
           <hh:typeInfo familyType="FCAT_GOTHIC" weight="6" proportion="4" contrast="0" strokeVariation="1" armStyle="1" letterform="1" midline="1" xHeight="1"/>
         </hh:font>
       </hh:fontface>
       <hh:fontface lang="HANJA" fontCnt="2">
-        <hh:font id="0" face="함초롬돋움" type="TTF" isEmbedded="0">
+        <hh:font id="0" face="Pretendard" type="TTF" isEmbedded="0">
           <hh:typeInfo familyType="FCAT_GOTHIC" weight="6" proportion="4" contrast="0" strokeVariation="1" armStyle="1" letterform="1" midline="1" xHeight="1"/>
         </hh:font>
-        <hh:font id="1" face="함초롬바탕" type="TTF" isEmbedded="0">
+        <hh:font id="1" face="Pretendard" type="TTF" isEmbedded="0">
           <hh:typeInfo familyType="FCAT_GOTHIC" weight="6" proportion="4" contrast="0" strokeVariation="1" armStyle="1" letterform="1" midline="1" xHeight="1"/>
         </hh:font>
       </hh:fontface>
       <hh:fontface lang="JAPANESE" fontCnt="2">
-        <hh:font id="0" face="함초롬돋움" type="TTF" isEmbedded="0">
+        <hh:font id="0" face="Pretendard" type="TTF" isEmbedded="0">
           <hh:typeInfo familyType="FCAT_GOTHIC" weight="6" proportion="4" contrast="0" strokeVariation="1" armStyle="1" letterform="1" midline="1" xHeight="1"/>
         </hh:font>
-        <hh:font id="1" face="함초롬바탕" type="TTF" isEmbedded="0">
+        <hh:font id="1" face="Pretendard" type="TTF" isEmbedded="0">
           <hh:typeInfo familyType="FCAT_GOTHIC" weight="6" proportion="4" contrast="0" strokeVariation="1" armStyle="1" letterform="1" midline="1" xHeight="1"/>
         </hh:font>
       </hh:fontface>
       <hh:fontface lang="OTHER" fontCnt="2">
-        <hh:font id="0" face="함초롬돋움" type="TTF" isEmbedded="0">
+        <hh:font id="0" face="Pretendard" type="TTF" isEmbedded="0">
           <hh:typeInfo familyType="FCAT_GOTHIC" weight="6" proportion="4" contrast="0" strokeVariation="1" armStyle="1" letterform="1" midline="1" xHeight="1"/>
         </hh:font>
-        <hh:font id="1" face="함초롬바탕" type="TTF" isEmbedded="0">
+        <hh:font id="1" face="Pretendard" type="TTF" isEmbedded="0">
           <hh:typeInfo familyType="FCAT_GOTHIC" weight="6" proportion="4" contrast="0" strokeVariation="1" armStyle="1" letterform="1" midline="1" xHeight="1"/>
         </hh:font>
       </hh:fontface>
       <hh:fontface lang="SYMBOL" fontCnt="2">
-        <hh:font id="0" face="함초롬돋움" type="TTF" isEmbedded="0">
+        <hh:font id="0" face="Pretendard" type="TTF" isEmbedded="0">
           <hh:typeInfo familyType="FCAT_GOTHIC" weight="6" proportion="4" contrast="0" strokeVariation="1" armStyle="1" letterform="1" midline="1" xHeight="1"/>
         </hh:font>
-        <hh:font id="1" face="함초롬바탕" type="TTF" isEmbedded="0">
+        <hh:font id="1" face="Pretendard" type="TTF" isEmbedded="0">
           <hh:typeInfo familyType="FCAT_GOTHIC" weight="6" proportion="4" contrast="0" strokeVariation="1" armStyle="1" letterform="1" midline="1" xHeight="1"/>
         </hh:font>
       </hh:fontface>
       <hh:fontface lang="USER" fontCnt="2">
-        <hh:font id="0" face="함초롬돋움" type="TTF" isEmbedded="0">
+        <hh:font id="0" face="Pretendard" type="TTF" isEmbedded="0">
           <hh:typeInfo familyType="FCAT_GOTHIC" weight="6" proportion="4" contrast="0" strokeVariation="1" armStyle="1" letterform="1" midline="1" xHeight="1"/>
         </hh:font>
-        <hh:font id="1" face="함초롬바탕" type="TTF" isEmbedded="0">
+        <hh:font id="1" face="Pretendard" type="TTF" isEmbedded="0">
           <hh:typeInfo familyType="FCAT_GOTHIC" weight="6" proportion="4" contrast="0" strokeVariation="1" armStyle="1" letterform="1" midline="1" xHeight="1"/>
         </hh:font>
       </hh:fontface>

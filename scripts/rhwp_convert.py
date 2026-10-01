@@ -31,6 +31,7 @@ import zipfile
 HERE = os.path.dirname(os.path.abspath(__file__))
 EDITOR = os.path.join(HERE, "..", "editor")
 EDITOR_ENGINE = os.path.join(EDITOR, "studio-dist", "node")
+FONTS = os.path.join(HERE, "..", "fonts")  # 동봉 Pretendard(OFL). 시스템에 없어도 PDF 가 이 글꼴로 나온다
 CACHE = os.path.join(os.path.expanduser("~"), ".cache")
 RELEASE = "https://github.com/edwardkim/rhwp/releases/download/v{ver}/{name}"
 DUMMY_RE = re.compile(
@@ -181,7 +182,7 @@ def to_pdf(src, pdf, timeout=300):
             ) as e:  # 보정을 못 해도 그림은 낸다(쪽 나눔이 어긋날 수 있다)
                 print(f"WARNING: 줄 배치 보정 없이 그린다({e})", file=sys.stderr)
                 target = src
-        _run([cli_path(), "export-pdf", target, "-o", pdf], timeout)
+        _run([cli_path(), "export-pdf", target, "-o", pdf, "--font-path", os.path.abspath(FONTS)], timeout)
     finally:
         shutil.rmtree(work, ignore_errors=True)
     if not os.path.isfile(pdf) or os.path.getsize(pdf) == 0:

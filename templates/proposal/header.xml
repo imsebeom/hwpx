@@ -4,58 +4,58 @@
   <hh:refList>
     <hh:fontfaces itemCnt="7">
       <hh:fontface lang="HANGUL" fontCnt="2">
-        <hh:font id="0" face="함초롬돋움" type="TTF" isEmbedded="0">
+        <hh:font id="0" face="Pretendard" type="TTF" isEmbedded="0">
           <hh:typeInfo familyType="FCAT_GOTHIC" weight="6" proportion="4" contrast="0" strokeVariation="1" armStyle="1" letterform="1" midline="1" xHeight="1"/>
         </hh:font>
-        <hh:font id="1" face="함초롬바탕" type="TTF" isEmbedded="0">
+        <hh:font id="1" face="Pretendard" type="TTF" isEmbedded="0">
           <hh:typeInfo familyType="FCAT_GOTHIC" weight="6" proportion="4" contrast="0" strokeVariation="1" armStyle="1" letterform="1" midline="1" xHeight="1"/>
         </hh:font>
       </hh:fontface>
       <hh:fontface lang="LATIN" fontCnt="2">
-        <hh:font id="0" face="함초롬돋움" type="TTF" isEmbedded="0">
+        <hh:font id="0" face="Pretendard" type="TTF" isEmbedded="0">
           <hh:typeInfo familyType="FCAT_GOTHIC" weight="6" proportion="4" contrast="0" strokeVariation="1" armStyle="1" letterform="1" midline="1" xHeight="1"/>
         </hh:font>
-        <hh:font id="1" face="함초롬바탕" type="TTF" isEmbedded="0">
+        <hh:font id="1" face="Pretendard" type="TTF" isEmbedded="0">
           <hh:typeInfo familyType="FCAT_GOTHIC" weight="6" proportion="4" contrast="0" strokeVariation="1" armStyle="1" letterform="1" midline="1" xHeight="1"/>
         </hh:font>
       </hh:fontface>
       <hh:fontface lang="HANJA" fontCnt="2">
-        <hh:font id="0" face="함초롬돋움" type="TTF" isEmbedded="0">
+        <hh:font id="0" face="Pretendard" type="TTF" isEmbedded="0">
           <hh:typeInfo familyType="FCAT_GOTHIC" weight="6" proportion="4" contrast="0" strokeVariation="1" armStyle="1" letterform="1" midline="1" xHeight="1"/>
         </hh:font>
-        <hh:font id="1" face="함초롬바탕" type="TTF" isEmbedded="0">
+        <hh:font id="1" face="Pretendard" type="TTF" isEmbedded="0">
           <hh:typeInfo familyType="FCAT_GOTHIC" weight="6" proportion="4" contrast="0" strokeVariation="1" armStyle="1" letterform="1" midline="1" xHeight="1"/>
         </hh:font>
       </hh:fontface>
       <hh:fontface lang="JAPANESE" fontCnt="2">
-        <hh:font id="0" face="함초롬돋움" type="TTF" isEmbedded="0">
+        <hh:font id="0" face="Pretendard" type="TTF" isEmbedded="0">
           <hh:typeInfo familyType="FCAT_GOTHIC" weight="6" proportion="4" contrast="0" strokeVariation="1" armStyle="1" letterform="1" midline="1" xHeight="1"/>
         </hh:font>
-        <hh:font id="1" face="함초롬바탕" type="TTF" isEmbedded="0">
+        <hh:font id="1" face="Pretendard" type="TTF" isEmbedded="0">
           <hh:typeInfo familyType="FCAT_GOTHIC" weight="6" proportion="4" contrast="0" strokeVariation="1" armStyle="1" letterform="1" midline="1" xHeight="1"/>
         </hh:font>
       </hh:fontface>
       <hh:fontface lang="OTHER" fontCnt="2">
-        <hh:font id="0" face="함초롬돋움" type="TTF" isEmbedded="0">
+        <hh:font id="0" face="Pretendard" type="TTF" isEmbedded="0">
           <hh:typeInfo familyType="FCAT_GOTHIC" weight="6" proportion="4" contrast="0" strokeVariation="1" armStyle="1" letterform="1" midline="1" xHeight="1"/>
         </hh:font>
-        <hh:font id="1" face="함초롬바탕" type="TTF" isEmbedded="0">
+        <hh:font id="1" face="Pretendard" type="TTF" isEmbedded="0">
           <hh:typeInfo familyType="FCAT_GOTHIC" weight="6" proportion="4" contrast="0" strokeVariation="1" armStyle="1" letterform="1" midline="1" xHeight="1"/>
         </hh:font>
       </hh:fontface>
       <hh:fontface lang="SYMBOL" fontCnt="2">
-        <hh:font id="0" face="함초롬돋움" type="TTF" isEmbedded="0">
+        <hh:font id="0" face="Pretendard" type="TTF" isEmbedded="0">
           <hh:typeInfo familyType="FCAT_GOTHIC" weight="6" proportion="4" contrast="0" strokeVariation="1" armStyle="1" letterform="1" midline="1" xHeight="1"/>
         </hh:font>
-        <hh:font id="1" face="함초롬바탕" type="TTF" isEmbedded="0">
+        <hh:font id="1" face="Pretendard" type="TTF" isEmbedded="0">
           <hh:typeInfo familyType="FCAT_GOTHIC" weight="6" proportion="4" contrast="0" strokeVariation="1" armStyle="1" letterform="1" midline="1" xHeight="1"/>
         </hh:font>
       </hh:fontface>
       <hh:fontface lang="USER" fontCnt="2">
-        <hh:font id="0" face="함초롬돋움" type="TTF" isEmbedded="0">
+        <hh:font id="0" face="Pretendard" type="TTF" isEmbedded="0">
           <hh:typeInfo familyType="FCAT_GOTHIC" weight="6" proportion="4" contrast="0" strokeVariation="1" armStyle="1" letterform="1" midline="1" xHeight="1"/>
         </hh:font>
-        <hh:font id="1" face="함초롬바탕" type="TTF" isEmbedded="0">
+        <hh:font id="1" face="Pretendard" type="TTF" isEmbedded="0">
           <hh:typeInfo familyType="FCAT_GOTHIC" weight="6" proportion="4" contrast="0" strokeVariation="1" armStyle="1" letterform="1" midline="1" xHeight="1"/>
         </hh:font>
       </hh:fontface>
@@ -267,7 +267,7 @@
         <hh:outline type="NONE"/>
         <hh:shadow type="NONE" color="#C0C0C0" offsetX="10" offsetY="10"/>
       </hh:charPr>
-      <!-- charPr 10: 14pt 흰색 볼드 함초롬돋움 (대제목 번호 Ⅰ,Ⅱ... on green bg) -->
+      <!-- charPr 10: 14pt 흰색 볼드 Pretendard (대제목 번호 Ⅰ,Ⅱ... on green bg) -->
       <hh:charPr id="10" height="1400" textColor="#FFFFFF" shadeColor="none" useFontSpace="0" useKerning="0" symMark="NONE" borderFillIDRef="2">
         <hh:fontRef hangul="0" latin="0" hanja="0" japanese="0" other="0" symbol="0" user="0"/>
         <hh:ratio hangul="100" latin="100" hanja="100" japanese="100" other="100" symbol="100" user="100"/>
@@ -280,7 +280,7 @@
         <hh:outline type="NONE"/>
         <hh:shadow type="NONE" color="#C0C0C0" offsetX="10" offsetY="10"/>
       </hh:charPr>
-      <!-- charPr 11: 11pt 흰색 볼드 함초롬돋움 (소제목 번호 1,2,3 on blue bg) -->
+      <!-- charPr 11: 11pt 흰색 볼드 Pretendard (소제목 번호 1,2,3 on blue bg) -->
       <hh:charPr id="11" height="1100" textColor="#FFFFFF" shadeColor="none" useFontSpace="0" useKerning="0" symMark="NONE" borderFillIDRef="2">
         <hh:fontRef hangul="0" latin="0" hanja="0" japanese="0" other="0" symbol="0" user="0"/>
         <hh:ratio hangul="100" latin="100" hanja="100" japanese="100" other="100" symbol="100" user="100"/>

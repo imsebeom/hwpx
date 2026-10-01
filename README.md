@@ -20,6 +20,7 @@ HWPX(한컴오피스 한글 개방형 문서) 생성, 편집, 병합을 위한 C
 | 스크립트 이식 | [chrisryugj/kordoc](https://github.com/chrisryugj/kordoc) | MIT (© 2026 chrisryugj) | `scripts/gongmun_lint.py` 공문서 표기법 검수, `scripts/seal_hwpx.py` 도장 날인, `scripts/chart_hwpx.py` 한글 네이티브 차트. TypeScript 를 파이썬 표준 라이브러리로 옮겼고 실행 때 kordoc 이나 네트워크를 쓰지 않는다 (2026-09-28) |
 | 알고리즘 원전 | [DoHyun468/claw-hwp](https://github.com/DoHyun468/claw-hwp) | MIT (© 2026 DoHyun468) | kordoc 이 가져온 차트 조립과 종류 표, 도장 배치 방식의 원전 (2026-09-28) |
 | 스펙 자료 | 한글과컴퓨터 HWP 파일 형식 공개 문서 | 공개 | HWPX XML 스키마 해석 기준 |
+| 기본 글꼴 | [orioncactus/pretendard](https://github.com/orioncactus/pretendard) v1.3.9 | SIL OFL 1.1 (© 2021 Kil Hyung-jin, Reserved Font Name Pretendard) | `fonts/Pretendard-Regular.ttf`, `Pretendard-Bold.ttf` 원본 그대로 동봉, 라이선스 전문 `fonts/OFL.txt`. 보고서, 회의록, 제안서, 기본 템플릿의 글꼴이며 rhwp PDF 가 쓴다 (2026-10-02) |
 | Python 라이브러리 | `lxml` / `python-hwpx 2.9.1+` / `Pillow` | 각 라이브러리 라이선스 | XML 파싱·편집, HWPX 읽기·`HwpxDocument` API, 이미지 처리 |
 
 **상세 참조**: 원본 fork 대비 변경 사항은 아래 "원본(jkf87) 대비 변경 사항" 참조.
@@ -87,6 +88,8 @@ Rust(`~/.cargo` 의 cargo, wasm-pack)가 있으면 `editor/patches/` 를 넣어 
 
 - rhwp CLI: GitHub 릴리스의 미리 빌드본(Windows, macOS, Linux, 약 10MB)을 받아 `SHA256SUMS.txt` 로 확인하고 `~/.cache/rhwp/<버전>` 에 둔다. HWP→HWPX 와 PDF 에 쓴다.
 - WASM 엔진: 줄 배치 보정에 쓴다. 에디터 빌드가 있으면 그것을, 없으면 npm `@rhwp/core`(약 4MB)를 `~/.cache/rhwp-core/<버전>` 에 받는다. **Node.js(npm 포함)가 필요하다.**
+
+기본 글꼴은 동봉한 Pretendard(`fonts/`, OFL)다. 공문과 정부 양식 템플릿만 함초롬, 휴먼명조 계열을 그대로 둔다. 받는 사람 PC 에 Pretendard 가 없으면 한글이 다른 글꼴로 보여 주므로, 남에게 보낼 문서는 PDF 를 함께 보낸다.
 
 버전은 `editor/setup.mjs` 의 `RHWP_VERSION` 을 따른다. 한글이 설치된 PC 에서 대조한 결과, rhwp 변환본과 줄 배치 보정본을 한글로 열면 한컴 COM 결과와 픽셀까지 같았다(공문 3~4건). rhwp 가 그리는 PDF 는 한글과 표, 그림, 쪽 구성이 같고 일부 글리프와 대체 글꼴만 다르다.
 

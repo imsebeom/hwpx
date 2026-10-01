@@ -47,6 +47,7 @@ ${CLAUDE_SKILL_DIR}/
 │   ├── server.mjs · host/     # 브리지 서버와 호스트 페이지
 │   ├── plugin/                # studio 플러그인, 한/글 단축키 층, 편집 도구 25종(lib/)
 │   └── tests/                 # 왕복 보존력, 쪽 번호, 실제 키 입력 시험
+├── fonts/                      # Pretendard Regular, Bold + OFL.txt (rhwp PDF 용, 기본 글꼴)
 ├── templates/
 │   ├── base/                  # 베이스 Skeleton
 │   ├── report/                # 보고서
@@ -203,12 +204,14 @@ pip install python-hwpx lxml --break-system-packages
 > **[references/design-basics.md](references/design-basics.md) 를 먼저 읽는다.**
 > 🔴 **사용자는 알록달록한 것을 좋아하지 않는다.** 기본 `ink`(먹색) 한 가지 색이다. 과목별 색 구분은 요청할 때만.
 
+> **기본 글꼴은 Pretendard 다(2026-10-02).** 보고서(`report`), 회의록(`minutes`), 제안서(`proposal`), 기본(`base`) 템플릿과 `md2hwpx_design.py` 가 Pretendard 를 쓴다. **공문(`gonmun`)과 정부 양식(`government`)은 행정 관행대로 함초롬, 휴먼명조 계열을 둔다.** Pretendard Regular, Bold(v1.3.9, SIL OFL 1.1)를 `fonts/` 에 동봉해 rhwp PDF 가 시스템에 글꼴이 없어도 Pretendard 로 그린다(`rhwp_convert.to_pdf` 의 `--font-path`. 없으면 맑은 고딕으로 대체된다). rhwp 에디터는 Pretendard 웹 글꼴을 이미 갖고 있다. **HWPX 는 글꼴을 품지 않으므로 받는 사람 PC 에 Pretendard 가 없으면 한글이 다른 글꼴로 바꿔 보여 줘 줄 나눔이 달라진다** — 남에게 보낼 문서는 PDF 로 함께 보내거나 공문 템플릿을 쓴다. HWPX 글꼴 임베딩(`isEmbedded="1"` + `BinData/*.ttf`)은 2026-10-02 시험에서 한글도 rhwp CLI 도 쓰지 않았다(한글이 저장한 임베딩 표본으로 형식을 확인하기 전까지 쓰지 않는다). 함초롬체는 동봉하지 않는다 — 한컴오피스에 딸린 판(v2.002)은 무료 배포판과 조건이 같은지 확인할 근거가 없다.
+
 ```bash
 python3 "${CLAUDE_SKILL_DIR}/scripts/md2hwpx_design.py" 학습지.md -o 학습지.hwpx            # 기본 ink
 python3 "${CLAUDE_SKILL_DIR}/scripts/md2hwpx_design.py" 학습지.md -o 학습지.hwpx --theme slate
 ```
 
-- 입히는 것: `#` 제목 → 강조색 배너, `##` 절 → 옅은 색 띠와 왼쪽 굵은 선, 표 머리 옅은 색, 회색 표 선, 맑은 고딕, 절 앞 빈 줄
+- 입히는 것: `#` 제목 → 강조색 배너, `##` 절 → 옅은 색 띠와 왼쪽 굵은 선, 표 머리 옅은 색, 회색 표 선, Pretendard(`--font` 로 바꾼다), 절 앞 빈 줄
 - 저절로 처리하는 것: 이름 줄(학년, 반, 번, 이름) 오른쪽 정렬과 쓸 자리 확보, 표 셀 `<br>` 연쇄를 쓰기 칸 빈 줄로,
   절 제목이 쪽 끝에 홀로 남지 않게, 짧은 표(15행 이하)는 나누지 않고 본문 순서 고정, 긴 표는 표 단위로 나누고 머리 행 반복
 - `fix_namespaces.py`(한글 줄 배치 포함)와 `validate.py` 까지 스스로 돌린다. 그 뒤 PDF 로 렌더해 눈으로 확인하고 에디터로 연다

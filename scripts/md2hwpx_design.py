@@ -277,7 +277,7 @@ def style_section(s, ids, cp):
     return re.sub(r"<hp:tbl\b[\s\S]*?</hp:tbl>", fix_tbl, s)
 
 
-def build(md_path, out, accent, light, font="맑은 고딕", layout=True):
+def build(md_path, out, accent, light, font="Pretendard", layout=True):
     md_path, out = Path(md_path).resolve(), Path(out).resolve()
     tmp_md = out.with_name(out.stem + ".__pre.md")
     tmp_md.write_text(preprocess(md_path.read_text(encoding="utf-8")), encoding="utf-8")
@@ -345,7 +345,7 @@ def main():
     ap.add_argument("--accent", help="강조색 #RRGGBB (주면 --theme 대신)")
     ap.add_argument("--light", help="옅은 색 #RRGGBB (--accent 와 함께)")
     ap.add_argument(
-        "--font", default="맑은 고딕", help="본문 글꼴. 빈 문자열이면 템플릿 글꼴 유지"
+        "--font", default="Pretendard", help="본문 글꼴(기본 Pretendard, 스킬 fonts/ 에 동봉). 빈 문자열이면 템플릿 글꼴 유지"
     )
     ap.add_argument(
         "--no-layout",

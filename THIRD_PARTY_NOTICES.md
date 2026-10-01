@@ -245,6 +245,14 @@ SOFTWARE.
 
 ---
 
+## 8. orioncactus/pretendard
+
+- 저장소: https://github.com/orioncactus/pretendard (v1.3.9)
+- 라이선스: SIL Open Font License 1.1, Copyright (c) 2021 Kil Hyung-jin, Reserved Font Name Pretendard
+- 사용: `fonts/Pretendard-Regular.ttf`, `fonts/Pretendard-Bold.ttf` 를 고치지 않고 동봉한다(2026-10-02). 라이선스 전문은 `fonts/OFL.txt`. 글꼴만 따로 팔지 않으며, 고친 판에는 Pretendard 라는 이름을 쓰지 않는다.
+
+---
+
 ## 문의
 
 추가 고지·수정 요청이 있으면 이슈로 알려주세요.
