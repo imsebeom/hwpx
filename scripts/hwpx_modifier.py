@@ -298,7 +298,7 @@ class HwpxModifier:
         self._max_parapr_id = max_id
         return max_id
 
-    def _create_indent_style(self, left_value: int) -> str:
+    def _create_indent_style(self, left_value: int, intent_value: int = 0) -> str:
         """
         주어진 왼쪽 여백 값으로 새 paraPr을 header.xml에 생성한다.
 
@@ -309,12 +309,14 @@ class HwpxModifier:
 
         Args:
             left_value: 왼쪽 여백 (HWPUNIT). 한글 UI의 "왼쪽 10" = 1000.
+            intent_value: 첫 줄 들여쓰기 (같은 단위). 음수면 내어쓰기("내어쓰기 10" = -1000).
 
         Returns:
             새로 생성된 paraPr의 id 문자열
         """
-        if left_value in self._indent_style_cache:
-            return self._indent_style_cache[left_value]
+        key = left_value if not intent_value else (left_value, intent_value)
+        if key in self._indent_style_cache:
+            return self._indent_style_cache[key]
 
         base = self._find_base_parapr()
         if base is None:
@@ -328,12 +330,12 @@ class HwpxModifier:
         # hp:switch 내의 case/default 분기에서 hc:left 값 설정
         for sw_child in new_ppr.iter():
             tag = sw_child.tag.split('}')[-1]
-            if tag == 'case':
+            if tag in ('case', 'default'):
+                k = 1 if tag == 'case' else 2
                 for left_elem in sw_child.iter(f'{{{self.HC}}}left'):
-                    left_elem.set('value', str(left_value))
-            elif tag == 'default':
-                for left_elem in sw_child.iter(f'{{{self.HC}}}left'):
-                    left_elem.set('value', str(left_value * 2))
+                    left_elem.set('value', str(left_value * k))
+                for intent_elem in sw_child.iter(f'{{{self.HC}}}intent'):
+                    intent_elem.set('value', str(intent_value * k))
 
         base.getparent().append(new_ppr)
 
@@ -344,7 +346,7 @@ class HwpxModifier:
                 break
 
         self._header_modified = True
-        self._indent_style_cache[left_value] = str(new_id)
+        self._indent_style_cache[key] = str(new_id)
         return str(new_id)
 
     def _get_all_paragraphs(self, table_index: int = -1, row_index: int = -1
@@ -433,13 +435,15 @@ class HwpxModifier:
     ]
 
     def set_outline_indent(self, step_pt: float = 10, table_index: int = -1,
-                           row_index: int = -1) -> int:
+                           row_index: int = -1, hang_pt: float = 10) -> int:
         """
         개조식 본문의 수준마다 왼쪽 여백을 step_pt(기본 10pt)씩 더한다(2026-10-01 사용자 지시, 20pt는 너무 넓어 10pt로).
 
         수준: 「1.」 0, 「가.」 1, 「1)」 2, 「가)」 3. 「-」 항목은 바로 앞 번호 문단보다 한 수준,
         「→」 부연은 그보다 한 수준 더 들어간다. 「[결정 사항]」 같은 대괄호 머리는 0이고,
         그 아래 번호와 「-」는 한 수준 들어간다. 문단 앞 공백은 보지 않는다.
+        모든 문단(0수준 포함)에 내어쓰기 hang_pt(기본 10pt)를 준다 — 둘째 줄이 번호 뒤 글자에
+        맞춰 들어간다(2026-10-01 사용자 지시, 수준이 있는 글에 공통). 0이면 주지 않는다.
         값은 _create_indent_style 단위(한글 UI 1pt = 100)로 넘긴다. 그 함수가 한글이 읽는 default 분기에 두 배를 넣는다(2026-10-01 한글 PDF 실측).
 
         Returns:
@@ -450,6 +454,7 @@ class HwpxModifier:
         base = self._find_base_parapr()
         base_id = base.get('id') if base is not None else '0'
         unit = int(round(step_pt * 100))
+        hang = int(round(hang_pt * 100))
 
         modified, last, in_bracket = 0, 0, False
         for p in self._get_all_paragraphs(table_index, row_index):
@@ -472,7 +477,11 @@ class HwpxModifier:
                     level = last + 2
                 else:
                     level = 0
-            prid = base_id if level <= 0 else self._create_indent_style(level * unit)
+            left = max(level, 0) * unit
+            if hang:
+                prid = self._create_indent_style(left, -hang)
+            else:
+                prid = base_id if left == 0 else self._create_indent_style(left)
             if p.get('paraPrIDRef') != prid:
                 p.set('paraPrIDRef', prid)
                 modified += 1
