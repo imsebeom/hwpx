@@ -311,6 +311,9 @@ const RUST_PATCHES = [
     // 문단 끝 글자처럼 취급 개체를 마지막 줄(안 들어가면 새 줄)에, 칸 붙여넣기 뒤 칸 안 뒤 문단 세로 위치
     ['tac-end-line', 'src/renderer/composer/line_breaking.rs'],
     ['cell-paste-vpos', 'src/document_core/commands/clipboard.rs'],
+    // 낡은 저장 리셋(쪽 맨 위 vpos=0) — 편집으로 흐름이 밀리면 풀고, 반도 안 찬 쪽에서는 따르지 않는다
+    ['stale-reset-edit', 'src/renderer/composer/line_breaking.rs'],
+    ['stale-reset-fill', 'src/renderer/typeset.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));
