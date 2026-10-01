@@ -13,9 +13,10 @@ python-hwpx가 생성한 HWPX 파일의 XML 네임스페이스 프리픽스를
   Import: exec(open("fix_namespaces.py").read())
           fix_hwpx_namespaces("output.hwpx")
 
-명령줄로 실행하면 마지막에 한글(COM)로 실제 줄 배치와 표 높이를 계산해 넣는다(hancom_layout.py).
+명령줄로 실행하면 마지막에 rhwp 로 더미 줄 배치를 걷고 표 높이를 적는다(rhwp_convert.apply_layout).
 스킬이 넣는 한 줄짜리 더미 줄 배치는 한글만 무시하고 rhwp 같은 다른 구현체는 그대로 믿어 문단이
-한 줄로 눌리거나 표가 겹친다. 한글이 없거나 실패하면 경고만 내고 파일은 그대로 둔다(더미 유지).
+한 줄로 눌리거나 표가 겹친다. 한글은 열 때 줄 배치를 다시 계산하므로 한글에서의 모양은 그대로다
+(2026-10-02 공문 3건 한글 PDF 픽셀 동일). Node.js 가 없거나 실패하면 경고만 내고 파일은 그대로 둔다(더미 유지).
 끄려면 --no-layout 또는 환경변수 HWPX_NO_LAYOUT=1. 가져다 쓰는 fix_hwpx_namespaces() 는 줄 배치를 넣지 않는다.
 """
 
@@ -111,16 +112,16 @@ def fix_hwpx_namespaces(hwpx_path):
 
 
 def apply_layout_if_possible(path):
-    """한글로 실제 줄 배치를 넣는다. 한글이 없거나 실패하면 경고만 내고 False."""
-    if os.environ.get("HWPX_NO_LAYOUT") == "1" or sys.platform != "win32":
+    """rhwp 로 더미 줄 배치를 걷고 표 높이를 적는다. 할 수 없으면 경고만 내고 False."""
+    if os.environ.get("HWPX_NO_LAYOUT") == "1":
         return False
-    from hancom_layout import LayoutError, apply_hancom_layout
+    from rhwp_convert import RhwpError, apply_layout
 
     try:
-        apply_hancom_layout(path)
+        apply_layout(path)
         return True
-    except LayoutError as e:
-        print(f"WARNING: 한글 줄 배치를 넣지 못했다({e}). 더미 줄 배치가 남아 rhwp 등에서 줄바꿈과 표 높이가 어긋날 수 있다.", file=sys.stderr)
+    except RhwpError as e:
+        print(f"WARNING: 줄 배치 보정을 하지 못했다({e}). 더미 줄 배치가 남아 rhwp 등에서 줄바꿈과 표 높이가 어긋날 수 있다(한글에서는 문제없다).", file=sys.stderr)
         return False
 
 
@@ -129,7 +130,7 @@ if __name__ == "__main__":
     if len(args) != 1:
         print("Usage: python fix_namespaces.py <file.hwpx> [--no-layout]")
         print("  Fixes namespace prefixes for Hangul Viewer compatibility,")
-        print("  then lays out lines with Hangul (COM) unless --no-layout.")
+        print("  then fixes line layout with rhwp unless --no-layout.")
         sys.exit(1)
 
     path = args[0]
@@ -140,4 +141,4 @@ if __name__ == "__main__":
     fix_hwpx_namespaces(path)
     print(f"Fixed namespaces: {path}")
     if "--no-layout" not in sys.argv[1:] and apply_layout_if_possible(path):
-        print(f"Laid out with Hangul: {path}")
+        print(f"Laid out with rhwp: {path}")

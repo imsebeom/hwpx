@@ -18,8 +18,8 @@ ${CLAUDE_SKILL_DIR}/
 │   ├── table_calc.py          # ★ 표 계산식 엔진 (SUM/AVG/IF 등, rhwp 포팅)
 │   ├── build_hwpx.py          # 템플릿+XML → .hwpx 조립
 │   ├── build_version.py       # ★ 파일명 날짜·순번 자동 부여 (같은 날 재빌드 덮어쓰기 방지)
-│   ├── fix_namespaces.py      # ★ 필수: 네임스페이스 후처리 + 한글 줄 배치(규칙 42)
-│   ├── hancom_layout.py       # ★ 한글(COM)로 실제 줄 배치와 표 높이를 계산해 옮겨 심기
+│   ├── fix_namespaces.py      # ★ 필수: 네임스페이스 후처리 + rhwp 줄 배치 보정(규칙 42)
+│   ├── rhwp_convert.py        # ★ rhwp 창구: HWP→HWPX, PDF, 줄 배치 보정. 한글 불필요, 엔진은 처음 쓸 때 받는다
 │   ├── validate.py            # HWPX 구조 검증
 │   ├── analyze_template.py    # HWPX 심층 분석 (xpath_local 사용)
 │   ├── clone_form.py           # ★ 양식 복제 (Workflow F)
@@ -32,7 +32,7 @@ ${CLAUDE_SKILL_DIR}/
 │   ├── hwpx_form_filler.py    # ★ 양식 부분 추출/표 조작 (Workflow H)
 │   ├── hwpx_writer.py         # 줄간격 XML 생성 유틸리티
 │   ├── exam_builder.py          # ★ 시험 문제지 생성 (Workflow J)
-│   ├── hwp_to_hwpx_hancom.py    # ★ HWP → HWPX 변환 (Workflow K 1차: rhwp, 실패 시 한컴 COM SaveAs)
+│   ├── hwp_to_hwpx_hancom.py    # ★ HWP → HWPX 변환 (Workflow K 1차: rhwp CLI)
 │   ├── convert_hwp.py           # HWP(바이너리) → HWPX 변환 (Workflow K 폴백: jkf87 순수 Python)
 │   ├── writing_optimizer.py     # ★ 공공기관 보고서 글쓰기 자동 변환 (Workflow P, public-doc-to-hwpx 포팅)
 │   ├── gongmun_lint.py          # 공문서 표기법 검수 (행정업무운영 편람, kordoc 규칙 이식, 표준 라이브러리만)
@@ -122,7 +122,7 @@ pip install python-hwpx lxml --break-system-packages
  ├─ "붙임 추출/표 행 추가/셀 채우기" → 워크플로우 H (표 조작)
  ├─ "여러 HWPX를 하나로 합쳐줘" → 워크플로우 I (병합)
  ├─ "시험 문제지/PDF 시험지 → HWPX" → 워크플로우 J (시험 문제지)
- ├─ ".hwp(바이너리) → HWPX 변환" → 워크플로우 K (1차 rhwp, 실패 시 한컴 COM SaveAs / 폴백 순수 Python)
+ ├─ ".hwp(바이너리) → HWPX 변환" → 워크플로우 K (1차 rhwp / 폴백 순수 Python)
  ├─ "{학교명}/{담당자} 일괄 치환 (양식 표 셀 포함)" → 워크플로우 L (zip-level 전역 치환)
  ├─ "빨간 글씨 일괄 검정으로/스타일별 부분 치환" → 워크플로우 M (스타일 필터 치환)
  ├─ "학생 작품 첨삭 메모 자동 삽입" → 워크플로우 N (자동 첨삭 메모)
@@ -1257,16 +1257,16 @@ xml = build_section_xml(data)
 
 | 순위 | 방법 | 스크립트 | 조건 | 품질 |
 |------|------|----------|------|------|
-| **1차** | rhwp 엔진 → 실패 시 한컴 COM `SaveAs(HWPX)` | `hwp_to_hwpx_hancom.py` | Node.js(npm). 엔진은 에디터 빌드가 없으면 첫 실행 때 `@rhwp/core`를 `~/.cache/rhwp-core`에 받는다. 폴백은 Windows + 한컴오피스 | ★★★ 표·이미지·서식 100% 보존 |
+| **1차** | rhwp CLI `export-hwpx --verify` | `hwp_to_hwpx_hancom.py` | 없음. CLI(Windows, macOS, Linux)는 첫 실행 때 GitHub 릴리스에서 받아 SHA256 을 확인하고 `~/.cache/rhwp/<버전>` 에 둔다 | ★★★ 표·이미지·서식 100% 보존 |
 
-> **rhwp 가 먼저 변환한다(2026-10-02).** 공문 HWP 4건(그림, 표 포함)에서 한컴 COM 변환본과 구조가 같고, 두 변환본을 한글 PDF 로 뽑으면 픽셀까지 같았다. 한글을 띄우지 않으니 1초 안쪽이고 포커스도 빼앗지 않는다. rhwp 가 실패한 파일만 한컴 COM 으로 넘기며, 그때 한글은 숨은 데스크톱에서 돈다(`scripts/hidden_desktop.py`). **한글 COM 을 새로 쓰는 스크립트도 반드시 이 모듈을 거친다** — 그냥 띄우면 한글이 뜰 때와 끝날 때 전경을 가져가 사용자 창이 직전 창으로 튕기고, `Visible=False` 로는 막히지 않는다.
+> **이 스킬은 한글(한컴오피스)을 쓰지 않는다(2026-10-02).** 공문 HWP 4건(그림, 표 포함)에서 rhwp 변환본을 한글로 뽑은 PDF 가 한컴 COM 변환본과 픽셀까지 같았다. 파일 이름의 `hancom` 은 옛 경로 시절 그대로다. 한글 COM 은 한글이 뜰 때와 끝날 때 사용자 창의 포커스를 빼앗아 직전 창으로 튕기게 했다(`Visible=False` 로 막히지 않는다).
 | 폴백 | 순수 Python (jkf87) | `convert_hwp.py` | 한컴·LibreOffice 無 (서버·리눅스) | ⚠️ 표·이미지 손실 (아래 한계 참조) |
 
-> **순수 Python(jkf87)보다 무조건 1차 경로를 쓴다.** 방금 실측(2026-07-06): 교과 평가계획 .hwp 6개를 `SaveAs(HWPX)`로 무손실 일괄 변환 성공. `HWPFrame.HwpObject` COM 자동화가 정공법이고, LibreOffice `--convert-to` 는 hwpx 출력을 지원하지 않는다.
+> **순수 Python(jkf87)보다 무조건 1차 경로를 쓴다.** LibreOffice `--convert-to` 는 hwpx 출력을 지원하지 않는다.
 
-> **⚠️ 확장자 위장 함정 (2026-07-06 실측)**: `.hwp` 확장자여도 **내용이 이미 HWPX(ZIP)** 인 파일이 섞여 있을 수 있다(GUI 저장·이관 과정에서 발생). 이때 `hwp.Open(경로, "HWP", ...)` 로 **바이너리 HWP라고 못박아 열면 열기 실패(False) → 빈 문서 → 표 통째 소실**된다. 반드시 **파일 시그니처로 실제 포맷을 먼저 판별**하라: 선두 4바이트가 `50 4B 03 04`(=`PK`, ZIP)이면 이미 hwpx이므로 **복사만** 하고, `D0 CF 11 E0`(OLE)이면 COM 변환한다. `hwp_to_hwpx_hancom.py` 는 이 판별을 내장했다. 또한 `Open` 의 반환값(False)을 반드시 체크할 것 — 조용히 빈 문서가 만들어지는 것을 막는다.
+> **⚠️ 확장자 위장 함정 (2026-07-06 실측)**: `.hwp` 확장자여도 **내용이 이미 HWPX(ZIP)** 인 파일이 섞여 있을 수 있다(GUI 저장·이관 과정에서 발생). 이것을 **바이너리 HWP라고 못박아 열면 열기 실패 → 빈 문서 → 표 통째 소실**된다(한컴 COM 시절 실측). 반드시 **파일 시그니처로 실제 포맷을 먼저 판별**하라: 선두 4바이트가 `50 4B 03 04`(=`PK`, ZIP)이면 이미 hwpx이므로 **복사만** 하고, `D0 CF 11 E0`(OLE)이면 변환한다. `hwp_to_hwpx_hancom.py` 는 이 판별을 내장했다.
 
-### 1차: `hwp_to_hwpx_hancom.py` (rhwp, 실패 시 한컴 COM SaveAs)
+### 1차: `hwp_to_hwpx_hancom.py` (rhwp CLI)
 
 ```bash
 # 파일 하나 또는 폴더(폴더 내 *.hwp 전부) 또는 여러 파일 나열
@@ -1275,13 +1275,12 @@ python "${CLAUDE_SKILL_DIR}/scripts/hwp_to_hwpx_hancom.py" "폴더경로"
 ```
 
 - 원본 `.hwp` 옆에 동일명 `.hwpx` 생성 (원본 보존).
-- 보안 팝업은 `RegisterModule("FilePathCheckDLL", "FilePathCheckerModule")`로 자동 우회.
-- 핵심: `hwp.Open(경로, "HWP", "forceopen:true")` → `hwp.SaveAs(out, "HWPX", "")`.
-- 무손실이므로 별도 fix_namespaces/verify 후처리 불필요(한컴 자체 출력).
+- 핵심: `rhwp export-hwpx <in.hwp> <out.hwpx> --verify`(산출물을 다시 읽어 IR 차이가 있으면 실패). 하나만 쓰려면 `python scripts/rhwp_convert.py hwpx <in.hwp> <out.hwpx>`.
+- 무손실이므로 별도 fix_namespaces/verify 후처리 불필요.
 
 ### 폴백: 순수 Python (jkf87)
 
-> 아래는 **한컴·LibreOffice 를 모두 쓸 수 없는 환경**에서만 쓴다. 표·이미지가 풍부한 문서에는 부적합.
+> 아래는 **rhwp CLI 를 받을 수 없는 환경**(네트워크 차단 등)에서만 쓴다. 표·이미지가 풍부한 문서에는 부적합.
 
 ### 한계 ⚠️ 중요 (폴백 순수 Python 경로)
 
@@ -1292,7 +1291,7 @@ python "${CLAUDE_SKILL_DIR}/scripts/hwp_to_hwpx_hancom.py" "폴더경로"
 - PDF 크기 비교: 원본 5.0MB → 변환 0.86MB (≈83% 콘텐츠 손실)
 - `verify_hwpx.py` 는 구조만 체크하므로 통과해도 **시각 렌더링은 깨질 수 있음**. 반드시 PDF 변환 후 육안 비교 필요
 
-**권장 사용 범위**: 단순 텍스트 위주의 짧은 .hwp (질문지·메모·간단한 공문 본문). 표·이미지·서식이 풍부한 보고서에는 사용 부적합 — 한컴/LibreOffice 가 가능하면 그쪽 우선.
+**권장 사용 범위**: 단순 텍스트 위주의 짧은 .hwp (질문지·메모·간단한 공문 본문). 표·이미지·서식이 풍부한 보고서에는 사용 부적합 — rhwp 가 가능하면 그쪽 우선.
 
 ### 기타
 - 처음 호출 시 `pyhwp5/olefile/lxml` + `hwp2hwpx-python-refactor` 자동 설치/클론 (네트워크 필요)
@@ -1774,7 +1773,7 @@ import subprocess
 subprocess.run(["python3", f"{SKILL_DIR}/scripts/fix_namespaces.py", "output.hwpx"], check=True)
 ```
 
-**명령줄로 실행하면 마지막에 한글(COM)로 실제 줄 배치를 넣는다**(`scripts/hancom_layout.py`, 문서당 3~6초, 2026-09-25). 빌더들이 넣는 한 줄짜리 더미 줄 배치(`LINESEG_DUMMY`)는 한글만 무시하고 **rhwp 같은 다른 구현체는 그대로 믿어** 문단이 한 줄로 눌리거나 표가 아래 표와 겹친다(규칙 42). 한글이 없거나 실패하면 `WARNING` 만 내고 파일은 그대로 둔다. 끄려면 `--no-layout` 또는 `HWPX_NO_LAYOUT=1`(한글이 없는 환경이나 수십 개 일괄 빌드). `import` 해서 쓰는 `fix_hwpx_namespaces()` 는 줄 배치를 넣지 않는다.
+**명령줄로 실행하면 마지막에 rhwp 로 줄 배치를 보정한다**(`rhwp_convert.apply_layout`, 문서당 1초 안팎, 2026-10-02). 빌더들이 넣는 한 줄짜리 더미 줄 배치(`LINESEG_DUMMY`)는 한글만 무시하고 **rhwp 같은 다른 구현체는 그대로 믿어** 문단이 한 줄로 눌리거나 표가 아래 표와 겹친다(규칙 42). Node.js 가 없거나 실패하면 `WARNING` 만 내고 파일은 그대로 둔다. 끄려면 `--no-layout` 또는 `HWPX_NO_LAYOUT=1`(수십 개 일괄 빌드). `import` 해서 쓰는 `fix_hwpx_namespaces()` 는 줄 배치를 넣지 않는다.
 
 | URI | 프리픽스 |
 |-----|---------|
@@ -1835,18 +1834,13 @@ subprocess.run(["python3", f"{SKILL_DIR}/scripts/fix_namespaces.py", "output.hwp
 33. **표 행 삭제 시 3종 동시 보정**: `<hp:tr>` 제거 후 ① 남은 모든 tr의 tc `cellAddr rowAddr`을 0부터 재번호 ② `<hp:tbl rowCnt>` 차감 ③ `<hp:tbl><hp:sz height>`에서 삭제 행 높이 합 차감. 세로 병합(rowSpan)이 삭제 구간을 가로지르면 rowSpan·병합 셀 height도 보정. ⚠ **③의 행 높이는 그 행의 `rowSpan=1`인 tc 기준으로 재라** — `rowSpan=3`인 셀의 `cellSz height`는 3행 합계라 그것까지 더하면 중복 차감된다(실측: 3행 삭제에 5138을 빼야 하는데 8910을 뺐다. `max(rowSpan=1 인 tc 의 height)`가 그 행의 높이다). 행이 삭제 대상인지 판별은 각 tr의 첫 tc cellAddr 기준. (역으로, 표가 통째로 다음 쪽으로 밀리면 데이터 행 `cellSz height`를 최소값(~800)으로 줄여 내용 맞춤 수축 가능). **`cellSz height`는 최소값이라 넘치면 조용히 겹친다** — 빈 양식지의 행 높이는 원래 들어 있던 한 줄에 맞춰져 있어, 2~3줄짜리 값을 채우면 글자가 셀을 넘어 아래 행 라벨과 포개진다. `validate.py`는 통과하므로 **PDF로 렌더해 눈으로 봐야 드러난다**(해당 행 모든 tc의 `cellSz height`와 `<hp:tbl><hp:sz height>`를 같은 양만큼 증량). 좁은 칸은 애초에 글자 수로 자르는 편이 낫다 — 10pt 기준 한 줄에 25mm=8자, 33mm=10자, 50mm=15자, 99mm=30자, 107mm=35자 (2026-08-25 실측). **표가 페이지 경계에서 잘리는 문제는 `<hp:tbl pageBreak>` 값으로 먼저 다룬다** — `NONE`(표를 나누지 않고 통째로 다음 쪽), `TABLE`(표는 나누되 셀은 안 나눔), `CELL`(기본, 셀 내부까지 나눔) + `repeatHeader="1"`(나뉜 쪽 제목 행 반복). KS X 6101:2024 표 194
 34. **편집 기준본은 hwpx 실물**: md 원고와 실제 제출·유통 hwpx는 다를 수 있다(사용자 수동 수정·버전 분기). 착수 전 `text_extract.py` 또는 `<hp:t>` 정규식 덤프로 실물 텍스트를 뽑아 원고와 대조하고, 완료 후에는 인물명·부서/보직명·연도 등 식별자를 전수 grep해 초안 가정값 잔존을 점검한다 (2026-07-09: 5월 초안의 가상 보직이 최종본에 잔존해 사용자 지적으로 발견)
 35. **글꼴 실재 확인**: `python scripts/font_check.py <file>` — 문서가 참조하는 글꼴이 시스템에 실제로 있는지 검사한다(TTF/TTC name 테이블 직접 파싱, 의존성 없음). 없으면 한컴이 임의 글꼴로 대체해 자간·줄 수가 달라지고 쪽 나눔이 밀리는데, **문서는 정상적으로 열리므로 조용히 넘어간다**. 레퍼런스 대비 쪽수가 어긋나면(워크플로 O) 이것부터 의심할 것. `isEmbedded="1"`인데 `binaryItemIDRef`가 무효인 경우도 오류로 잡는다(KS X 6101:2024 9.3.2.2.2). 실측 사례: `IEP 양식(수학).hwpx`가 미설치 `KoPub돋움체_Pro Bold`를 참조 중
-36. **한컴 COM 에는 절대 경로만**: `Open()`·`SaveAs()`에 상대 경로를 넘기면 COM 서버가 별도 프로세스(CWD=`...\HOffice130\Bin`)라 **자기 설치 폴더 기준으로 해석**해 "파일을 저장할 수 없습니다" 다이얼로그가 뜨고, 그 다이얼로그가 후속 COM 호출을 전부 블록한다. 경로는 `os.path.abspath()`/`Path.resolve()`로 절대화하고 넘기기 직전 `assert os.path.isabs(...)`로 확인한다. **출력 디렉터리 인자도 대상이다** — 파일명만 절대 경로여도 부모가 상대면 같은 사고가 난다(2026-07-20 `/md doc_to_md.py`, 2026-07-29 `form_gate.render_preview` 두 번 반복). 더불어 COM 인스턴스 재생성은 연속 호출에서 산발적으로 RPC 오류를 내므로 **1회 재시도**를 두고, `finally`의 `Quit()`으로 잔여 `Hwp.exe`를 남기지 않는다.
-
-⚠ **`EnsureDispatch`가 `has no attribute 'CLSIDToClassMap'`(또는 `MinorVersion`)으로 죽으면 gen_py 캐시가 깨진 것이다.** 복구는 두 가지를 함께 해야 한다 — 한쪽만 하면 같은 오류가 반복된다(2026-08-06 실측).
-
-1. **캐시는 `site-packages/win32com/gen_py`가 아니라 `%TEMP%\gen_py\<파이썬버전>`에 있다.** 실제 경로는 `win32com.client.gencache.GetGeneratePath()`로 확인하고 그 폴더를 통째로 지운다.
-2. **창 없는 `Hwp.exe` 잔여 프로세스를 죽인다.** 실패한 호출이 인스턴스를 남기고, 그것이 쌓이면 캐시를 지워도 새 타입라이브러리를 못 만든다(실측: 닷새 전 것까지 3개가 살아 있었다). `MainWindowTitle`이 비어 있으면 COM 잔여물이라 안전하게 종료할 수 있다 — **제목이 있으면 사용자가 연 문서이므로 건드리지 않는다.** `HAction` 방식보다 `gencache.EnsureDispatch` + `SaveAs(path, "PDF", "")`가 안정적이다
+36. **이 스킬은 한글(한컴오피스) COM 을 쓰지 않는다**(2026-10-02): HWP→HWPX, 줄 배치 보정, 미리보기 PDF 를 모두 rhwp(`scripts/rhwp_convert.py`)로 한다. 새 기능에 한글 COM 을 끌어들이지 않는다 — 한글이 없는 PC 에서 스킬이 깨지고, 한글이 있어도 뜰 때와 끝날 때 사용자 창의 포커스를 빼앗는다. 한글의 정확한 렌더가 꼭 필요하면(제출용 PDF, 최종 쪽수 확인) 스킬 밖에서 사용자가 한글로 연다
 37. **표 셀 좌표는 cellAddr 격자, 순회는 직계만**: `tr` 안 `tc` 의 순번은 실제 열 위치가 아니다 — `colSpan="2"` 병합이 있으면 순번 0,1,2가 실제로는 열 0,2,4다. 좌표로 셀을 찾을 때는 `build_cell_grid()`처럼 `cellAddr`의 `rowAddr`/`colAddr`을 써야 하며, 순번을 쓰면 엉뚱한 칸을 채운다. 함께 지킬 것은 **순회 범위** — `tbl.iter(tc)`로 훑으면 **셀 안에 든 중첩 표의 셀까지** 바깥 표 것으로 계산된다(실측: 1×1 표 안의 표 4개, 셀 53개가 전부 바깥 격자로 들어가 `verify_hwpx`가 정상 문서를 "셀 주소 중복"으로 FAIL 판정). 반드시 `tbl > tr > tc` 직계 경로로 순회하고, 중첩 표는 상위 순회에서 별도 표로 검사한다
 38. **PrintMethod 는 항상 0(기본 인쇄)으로 정규화한다**: `settings.xml` 의 `PrintMethod` 가 `4`면 **모아 찍기**라서 한컴 `SaveAs(PDF)` 와 인쇄가 A4 한 장에 두 쪽을 얹어 낸다. 외부에서 받은 양식에 이 값이 들어 있으면 편집 산출물이 전부 2-up 으로 나오는데, **문서 내용에는 아무 흔적이 없어 PDF 를 눈으로 보기 전까지 드러나지 않는다**(secPr, pagePr 은 정상이다). `fix_namespaces.py` 와 `zip_replace_all.py` 가 저장 시 `hwpx_helpers.force_default_print_method()` 로 0 을 강제하며, `zip_replace_all` 은 `stats["print_method_reset"]` 로 보고한다. 의도적으로 모아 찍기 양식을 만들 일이 있으면 저장 후 다시 설정한다. 소책자 인쇄는 이 값이 아니라 `/booklet` 스킬(면 재배열)로 처리한다 (2026-08-14 민주시민교육 실습지 양식 실측)
 39. **수식은 이미지가 아니라 개체로 넣는다**: `python scripts/add_equation.py in.hwpx -o out.hwpx --after "앵커" --script "1 over 2"` — 한컴 네이티브 `<hp:equation>` 이라 수식 편집기로 다시 열린다. 표 셀은 `--table/--row/--col`(cellAddr 격자, 규칙 37과 같은 좌표계). 수식은 자기완결 개체라 header.xml·BinData 등록이 필요 없고, `treatAsChar="1"` 이 **맞다**(글자 크기 인라인 개체라 쪽을 넘길 일이 없다 — 표가 0이어야 하는 것과 반대). 문법과 함정은 [references/equation-syntax.md](references/equation-syntax.md): `&` 는 글자가 아니라 **열 구분자**라 그대로 쓰면 사라지고, `matrix` 는 **괄호를 그리지 않아** `LEFT ( matrix{…} RIGHT )` 로 감싸야 한다 (2026-09-08 한컴 개봉·PDF 렌더로 토큰 검증)
 40. **명사형 종결 변환은 보고서에만**: `writing_optimizer.py` 의 R3/R4/R5(`~보입니다`→`예상`, `~판단됩니다`→`판단`, `~예정이었으나 유예`)는 개조식 보고서 문체다. **공문·이메일은 서술형에 경어**(`~하시기 바랍니다`)가 행정 규범이라 적용하면 격식 위반이고, 정규식이 관형형을 남겨 **비문을 만든다** — `적정하게 이행된 것으로 판단됩니다` → `적정하게 이행된 판단`(2026-09-08 실측). 그래서 기본은 검토 권장으로만 보고하고 자동 치환하지 않는다. 보고서 원고에는 `--nominal-endings` 로 켜되, 켠 뒤 앞말은 사람이 명사형으로 고친다. 근거는 [references/layout-rules.md](references/layout-rules.md) §8-1
 41. **🔴 텍스트 치환은 `<hp:t>` 안에서만 — XML 전체 `str.replace` 금지**: section0.xml 문자열에 `text.replace(old, new)` 를 걸면 **속성값도 같이 바뀐다.** 2026-09-15 실측(코덱스가 만든 계획서): 「7→4」, 「17→」, 「4.2→」 같은 짧은 키가 `pagePr height="84186"` 을 `8` 로, 여백 `1417` 을 `14` 로, 표 7행 `rowAddr` 를 4 로 바꿨고 **XML 은 유효해서 `validate.py` 를 통과했는데 한글은 그 파일을 열다 멈췄다**(쪽 높이 8 HWPUNIT). 원본과 요소 수 1,706 동일, 속성 다른 요소 413. 처방 = ⓐ 치환은 `hwpx_helpers.replace_in_text_nodes()` 로 한다(태그와 속성은 건드리지 않고 `<hp:t>` 내부 글자만, 인라인 `<hp:tab/>` 조각도 처리). `zip_replace_all.py` 와 `clone_form.py` Phase 1 의 **기본이 이 방식**이고 XML 전체 치환은 `--raw` 를 줘야 한다(짧거나 숫자뿐인 키면 경고) ⓑ `validate.py` 가 **쪽 크기 상식(pagePr 10,000~300,000 HWPUNIT)과 표 격자(cellAddr 중복·빈 칸)** 를 검사한다 — 유효한 XML 이라도 이 둘에 걸리면 INVALID ⓒ 한글이 파일을 열다 멈추면 XML 오류가 아니라 **속성값 오염을 먼저 의심**하고, 글자를 뺀 구조 diff(태그와 속성만 나열해 원본과 대조)로 찾는다. AI 에게 hwpx 편집 스크립트를 쓰게 할 때도 「본문 글자만 바꿔라, 서식과 표 구조는 그대로」를 지시에 넣는다
-42. **🔴 줄 배치(`linesegarray`)는 한글이 계산한 것을 넣는다 — 더미는 다른 구현체를 깨뜨린다**: 빌더가 넣는 `LINESEG_DUMMY`(한 줄짜리, polaris-dvc JID 11004 대응)는 한글만 다시 조판하고 **rhwp 는 그대로 믿어 문단 전체를 한 줄에 눌러 그린다.** 더미를 걷어도 **글자처럼 취급(`treatAsChar="1"`)하는 표**는 rhwp 가 행을 늘리지 못해 넘친 줄이 아래 표와 겹친다(rhwp 결함 #7419, v0.8.6과 devel 모두 — 원인은 글자처럼 취급하는 표의 비례 축소 규칙이 줄 배치 없는 행을 하한 0 으로 누르는 것). 한글이 계산한 줄 배치와 **표 `hp:sz height`** 를 넣으면 rhwp 가 한글 재저장본과 글자 좌표까지 같게 그린다(2026-09-25 서술형 문항지 6쪽 3,478자 대조). 그래서 `fix_namespaces.py` 명령줄 실행이 마지막에 `hancom_layout.py` 를 부른다 — 사본을 한글로 열어 **쪽수를 읽어 조판을 끝낸 뒤**(`PageCount` 를 묻지 않고 `SaveAs` 하면 더미가 그대로 저장된다) 저장하고, 문단끼리 짝지어 줄 배치를, 표끼리 짝지어 `sz height` 를 원본에 옮긴다. 한글 재저장본을 통째로 쓰지 않는 것은 그림을 BMP 로 다시 넣어 파일이 부풀기 때문이다. 여러 빌드가 동시에 불러도 잠금 파일로 한 번에 하나씩 돌고, 닫히는 중인 한글에 붙어 나는 RPC 오류는 통째로 다시 시도한다(4건 동시 × 3회 전부 성공, 결과 md5 동일). 두 번 돌려도 결과가 같다. 한글이 없어 더미가 남은 문서는 에디터가 열 때 `editor/rhwp_layout.mjs` 로 표 높이를 보정한다(`references/editor-mode.md` 1절)
+42. **🔴 줄 배치(`linesegarray`)는 더미로 두지 않는다 — 더미는 다른 구현체를 깨뜨린다**: 빌더가 넣는 `LINESEG_DUMMY`(한 줄짜리, polaris-dvc JID 11004 대응)는 한글만 다시 조판하고 **rhwp 는 그대로 믿어 문단 전체를 한 줄에 눌러 그린다.** 더미를 걷어도 **글자처럼 취급(`treatAsChar="1"`)하는 표**는 rhwp 가 행을 늘리지 못해 넘친 줄이 아래 표와 겹친다(rhwp 결함 #7419 — 글자처럼 취급하는 표의 비례 축소 규칙이 줄 배치 없는 행을 하한 0 으로 누른다). 그래서 `fix_namespaces.py` 명령줄 실행이 마지막에 `rhwp_convert.apply_layout()` 을 부른다 — 더미를 걷고(`editor/rhwp_layout.mjs`) **① 표 높이를 0 으로 열어 rhwp 가 내용으로 잰 높이를 얻고 ② 그 값을 `hp:sz height` 에 적는다.** 2026-10-02 실측(한글이 설치된 PC 에서 대조): 공문 3건의 줄 배치를 더미로 바꾼 뒤 이 보정을 하면 rhwp PDF 쪽수가 한글과 같아지고(더미 그대로면 2쪽 문서가 1쪽), **그 결과를 한글로 열면 원본과 픽셀 동일(0.000~0.004%)** 이다. 한글은 열 때 줄 배치와 표 높이를 다시 계산하기 때문이다. Node.js 가 필요하고 WASM 엔진(에디터 빌드, 없으면 npm `@rhwp/core`)은 처음 쓸 때 받는다. 할 수 없으면 경고만 내고 더미를 남긴다(한글에서는 문제없다). 2026-09-25~10-01 에는 한글 COM 으로 줄 배치를 계산했으나(`hancom_layout.py`) 한글 없이도 같은 결과가 나와 걷어 냈다
 
 ---
 

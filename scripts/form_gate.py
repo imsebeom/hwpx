@@ -26,7 +26,6 @@ import re
 import shutil
 import subprocess
 import sys
-import time
 import zipfile
 from datetime import datetime
 from pathlib import Path
@@ -180,7 +179,7 @@ def approve(template_path: str, note: Optional[str] = None,
     if not previews and not no_preview:
         try:
             previews = render_preview(template_path, pages=pages)
-        except Exception as e:  # 한컴 미설치·COM 실패 등
+        except Exception as e:  # rhwp 엔진을 받지 못한 경우 등
             raise TemplateGateError(
                 f"미리보기 생성 실패: {e}\n"
                 f"  사용자가 템플릿을 직접 열어 확인했다면 --no-preview 로 승인하라."
@@ -258,7 +257,7 @@ def guard_write(target_path: str, values: Iterable[Any], action: str,
 
 
 # ---------------------------------------------------------------------------
-# 미리보기 (한컴 COM → PDF → pdftoppm PNG)
+# 미리보기 (rhwp → PDF → pdftoppm PNG). 한글이 필요 없다
 # ---------------------------------------------------------------------------
 
 def _pdftoppm() -> Optional[str]:
@@ -269,73 +268,24 @@ def _pdftoppm() -> Optional[str]:
     return fallback if os.path.exists(fallback) else None
 
 
-def _hancom_to_pdf(src: str, pdf_path: str) -> None:
-    """한컴 COM 으로 HWPX 를 PDF 로 저장한다 (경로는 반드시 절대 경로)."""
-    import hidden_desktop
-
-    # 한글이 사용자 창의 포커스를 빼앗지 않게 숨은 데스크톱의 자식 프로세스에서 연다(hidden_desktop.py).
-    if hidden_desktop.available():
-        hidden_desktop.delegate(__file__, "--hancom-pdf", src, pdf_path, timeout=120)
-    else:
-        _hancom_to_pdf_here(src, pdf_path)
-    if not os.path.isfile(pdf_path) or os.path.getsize(pdf_path) == 0:
-        raise RuntimeError("PDF 가 생성되지 않았다")
-
-
-def _hancom_to_pdf_here(src: str, pdf_path: str) -> None:
-    import win32com.client as win32  # 한컴 COM (Windows 전용)
-
-    hwp = win32.gencache.EnsureDispatch("HWPFrame.HwpObject")
-    try:
-        hwp.RegisterModule("FilePathCheckDLL", "FilePathCheckerModule")
-        if not hwp.Open(src, "", "forceopen:true"):
-            raise RuntimeError(f"한글이 파일을 열지 못했다: {src}")
-        hwp.SaveAs(pdf_path, "PDF", "")
-        hwp.Clear(1)
-    finally:
-        # COM 서버가 도중에 죽어도 Hwp.exe 가 백그라운드에 남지 않게 한다
-        try:
-            hwp.Quit()
-        except Exception:
-            pass
-
-    if not os.path.isfile(pdf_path) or os.path.getsize(pdf_path) == 0:
-        raise RuntimeError("PDF 가 생성되지 않았다")
-
-
 def render_preview(hwpx_path: str, out_dir: Optional[str] = None,
                    pages: int = 2, dpi: int = 110) -> List[str]:
     """템플릿을 PDF 로 변환하고 앞 몇 쪽을 PNG 로 만든다."""
-    # 한컴 COM 서버는 별도 프로세스(CWD=한컴 Bin)라 상대 경로를 자기 폴더 기준으로
-    # 해석한다. 반드시 절대 경로로 넘긴다.
     src = os.path.abspath(hwpx_path)
     out = Path(out_dir).resolve() if out_dir else Path(src).parent / "_preview"
     out.mkdir(parents=True, exist_ok=True)
     stem = Path(src).stem
     pdf_path = str(out / f"{stem}.pdf")
 
-    # 상대 경로를 넘기면 한컴이 자기 Bin 폴더에 저장을 시도해 다이얼로그가 뜨고,
-    # 그 다이얼로그가 후속 COM 호출을 전부 블록한다 (2026-07-20 /md 동일 사고)
-    assert os.path.isabs(src) and os.path.isabs(pdf_path), "한컴 COM 에는 절대 경로만"
-
-    # 이전 산출물이 남아 있으면 조용한 SaveAs 실패를 성공으로 오판한다
+    # 이전 산출물이 남아 있으면 조용한 실패를 성공으로 오판한다
     if os.path.exists(pdf_path):
         os.remove(pdf_path)
     for old in out.glob(f"{stem}-*.png"):   # 옛 PNG가 남으면 쪽 수가 실제보다 많아 보인다
         old.unlink()
 
-    # COM 인스턴스 재생성은 연속 호출에서 산발적으로 실패한다 (RPC 오류)
-    last_err = None
-    for attempt in range(2):
-        try:
-            _hancom_to_pdf(src, pdf_path)
-            last_err = None
-            break
-        except Exception as e:
-            last_err = e
-            time.sleep(2)
-    if last_err is not None:
-        raise RuntimeError(f"한컴 PDF 변환 실패: {last_err}")
+    from rhwp_convert import to_pdf
+
+    to_pdf(src, pdf_path)  # 스킬 산출물(더미 줄 배치)은 사본에 줄 배치 보정을 한 뒤 그린다
 
     exe = _pdftoppm()
     if not exe:
@@ -496,7 +446,4 @@ def main(argv: Optional[List[str]] = None) -> int:
 
 
 if __name__ == "__main__":
-    if sys.argv[1:2] == ["--hancom-pdf"]:  # _hancom_to_pdf 가 숨은 데스크톱에서 부른다
-        _hancom_to_pdf_here(*sys.argv[2:4])
-        sys.exit(0)
     sys.exit(main())

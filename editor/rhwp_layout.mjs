@@ -23,7 +23,9 @@ let HwpDocument = null;
 
 async function engine() {
   if (HwpDocument) return HwpDocument;
-  const dir = path.join(HERE, 'studio-dist', 'node');   // setup.mjs 가 번들과 같은 WASM 을 둔다
+  // setup.mjs 가 번들과 같은 WASM 을 둔다. 에디터를 빌드하지 않은 PC 에서 빌드 마지막 보정을 할 때는
+  // scripts/rhwp_convert.py 가 받아 둔 npm @rhwp/core 폴더를 RHWP_ENGINE 으로 넘긴다.
+  const dir = process.env.RHWP_ENGINE || path.join(HERE, 'studio-dist', 'node');
   const m = await import(pathToFileURL(path.join(dir, 'rhwp.js')).href);
   m.initSync({ module: fs.readFileSync(path.join(dir, 'rhwp_bg.wasm')) });
   return (HwpDocument = m.HwpDocument);

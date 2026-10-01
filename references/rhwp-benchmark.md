@@ -29,7 +29,7 @@ rhwp 프로젝트는 read-only 참조.
 > 바이너리를 붙이면 9.8MB 자산과 버전 추적 부담이 생긴다. 다시 검토할 만한 경우는
 > 아래 둘뿐이다.
 > - 렌더링·조판 정합처럼 Python 재구현 비용이 큰 기능이 필요해질 때
-> - 산출물을 한컴 없이 PDF/이미지로 뽑아야 할 때(현재는 한컴 COM에 의존)
+> - 산출물을 한컴 없이 PDF/이미지로 뽑아야 할 때 → **2026-10-02 실현**: `scripts/rhwp_convert.py` 가 CLI 미리 빌드본을 받아 HWP→HWPX 와 PDF 를 맡는다
 >
 > 참고로 jkf87/hwpx-skill 은 `scripts/vendor/rhwp/` 에 WASM 번들을 vendoring 하는
 > 쪽을 택했다. 노선이 다르므로 따라가지 않는다.

@@ -1,15 +1,14 @@
-"""HWP(바이너리) → HWPX 변환 — rhwp 엔진 1차, 한컴오피스 COM SaveAs 폴백 (최우선 경로).
+"""HWP(바이너리) → HWPX 변환 — rhwp CLI(export-hwpx --verify). 한글(한컴오피스)이 필요 없다.
 
-rhwp(에디터의 WASM 엔진)가 한글 없이 변환한다. 공문 HWP 4건에서 한글 COM 변환본과 한글 PDF 가
-픽셀까지 같았다(2026-10-02). rhwp 가 실패한 파일만 한글 COM 으로 넘기고, 그때는 한글이
-사용자 창의 포커스를 빼앗지 않게 숨은 데스크톱에서 돌린다(hidden_desktop.py).
+파일 이름은 옛 한컴 COM 경로 시절 그대로다(다른 스킬과 문서가 이 이름으로 부른다).
+rhwp 변환본을 한글로 뽑은 PDF 는 한글 COM 변환본과 픽셀까지 같았다(2026-10-02 공문 4건).
+엔진은 처음 쓸 때 받는다(rhwp_convert.py). Windows, macOS, Linux 에서 돈다.
 jkf87 순수 Python 변환기(convert_hwp.py)는 표·이미지 손실이 크므로 쓰지 않는다.
 
     python hwp_to_hwpx_hancom.py <파일 또는 폴더> [파일2 ...]
 
 - 파일을 주면 그 파일만, 폴더를 주면 폴더 내 *.hwp 전부 변환.
 - 원본 .hwp 옆에 동일명 .hwpx 생성 (원본은 보존).
-- 보안 팝업은 FilePathCheckerModule 등록으로 자동 우회.
 """
 
 import os
@@ -55,41 +54,23 @@ def convert(paths):
         (ole_files if k == "ole" else zip_files if k == "zip" else bad).append(f)
 
     ok = 0
-    # (1) ZIP(=이미 hwpx 내용) → 복사만. COM 변환 시 표가 통째로 날아가는 함정.
+    # (1) ZIP(=이미 hwpx 내용) → 복사만. 바이너리로 못박아 열면 표가 통째로 날아가는 함정.
     for f in zip_files:
         out = os.path.splitext(os.path.abspath(f))[0] + ".hwpx"
         shutil.copyfile(f, out)
         print("COPY(내용이 이미 hwpx):", os.path.basename(out))
         ok += 1
 
-    # (2) 진짜 바이너리 HWP → rhwp. 한글을 띄우지 않으니 포커스도 뺏지 않는다.
-    #     실패한 파일만 한컴 COM 으로 넘긴다(숨은 데스크톱에서).
+    # (2) 진짜 바이너리 HWP → rhwp
     from rhwp_convert import hwp_to_hwpx
 
-    com_files = []
     for f in ole_files:
         out = os.path.splitext(os.path.abspath(f))[0] + ".hwpx"
         if hwp_to_hwpx(f, out):
-            print("OK(rhwp):", os.path.basename(out))
+            print("OK:", os.path.basename(out))
             ok += 1
         else:
-            com_files.append(f)
-    if com_files:
-        import hidden_desktop
-
-        if hidden_desktop.available():
-            try:
-                hidden_desktop.delegate(
-                    __file__, "--com", *map(os.path.abspath, com_files), timeout=300
-                )
-            except RuntimeError as e:
-                print("FAIL(한컴 COM):", e)
-        else:
-            _com_convert(com_files)
-        ok += sum(
-            os.path.isfile(os.path.splitext(os.path.abspath(f))[0] + ".hwpx")
-            for f in com_files
-        )
+            print("FAIL:", os.path.basename(f))
 
     for f in bad:
         print("SKIP(알 수 없는 포맷):", os.path.basename(f))
@@ -98,45 +79,7 @@ def convert(paths):
     return 0 if ok == len(files) else 2
 
 
-def _com_convert(ole_files):
-    """한컴 COM SaveAs. 숨은 데스크톱의 자식 프로세스(--com)에서 부른다."""
-    if ole_files:
-        import win32com.client as win32
-
-        hwp = win32.gencache.EnsureDispatch("HWPFrame.HwpObject")
-        try:
-            try:
-                hwp.RegisterModule("FilePathCheckDLL", "FilePathCheckerModule")
-            except Exception as e:
-                print("보안 모듈 등록 생략(팝업이 뜰 수 있음):", e)
-            for f in ole_files:
-                out = os.path.splitext(os.path.abspath(f))[0] + ".hwpx"
-                try:
-                    # 이전 실행 산출물이 남아 있으면 "조용한 SaveAs 실패"를 성공으로
-                    # 오판하므로 먼저 지운다 (원본 .hwp는 보존되니 재생성 가능).
-                    if os.path.exists(out):
-                        os.remove(out)
-                    if not hwp.Open(os.path.abspath(f), "HWP", "forceopen:true"):
-                        raise RuntimeError("한컴 Open 실패(False 반환)")
-                    hwp.SaveAs(out, "HWPX", "")
-                    if not os.path.isfile(out) or os.path.getsize(out) == 0:
-                        raise RuntimeError("SaveAs 후 출력 파일이 없거나 0바이트")
-                    print("OK(한컴 COM):", os.path.basename(out))
-                except Exception as e:
-                    print("FAIL:", os.path.basename(f), e)
-                hwp.Clear(1)
-        finally:
-            # COM 서버가 도중에 죽어도 Hwp.exe가 백그라운드에 남지 않게 한다.
-            try:
-                hwp.Quit()
-            except Exception:
-                pass
-
-
 if __name__ == "__main__":
-    if sys.argv[1:2] == ["--com"]:
-        _com_convert(sys.argv[2:])
-        sys.exit(0)
     if len(sys.argv) < 2:
         print(__doc__)
         sys.exit(1)

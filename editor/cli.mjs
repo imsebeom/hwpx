@@ -308,7 +308,7 @@ switch (sub) {
       // 기본은 앱 창(한/글 단축키 전부). --browser 면 브라우저 탭(Ctrl+N 계열은 Ctrl+M 으로 대신).
       if (mode === 'browser' || !openAppWindow(url, path.basename(file))) openBrowser(url);
     }
-    // 스킬 파이프라인 산출물은 서버가 한글로 줄 배치를 계산해 보내므로(hancom_layout.py) 넉넉히 기다린다.
+    // 스킬 파이프라인 산출물은 서버가 rhwp 로 표 높이를 재서 보내므로(rhwp_layout.mjs) 넉넉히 기다린다.
     for (let i = 0; i < 180; i++) {
       if (readChanges().some((c) => c.source === 'open')) { out(`열림: ${file}\n에디터: http://localhost:${PORT}/`); process.exit(0); }
       await sleep(500);

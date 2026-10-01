@@ -18,14 +18,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
 import { readZip, stripDummyLinesegs, fixHfFields } from './hwpx-zip.mjs';
 import { rhwpLayout } from './rhwp_layout.mjs';
 import { makeProxy, restoreImages, PROXY_MIN_BYTES } from './image-proxy.mjs';
 import { formatLog, formatOp, coalesceOps } from './log-format.mjs';
-
-const execFileP = promisify(execFile);
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.HWPX_EDITOR_PORT || 7780);
@@ -94,9 +90,9 @@ export function logEvent(ev, data = {}) {
 }
 
 /**
- * 에디터에 보낼 문서 바이트. 스킬 파이프라인 산출물(더미 줄 배치)이면 한글로 줄 배치와 표 높이를 계산해
- * 옮겨 심은 판(hancom_layout.py)을 보낸다. 한글이 없거나 실패하면 더미만 걷어낸다(표가 겹칠 수 있다).
- * 원본 파일은 어느 경우에도 건드리지 않는다. 결과는 원본의 크기와 수정 시각으로 캐시한다.
+ * 에디터에 보낼 문서 바이트. 스킬 파이프라인 산출물(더미 줄 배치)이면 더미를 걷고 rhwp 로 잰 표 높이를
+ * 적은 판(rhwp_layout.mjs)을 보낸다. 실패하면 더미만 걷어낸다(표가 겹칠 수 있다).
+ * 원본 파일은 어느 경우에도 건드리지 않는다. 한글(한컴오피스)은 쓰지 않는다(2026-10-02).
  */
 /** 줄 배치(linesegarray)가 없는 문단이 있고 글자처럼 취급하는 표가 있는가. */
 function lacksLinesegsWithTacTable(buf) {
@@ -110,8 +106,6 @@ function lacksLinesegsWithTacTable(buf) {
   return false;
 }
 
-const LAYOUT_CACHE = path.join(STATE_DIR, 'layout-cache.hwpx');
-const LAYOUT_KEY = path.join(STATE_DIR, 'layout-cache.json');
 async function editorBytes(src) {
   const raw = fs.readFileSync(src);
   if (!/\.hwpx$/i.test(src)) { logEvent('load', { layout: 'raw' }); return raw; }
@@ -119,34 +113,14 @@ async function editorBytes(src) {
   // 더미가 없어도 줄 배치가 빠진 문단과 글자처럼 취급하는 표가 함께 있으면 같은 결함(rhwp#7419)에 걸린다 —
   // 양식 수정 도구(hwpx_modifier, hwpx_form_filler)는 고친 칸의 줄 배치를 지우고, 줄 배치 없이 저장하는 생성기도 있다.
   if (!stripped.removed && !lacksLinesegsWithTacTable(raw)) { logEvent('load', { layout: 'stored' }); return raw; }
-  // 한글이 없으면(다른 OS, 한글 미설치, 실패) rhwp 로 표 높이를 잰다(rhwp_layout.mjs). 그것도 안 되면 더미만 걷는다.
-  const withoutHancom = async (why) => {
-    try {
-      const r = await rhwpLayout(raw);
-      logEvent('load', { layout: 'rhwp', dummy: stripped.removed, tables: r.tables, ...(why ? { note: why } : {}) });
-      return r.buf;
-    } catch (e) {
-      logEvent('load', { layout: 'strip', dummy: stripped.removed, error: `${why ? why + ' / ' : ''}rhwp 보정 실패: ${e?.message ?? e}` });
-      return stripped.buf;
-    }
-  };
-  if (process.platform !== 'win32' || process.env.HWPX_EDITOR_NO_HANCOM === '1') return withoutHancom();
-  const st = fs.statSync(src);
-  const key = JSON.stringify({ src, size: st.size, mtimeMs: st.mtimeMs });
+  // rhwp 로 표 높이를 잰다(rhwp_layout.mjs). 안 되면 더미만 걷는다.
   try {
-    if (fs.readFileSync(LAYOUT_KEY, 'utf8') === key) { logEvent('load', { layout: 'hancom-cache', dummy: stripped.removed }); return fs.readFileSync(LAYOUT_CACHE); }
-  } catch { /* 캐시 없음 */ }
-  try {
-    await execFileP('python', [path.join(HERE, '..', 'scripts', 'hancom_layout.py'), src, LAYOUT_CACHE],
-      { timeout: 120000, windowsHide: true, env: { ...process.env, PYTHONIOENCODING: 'utf-8' } });
-    fs.writeFileSync(LAYOUT_KEY, key);
-    console.log(`한글 줄 배치 적용: ${path.basename(src)}`);
-    logEvent('load', { layout: 'hancom', dummy: stripped.removed });
-    return fs.readFileSync(LAYOUT_CACHE);
+    const r = await rhwpLayout(raw);
+    logEvent('load', { layout: 'rhwp', dummy: stripped.removed, tables: r.tables });
+    return r.buf;
   } catch (e) {
-    const why = String(e?.stderr || e?.message || e).trim().split('\n').pop();
-    console.error(`한글 줄 배치 실패, rhwp 보정으로: ${why}`);
-    return withoutHancom(`한글 실패: ${why}`);
+    logEvent('load', { layout: 'strip', dummy: stripped.removed, error: `rhwp 보정 실패: ${e?.message ?? e}` });
+    return stripped.buf;
   }
 }
 

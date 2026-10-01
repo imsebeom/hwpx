@@ -44,8 +44,8 @@ rhwp 포팅 상세는 [`references/rhwp-benchmark.md`](references/rhwp-benchmark
 | `templates/report/header.xml` | 모든 paraPr의 `borderFillIDRef`를 `"1"`로 변경 (문단 가로선 제거). `diagonal type="SOLID"` → `"NONE"` |
 | `zip_replace_all.py`, `clone_form.py` (2026-09-15) | 텍스트 치환 범위를 **`<hp:t>` 안의 글자만**으로 바꿈(`hwpx_helpers.replace_in_text_nodes`). XML 전체 치환은 `--raw` 로만. AI가 만든 편집 스크립트가 「7→4」 같은 짧은 키로 XML 전체를 치환해 쪽 높이·여백·셀 주소가 깨지고 한글이 멈춘 사고에서 |
 | `validate.py` (2026-09-15) | XML 유효성에 더해 **쪽 크기 상식 검사**(pagePr 10,000~300,000 HWPUNIT)와 **표 격자 검사**(cellAddr 중복·빈 칸)를 넣음. 위 사고 파일이 유효성만으로는 「정상」이었다 |
-| `fix_namespaces.py` (2026-09-25) | 명령줄로 실행하면 마지막에 **한글(COM)이 계산한 실제 줄 배치와 표 높이**를 넣는다(`scripts/hancom_layout.py`). 빌더가 넣는 한 줄짜리 더미 줄 배치는 한글만 무시하고 rhwp 같은 다른 구현체는 그대로 믿어 문단이 한 줄로 눌리거나 표가 겹쳤다. 한글이 없으면 경고만 내고 그대로 둔다. `--no-layout` 또는 `HWPX_NO_LAYOUT=1` 로 끈다 |
-| `scripts/hancom_layout.py` (신규, 2026-09-25) | 사본을 한글로 열어 쪽수를 읽어 조판을 끝낸 뒤 저장하고, 줄 배치는 문단끼리, 표 `hp:sz height` 는 표끼리 짝지어 원본에 옮겨 심는다(한글 재저장본을 통째로 쓰면 그림이 BMP 로 부푼다). 한글 호출 잠금과 RPC 오류 재시도 포함 |
+| `fix_namespaces.py` (2026-09-25, 10-02 rhwp 로 교체) | 명령줄로 실행하면 마지막에 **더미 줄 배치를 걷고 rhwp 로 잰 표 높이**를 넣는다(`rhwp_convert.apply_layout`, 9/25~10/1 은 한글 COM). 빌더가 넣는 한 줄짜리 더미 줄 배치는 한글만 무시하고 rhwp 같은 다른 구현체는 그대로 믿어 문단이 한 줄로 눌리거나 표가 겹쳤다. Node.js 가 없으면 경고만 내고 그대로 둔다. `--no-layout` 또는 `HWPX_NO_LAYOUT=1` 로 끈다 |
+| `scripts/hancom_layout.py` (2026-09-25 신규, **10-02 삭제**) | 사본을 한글로 열어 쪽수를 읽어 조판을 끝낸 뒤 저장하고, 줄 배치는 문단끼리, 표 `hp:sz height` 는 표끼리 짝지어 원본에 옮겨 심는다(한글 재저장본을 통째로 쓰면 그림이 BMP 로 부푼다). 한글 호출 잠금과 RPC 오류 재시도 포함 |
 
 ### 추가된 워크플로우
 
@@ -83,9 +83,12 @@ node ~/.claude/skills/hwpx/editor/setup.mjs   # rhwp v0.8.6 받기 → 패치 �
 
 Rust(`~/.cargo` 의 cargo, wasm-pack)가 있으면 `editor/patches/` 를 넣어 WASM 을 직접 빌드하고, 없으면 npm 의 공식 WASM 을 쓴다(그때는 아래 「에디터 모드」의 엔진 패치가 빠진다).
 
-**HWP → HWPX 변환은 한글이 없어도 된다.** `scripts/hwp_to_hwpx_hancom.py` 가 rhwp 엔진으로 먼저 변환하는데, `setup.mjs` 를 돌리지 않은 PC 에서는 처음 한 번 npm 의 `@rhwp/core`(약 4MB)를 `~/.cache/rhwp-core/<버전>` 에 받아 쓴다. 그래서 Node.js(npm 포함)만 있으면 된다. 공문 HWP 3건에서 이 엔진과 에디터 빌드 엔진의 변환 결과가 바이트까지 같았다. rhwp 가 실패하면 한컴 COM(Windows + 한컴오피스)으로 넘어간다.
+**한글(한컴오피스)이 없어도 된다(2026-10-02).** HWP→HWPX 변환, 빌드 마지막 줄 배치 보정, 양식 미리보기 PDF 를 모두 rhwp 로 한다(`scripts/rhwp_convert.py`). 엔진은 처음 쓸 때 받아 캐시에 둔다.
 
-한컴 COM 을 쓰는 작업(한글 줄 배치, 미리보기 PDF)은 `scripts/hidden_desktop.py` 로 보이지 않는 데스크톱에서 돌려, 한글이 사용자 창의 포커스를 빼앗지 않게 한다(Windows + pywin32).
+- rhwp CLI: GitHub 릴리스의 미리 빌드본(Windows, macOS, Linux, 약 10MB)을 받아 `SHA256SUMS.txt` 로 확인하고 `~/.cache/rhwp/<버전>` 에 둔다. HWP→HWPX 와 PDF 에 쓴다.
+- WASM 엔진: 줄 배치 보정에 쓴다. 에디터 빌드가 있으면 그것을, 없으면 npm `@rhwp/core`(약 4MB)를 `~/.cache/rhwp-core/<버전>` 에 받는다. **Node.js(npm 포함)가 필요하다.**
+
+버전은 `editor/setup.mjs` 의 `RHWP_VERSION` 을 따른다. 한글이 설치된 PC 에서 대조한 결과, rhwp 변환본과 줄 배치 보정본을 한글로 열면 한컴 COM 결과와 픽셀까지 같았다(공문 3~4건). rhwp 가 그리는 PDF 는 한글과 표, 그림, 쪽 구성이 같고 일부 글리프와 대체 글꼴만 다르다.
 
 ## 워크플로우 요약
 
@@ -101,7 +104,7 @@ Rust(`~/.cargo` 의 cargo, wasm-pack)가 있으면 `editor/patches/` 를 넣어 
 | H | 표 조작 (셀 채우기, 행 추가) | hwpx_form_filler.py |
 | I | 여러 HWPX 병합 | lxml 기반 문단 복사 |
 | J | 시험 문제지 생성 (PDF→HWPX) | exam_builder.py |
-| K | HWP(바이너리) → HWPX 순수 Python 변환 | convert_hwp.py (jkf87/hwp2hwpx-python-refactor) |
+| K | HWP(바이너리) → HWPX 변환 | hwp_to_hwpx_hancom.py (rhwp CLI, 한글 불필요). 폴백 convert_hwp.py (jkf87/hwp2hwpx-python-refactor) |
 | L | ZIP-level 전역 치환 (양식 표 셀 포함) | zip_replace_all.py (airmang 이식 + lineseg 통합) |
 | M | 스타일 필터 텍스트 치환 (글자 색·밑줄·charPrIDRef·limit) | style_filter_replace.py (python-hwpx 2.x) |
 | N | 자동 첨삭 메모 batch 삽입 (학생 작품 평가 자동화) | add_review_memo.py (python-hwpx 2.x) |
@@ -148,7 +151,7 @@ $E stop
 | 실시간 공동 편집 | Claude 의 수정이 화면에 바로 반영되고, 사용자 편집은 좌표로 읽힌다. 한/글 단축키(Ctrl+N,T 표 등)는 앱 창에서 모두 된다 |
 | 세션마다 에디터 하나 | 상태 폴더 `~/.claude/cache/hwpx-editor/<세션 ID 앞 8자>/`, 포트 7780 부터 빈 것. 여러 Claude 세션이 동시에 써도 서로의 문서를 덮어쓰지 않는다. `HWPX_EDITOR_INSTANCE` 로 이름을 줄 수 있다 |
 | 작업 기록 | `editor-log.jsonl` 에 비우지 않고 쌓인다. 에디터 화면에서 저장한 것도 파일 이름과 크기로 남는다(브라우저가 전체 경로를 주지 않는다) |
-| 열 때 조판 보정 | 더미 줄 배치나 줄 배치가 빠진 문서는 한글로 줄 배치와 표 높이를 계산해 연다. 한글이 없으면 rhwp 로 표 높이를 재서 적는다(`editor/rhwp_layout.mjs`). 원본 파일은 건드리지 않는다 |
+| 열 때 조판 보정 | 더미 줄 배치나 줄 배치가 빠진 문서는 rhwp 로 표 높이를 재서 적은 판을 연다(`editor/rhwp_layout.mjs`). 원본 파일은 건드리지 않는다. 한글은 쓰지 않는다 |
 | 편집 개선 (09-27~28) | 개체 옆 캐럿과 입력, 삭제, 선택 위치 맞춤(캐럿 축), F5 셀 블록에서 표, 셀, 문단, 글자 모양 대화상자, 글자 색 목록, 표와 그림 끌어 옮기기(끄는 동안 푸른 선, 놓을 때 문단째 이동), 그림 자르기, 칸 안 그림 크기 조절 뒤 칸 높이 = max(적힌 높이, 내용), 칸을 고친 뒤 표 높이와 쪽 나누기를 한글 방식(저장 줄 배치 사다리)으로 맞춤, Ctrl+위/아래 행 크기 조절, 창 닫을 때 저장 확인 |
 | 엔진 패치 | `editor/patches/tac-no-ls-*.rs` — 줄 배치 없는 글자처럼 취급 표가 적힌 높이로 눌려 아래 표와 겹치는 rhwp 결함([#7419](https://github.com/edwardkim/rhwp/issues/7419))의 수정 두 가지. 같은 수정을 [PR #7433](https://github.com/edwardkim/rhwp/pull/7433) 으로 보냈다. 받아들여지면 이 패치를 걷고 rhwp 판을 올린다 |
 
