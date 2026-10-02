@@ -113,6 +113,20 @@
         }
     }
 
+    /// [claude-hwpx tac-sync-offset] 문서를 열 때 이 표를 그린 높이(HWPUNIT) — max(적힌 높이, 쪽 나누기 측정). 보정값(claude_measure_offset)은
+    /// 「잰 높이 − 이 값」이다. 예전에는 적힌 높이만 뺐는데, 적힌 높이가 낡아 내용보다 작은 표(그림을 바꿔 넣은 상자)는 처음부터 내용대로
+    /// 그리므로(cell-floor-stack) 그 차이까지 보정값에 들어가 편집 뒤 표가 그만큼 작게 적혀 화면과 쪽 나누기가 21px 어긋났다(2026-10-02)
+    pub(crate) fn claude_opened_table_height(&self, table: &crate::model::table::Table, parent_para_idx: usize, control_idx: usize) -> i32 {
+        let declared = table.common.height as i32;
+        let native_hwp5 = self.document.layout_profile().native_hwp5_layout();
+        let px = crate::renderer::height_measurer::HeightMeasurer::new(self.dpi)
+            .with_native_hwp5(native_hwp5)
+            .measure_table_for_edit(table, parent_para_idx, control_idx, &self.styles);
+        let drawn = crate::renderer::px_to_hwpunit(px, self.dpi);
+        // 측정의 작은 차이(바깥 여백 등)로 다른 표의 보정값이 흔들리지 않게, 2% 넘게 클 때만 그린 높이를 쓴다
+        if drawn > declared + declared / 50 + 100 { drawn } else { declared }
+    }
+
     /// [claude-hwpx tac-sync-offset] 표를 적힌 높이 0 인 사본으로 잰 높이(HWPUNIT). 적힌 높이로 재면 글자처럼 취급 표
     /// 비례 축소가 늘어난 내용을 도로 누른다.
     pub(crate) fn claude_raw_table_measure(
@@ -196,7 +210,7 @@
                 for (ci, ctrl) in para.controls.iter().enumerate() {
                     if let Control::Table(t) = ctrl {
                         if t.claude_measure_offset.is_none() && !t.dirty && t.common.height > 0 {
-                            let off = self.claude_raw_table_measure(t, pi, ci) - t.common.height as i32;
+                            let off = self.claude_raw_table_measure(t, pi, ci) - self.claude_opened_table_height(t, pi, ci);
                             found.push((si, pi, ci, off));
                         }
                     }

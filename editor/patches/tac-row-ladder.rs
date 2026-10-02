@@ -17,13 +17,18 @@
         {
             let mut ladder = vec![0.0f64; row_count];
             for c in &table.cells {
-                let end = c
-                    .paragraphs
-                    .iter()
-                    .flat_map(|p| p.line_segs.iter())
-                    .map(|s| s.vertical_pos.saturating_add(s.line_height))
-                    .max()
-                    .unwrap_or(0);
+                // 줄을 차례로 쌓아 끝을 잰다 — 줄의 위치가 앞 줄 끝 + 줄 간격보다 위면 그 자리로 내린다. 칸에 그림을 바꿔 넣은 뒤
+                // 저장된 파일은 그림 뒤 빈 문단의 vertpos 가 옛 값(1600)으로 남아, 최댓값만 보면 그 줄이 칸에서 빠졌다(2026-10-02
+                // 가이드북 3절 그림 3-2 상자, 한/글 441.9px 대 rhwp 421.1px). 저장 위치가 맞는 칸은 값이 그대로다
+                let end = {
+                    let (mut next_top, mut end) = (0i32, 0i32);
+                    for s in c.paragraphs.iter().flat_map(|p| p.line_segs.iter()) {
+                        let top = s.vertical_pos.max(next_top);
+                        end = end.max(top.saturating_add(s.line_height));
+                        next_top = top.saturating_add(s.line_height).saturating_add(s.line_spacing.max(0));
+                    }
+                    end
+                };
                 let pad = if c.apply_inner_margin { &c.padding } else { &table.padding };
                 let need = end + pad.top as i32 + pad.bottom as i32;
                 let declared = if c.height < 0x8000_0000 { c.height as i32 } else { 0 };

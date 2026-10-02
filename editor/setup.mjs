@@ -328,6 +328,10 @@ const RUST_PATCHES = [
     ['tac-table-footnote', 'src/renderer/typeset.rs'],
     // 저장 스텝이 표 줄 전체 높이와 같으면 표 줄 높이를 줄이지 않는다(쪽 나누기와 화면이 2.2px 씩 어긋나 쪽 끝 줄이 넘쳤다)
     ['tac-cap-ladder', 'src/renderer/typeset.rs'],
+    // 글자처럼 취급 표 비례 축소의 행별 하한을 줄을 쌓아 잰다(낡은 vertpos 에 빈 줄이 눌렸다)
+    ['cell-floor-stack', 'src/renderer/height_measurer.rs'],
+    // 칸을 위아래로 나눈 새 빈 칸이 원본 그림 줄 높이를 물려받던 것
+    ['split-empty-stale', 'src/document_core/commands/table_ops.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));

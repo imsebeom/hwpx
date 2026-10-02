@@ -103,7 +103,7 @@
                     if let Control::Table(child) = c {
                         changed |= self.claude_init_nested_in(child, pi, ci);
                         if child.common.treat_as_char && child.claude_measure_offset.is_none() && child.common.height > 0 {
-                            child.claude_measure_offset = Some(self.claude_raw_table_measure(child, pi, ci) - child.common.height as i32);
+                            child.claude_measure_offset = Some(self.claude_raw_table_measure(child, pi, ci) - self.claude_opened_table_height(child, pi, ci));
                             changed = true;
                         }
                     }
