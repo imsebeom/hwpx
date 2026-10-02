@@ -75,7 +75,16 @@
     검증: 문서 300개 중 바뀐 2-9절 두 판은 한/글 PDF 처럼 표 9-2 가 7쪽으로, 3절 세 판 편집 흐름 실패 5건씩(원본 rhwp 에서도 실패하는 p0, p12 큰 표 넘침), `cargo test --lib` 3,889 통과
   - 사용자 질문(스킬 용량): GitHub 저장소 250개 10 MB(pack 4.8 MB, 글꼴 5 MB). 로컬 폴더가 큰 것은 `.hwp2hwpx-repo` 78 MB, `studio-dist` 37 MB, `.git` 22 MB(모두 미추적). 설치가 느린 것은 에디터 setup(rhwp 빌드, Rust 면 8분)
     ⚠ Rust 없는 PC 는 npm 원본 WASM 을 써서 엔진 패치가 다 빠진다 — 빌드한 WASM 을 릴리스로 배포할지 제안해 둠(답 없음)
-  - next_steps: ① 스킬 각주 커밋 푸시 여부 묻기 ② 남은 편집 흐름 실패(p0, p12 큰 표가 커질 때 쪽 끝 넘침, 원본 rhwp 부터 있던 것) ③ 빌드 WASM 배포 방식 ④ `.hwp2hwpx-repo` 쓰임 확인(정리 요청 시)
+  - 사용자 「세가지 처리해라」 → ① b3e1ade 푸시 ② 쪽 끝 넘침 ③ 미리 빌드 배포. 스킬 55c96bc, 297aafc 까지 hwpx, hwpx2 푸시
+  - ③ 🔑 **미리 빌드한 에디터 배포**(55c96bc): `editor/prebuilt.mjs`(원본 지문 = setup.mjs + patches/ + plugin/, 줄바꿈 LF 로 맞춤), `release.mjs`(studio-dist+sdk zip 17.4MB 를 hwpx, hwpx2 릴리스 `editor-<지문12>` 에 올리고 `prebuilt.json` 갱신), setup.mjs 가 지문이 같으면 받아 sha256 확인 후 풀고 끝(`--build` 면 빌드).
+    빌드할 때 Rust 가 있을 때만 `studio-dist/.source-hash` 를 남겨 패치 없는 묶음이 올라가지 않게 했다. GitHub 에서 새로 받은 사본으로 4초 만에 설치, 엔진 패치(_05 6쪽) 확인
+    ⚠ **엔진이나 플러그인을 고치면 `setup.mjs --build` → `release.mjs` → prebuilt.json 커밋, 푸시까지 해야 공유 사용자에게 간다**(지문이 다르면 공유 PC 는 직접 빌드로 떨어진다). 현재 릴리스 editor-b2bdd0b35a86
+  - ② 패치 `tac-cap-ladder`: 쪽 나누기가 표 줄을 cap(lh + ls/2 + 바깥 위 여백)으로 줄여 셈하고 화면은 저장 vpos 로 그려 표마다 2.2px 어긋났다(진단: `RHWP_DIAG_TACCAP`, 「DIAG_TAC_END 뒤 다음 문단 시작에서 줄어든다」를 임시 eprintln 으로 좁힘).
+    🔑 첫 판은 구역 연속 좌표 문서(난산 최종보고서, vpos 1.68M)에서 저장 스텝이 rhwp 자기 값이라 늘 일치해 쪽 끝 빈 문단을 다음 쪽으로 밀었다(한/글 COM `SetPos`+`KeyIndicator` 로 문단 쪽 확인, scratchpad `hwp_parapage.py`) → 쪽 기준 좌표일 때만
+    검증: 문서 300개 열 때 바뀐 문서 0, 3절 편집 흐름 5 → 3, `cargo test --lib` 3,889
+  - 사용자 질문 「스킬이 엄청 용량이 많네」: 로컬 `editor/.build` 가 16GB(Rust 캐시, 개발 폴더에 링크) — GitHub 와 무관
+  - 권한 거부: 시험용 headless 프로세스 종료와 `~/.cache/hwpx-clone-test`(GitHub 사본, 시험 설치) 삭제 명령이 막혔다 — 남아 있다
+  - next_steps: ① 남은 편집 흐름 실패 — 3절 p12 는 처음 적재 때 표 비례 축소(별개 결함), 260927 판 5건(좁은 칸 등) ② `.hwp2hwpx-repo`(78MB) 쓰임 확인(정리 요청 시) ③ `~/.cache/hwpx-clone-test` 삭제
 - **10-02 둘째**: 사용자 화면 「그림이 엉뚱한 데 가 있고 문단이 다 어그러짐」(아궁이 문항카드, <자료 1> 그림을 <자료 2> 여러 줄 문단 끝으로 옮김) → 스킬 6eb9ff3. 원인 셋: 줄 나누기가 문단 끝 글자처럼 취급 개체 높이를 첫 줄에 붙임(`tac-end-line`), 칸 붙여넣기, 그림 넣기 뒤 칸 안 뒤 문단 vpos 안 매김(`cell-paste-vpos`, `cell-pic-nested`), 표 높이 맞추기가 맨 바깥 표만 다뤄 표 속 표가 비례 축소(`tac-nested-sync`). 한글 PDF 와 같은 모양, `cargo test --lib` 3,889 통과
   - 🔴 **사고**: 시험 스크립트가 시작 전마다 `stop --force` 했는데, cli 는 stop 이 포트 파일을 지운 인스턴스에 기본 포트 7780 으로 명령을 보냈다 → 교육력제고 실적 창(60ded568)의 서버를 내렸고, 그 창이 내 시험 서버에 붙어 `save` 가 그 문서를 내보냈다(scratchpad m5.hwpx, 그 창 내용 사본). 60ded568 서버를 `hold` 로 다시 띄워 창이 붙음(dirty false, 6쪽). 스킬 b732cb2: 그 포트 서버의 stateDir 이 이 인스턴스가 아니면 stop 은 아무것도 안 내리고 다른 명령은 멈춘다
   - 이산화탄소(card3), 아궁이(card2) 창은 각각 언제인가 닫혔다(창 프로세스 없음, card2 는 02:10 종료 기록). 내가 닫은 흔적은 못 찾음. 아궁이는 새 빌드로 다시 열었다(card2, 7781)
