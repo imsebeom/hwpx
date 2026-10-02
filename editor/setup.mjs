@@ -7,6 +7,8 @@
  *
  *   node setup.mjs            (이미 받은 소스가 있으면 재사용)
  *   node setup.mjs --clean    (.build 를 지우고 처음부터)
+ *   node setup.mjs --build    (미리 빌드한 묶음이 있어도 직접 빌드)
+ * 원본 지문이 prebuilt.json 과 같으면 GitHub 릴리스의 미리 빌드한 묶음을 받아 쓴다(prebuilt.mjs, 올리기는 release.mjs).
  *
  * rhwp 버전을 올릴 때는 RHWP_VERSION 만 바꾸고 --clean 으로 다시 돌린다.
  */
@@ -15,6 +17,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { installPrebuilt, sourceHash } from './prebuilt.mjs';
 
 const RHWP_VERSION = '0.8.6';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -48,6 +51,13 @@ function copyDir(src, dst) {
     const s = path.join(src, f), d = path.join(dst, f);
     if (fs.statSync(s).isDirectory()) copyDir(s, d); else fs.copyFileSync(s, d);
   }
+}
+
+// 0. 미리 빌드한 에디터(prebuilt.json, GitHub 릴리스). 원본 지문이 같으면 받아서 풀고 끝낸다 — Rust 없는 PC 도
+//    엔진 패치가 든 에디터를 쓰고, 빌드(rhwp 소스, npm, Rust 8분 이상)를 건너뛴다. --build 면 늘 빌드한다
+if (!process.argv.includes('--build') && !process.argv.includes('--clean') && (await installPrebuilt())) {
+  console.log(`\n완료: 미리 빌드한 에디터 → ${path.join(HERE, 'studio-dist')}`);
+  process.exit(0);
 }
 
 if (process.argv.includes('--clean')) rmrf(BUILD);
@@ -577,4 +587,6 @@ fs.mkdirSync(sdk, { recursive: true });
 for (const f of ['index.js', 'transport.js', 'document-agent-contract.js']) {
   fs.copyFileSync(path.join(RHWP, 'npm', 'editor', f), path.join(sdk, f));
 }
+// 엔진 패치를 넣어 빌드했을 때만 원본 지문을 남긴다(release.mjs 가 이것을 보고 올린다. npm 원본 WASM 묶음은 올리지 않는다)
+if (hasRust) fs.writeFileSync(path.join(dist, '.source-hash'), sourceHash());
 console.log(`\n완료: rhwp ${RHWP_VERSION} + claude 플러그인 → ${dist}`);

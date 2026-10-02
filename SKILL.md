@@ -42,7 +42,8 @@ ${CLAUDE_SKILL_DIR}/
 │   └── office/{unpack,pack}.py
 ├── editor/                    # ★ 에디터 모드: rhwp 에디터로 사용자와 실시간 공동 편집 (references/editor-mode.md)
 │   ├── cli.mjs                # Claude 용 CLI — start / run / outline / state / changes / save / stop
-│   ├── setup.mjs              # 최초 1회 빌드 (rhwp v0.8.6 + claude 플러그인, Rust 있으면 패치 WASM)
+│   ├── setup.mjs              # 최초 1회 준비 — 미리 빌드한 에디터(prebuilt.json, 릴리스)를 받고, 원본이 다르면 빌드
+│   ├── release.mjs            # (관리자) 빌드한 에디터를 릴리스로 올리고 prebuilt.json 갱신
 │   ├── app.py                 # 에디터 앱 창 (pywebview=WebView2, 한/글 단축키 전부)
 │   ├── server.mjs · host/     # 브리지 서버와 호스트 페이지
 │   ├── plugin/                # studio 플러그인, 한/글 단축키 층, 편집 도구 25종(lib/)
