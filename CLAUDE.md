@@ -61,7 +61,14 @@
   - 검증: 문서 300개(scratchpad `pagemap.mjs`, `prep.mjs`, 한/글 쪽수 `hwp_pages.py` 를 `hidden_desktop.py` 로) 바뀐 5개 모두 한/글과 같아짐, 나빠짐 0. 편집 시험 `edit_reset.mjs`(한/글 원본에서 칸 글과 앞 문단 지움) 한/글과 같은 5쪽, 저장 뒤 다시 열어도 같음. `cargo test --lib` 3,889 통과. _06 편집 흐름 실패 17 → 7(줄어든 10건은 낡은 리셋이 만든 넘침). 실제 창에서 _05 표 3-1 제목 아래 확인
   - ⚠ 남은 것: 리셋이 풀린 뒤 rhwp 직접 조판에서 칸 안 각주가 든 표가 쪽 맨 아래에 걸리면 각주와 겹친다(_05 에서 앞 칸 16pt 시험, edit_flow 실패 15 → 73 의 대부분). rhwp 쪽 맞춤이 표 속 각주 높이를 빼지 않는 것으로 보임, 미확인
   - 한/글 COM 이 다시 필요해 `git show 85bab48^:scripts/hidden_desktop.py` 를 scratchpad 에 꺼내 썼다
-  - next_steps: ① 메모 2~8번(JSON 공백 정규화, 새 문단 글자 크기 상속, clone_table, 표 속 표 format_text, save 뒤 화면 저장 대상, 포커스, 작은 것) ② 표 속 각주 쪽 맞춤 겹침 원인 확인 ③ 스킬 f982ae4, d0e90cf 푸시 여부 묻기
+  - 이어서 메모 2~8번 전부(사용자 「전부」, 6번은 「새 판으로」 선택) → 스킬 135e2f2(푸시 안 함). 플러그인과 CLI 만 바꿨다(엔진 그대로)
+    JSON 문자열 공백 정규화(글 받는 메서드 제외), 없는 메서드 비슷한 이름 안내, insert_paragraphs 빈 문단 뒤 글자 모양, `clone_table`, 표 속 표 좌표 `T20r0c0/T1r0c0`(search_text, format_text, set_cell),
+    `save` 뒤 세션 연결을 새 판으로, `changes` 한/영 오타 표시(`log-format.mjs dubeolsik`), `image --replace`
+  - 🔑 **빌드가 WASM 메서드 매개변수 이름을 지운다**(vite 압축) — `fn.toString()` 으로 `_json` 인자를 가리려던 첫 판이 실패했다. 메서드 이름으로 가린다
+  - 🔑 7번은 포커스 탈취가 아니었다: 사용자가 에디터에서 서식을 바꾸고 9초 뒤 같은 창에 영문 상태로 쳤다(guide4 ops.jsonl). 코드로 막을 수 없어 알림으로
+  - 🔑 사용자가 다른 창에서 일하는 중이면 시험 창을 띄우지 않는다 — `start --no-browser` 뒤 Playwright 보이지 않는 크로미움(scratchpad `headless.py`)으로 호스트 페이지를 열면 cli 명령이 그대로 돈다
+  - 검증: 4절 사본에서 항목마다 전/후 확인, 기존 도구(set_cell, format_text, search_text, replace_paragraph) 스모크 통과, 저장본 validate 통과
+  - next_steps: ① 표 속 각주 쪽 맞춤 겹침 원인 확인 ② 스킬 f982ae4, d0e90cf, 135e2f2 푸시 여부 묻기 ③ 떠 있던 guide3, guide4 창은 이미 닫혀 있다 — 새 기능은 다시 열 때부터
 - **10-02 둘째**: 사용자 화면 「그림이 엉뚱한 데 가 있고 문단이 다 어그러짐」(아궁이 문항카드, <자료 1> 그림을 <자료 2> 여러 줄 문단 끝으로 옮김) → 스킬 6eb9ff3. 원인 셋: 줄 나누기가 문단 끝 글자처럼 취급 개체 높이를 첫 줄에 붙임(`tac-end-line`), 칸 붙여넣기, 그림 넣기 뒤 칸 안 뒤 문단 vpos 안 매김(`cell-paste-vpos`, `cell-pic-nested`), 표 높이 맞추기가 맨 바깥 표만 다뤄 표 속 표가 비례 축소(`tac-nested-sync`). 한글 PDF 와 같은 모양, `cargo test --lib` 3,889 통과
   - 🔴 **사고**: 시험 스크립트가 시작 전마다 `stop --force` 했는데, cli 는 stop 이 포트 파일을 지운 인스턴스에 기본 포트 7780 으로 명령을 보냈다 → 교육력제고 실적 창(60ded568)의 서버를 내렸고, 그 창이 내 시험 서버에 붙어 `save` 가 그 문서를 내보냈다(scratchpad m5.hwpx, 그 창 내용 사본). 60ded568 서버를 `hold` 로 다시 띄워 창이 붙음(dirty false, 6쪽). 스킬 b732cb2: 그 포트 서버의 stateDir 이 이 인스턴스가 아니면 stop 은 아무것도 안 내리고 다른 명령은 멈춘다
   - 이산화탄소(card3), 아궁이(card2) 창은 각각 언제인가 닫혔다(창 프로세스 없음, card2 는 02:10 종료 기록). 내가 닫은 흔적은 못 찾음. 아궁이는 새 빌드로 다시 열었다(card2, 7781)
