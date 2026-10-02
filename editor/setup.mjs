@@ -314,6 +314,8 @@ const RUST_PATCHES = [
     // 낡은 저장 리셋(쪽 맨 위 vpos=0) — 편집으로 흐름이 밀리면 풀고, 반도 안 찬 쪽에서는 따르지 않는다
     ['stale-reset-edit', 'src/renderer/composer/line_breaking.rs'],
     ['stale-reset-fill', 'src/renderer/typeset.rs'],
+    // 칸 안 각주가 든 글자처럼 취급 표의 쪽 맞춤에 그 각주 높이를 뺀다(쪽 맨 아래 표와 각주가 겹쳤다)
+    ['tac-table-footnote', 'src/renderer/typeset.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));
