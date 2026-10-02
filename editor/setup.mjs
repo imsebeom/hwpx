@@ -332,6 +332,8 @@ const RUST_PATCHES = [
     ['cell-floor-stack', 'src/renderer/height_measurer.rs'],
     // 칸을 위아래로 나눈 새 빈 칸이 원본 그림 줄 높이를 물려받던 것
     ['split-empty-stale', 'src/document_core/commands/table_ops.rs'],
+    // 화면 배치가 빈 문단 뒤 줄 간격을 이중으로 셈해 저장 위치로 8px 씩 밀던 것
+    ['lazy-base-empty-bridge', 'src/renderer/height_cursor.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));

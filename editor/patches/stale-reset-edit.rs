@@ -27,3 +27,44 @@
                 .unwrap_or(0);
             next_vpos.saturating_add(gap) - current_start
         } else if is_reset {
+// ==== next ====
+        if delta != 0 {
+            // 모든 LineSeg의 vpos를 delta만큼 이동
+            for seg in &mut paragraphs[pi].line_segs {
+                seg.vertical_pos = seg.vertical_pos.saturating_add(delta);
+            }
+        }
+
+        // 다음 문단의 시작 vpos 계산 (이동 후 end = 저장 end + delta)
+        if let Some(end) = orig_end {
+            next_vpos = end.saturating_add(delta);
+        }
+// ==== replace ====
+        if delta != 0 {
+            // 모든 LineSeg의 vpos를 delta만큼 이동
+            for seg in &mut paragraphs[pi].line_segs {
+                seg.vertical_pos = seg.vertical_pos.saturating_add(delta);
+            }
+        }
+
+        // 다음 문단의 시작 vpos 계산 (이동 후 end = 저장 end + delta)
+        if let Some(end) = orig_end {
+            next_vpos = end.saturating_add(delta);
+        }
+        // [claude-hwpx stale-reset-edit 문단 안] 쪽을 넘는 문단은 한/글이 다음 쪽 첫 줄부터 vpos 를 0 근처로 다시 센다. 흐름이 밀릴 때
+        // (delta ≠ 0) 모든 줄에 같은 이동량을 더하면 그 문단 안 리셋이 낡은 채 남아, 렌더러가 그 쪽의 기준 위치를 되감긴 값으로 다시 잡고
+        // 뒤 문단을 저장 위치로 8px 씩 밀었다(2026-10-02 260927 판 p25 → 3쪽 끝 소제목 9.7px 넘침). 그 문단의 줄을 앞 줄 끝부터 쌓는다
+        if delta != 0 {
+            let segs = &mut paragraphs[pi].line_segs;
+            if segs.windows(2).any(|w| w[1].vertical_pos < w[0].vertical_pos) {
+                for i in 1..segs.len() {
+                    let floor = segs[i - 1].vertical_pos.saturating_add(seg_advance(&segs[i - 1]));
+                    if segs[i].vertical_pos < floor {
+                        segs[i].vertical_pos = floor;
+                    }
+                }
+                if let Some(end) = seg_end(&paragraphs[pi]) {
+                    next_vpos = end;
+                }
+            }
+        }

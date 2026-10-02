@@ -1,12 +1,12 @@
 {
-  "sourceHash": "fe3dbeafc3b12f5ee5b19f6fe1bc9185f9e2a63ff348d2be9746d595b6cec775",
-  "sha256": "fd250b2e86062ea99e391ac9bed3d58a2c7160db0e977efdce9a7c89cc977643",
-  "tag": "editor-fe3dbeafc3b1",
-  "asset": "hwpx-editor-fe3dbeafc3b1.zip",
+  "sourceHash": "1190a7ed15224e395d0178d2bb6ace9a305cb08b8e357cdcecfa97c0b677aef8",
+  "sha256": "da360af77208c5733e176af3a709d9a035ba35040d90cd00032b7c5a5dbd6251",
+  "tag": "editor-1190a7ed1522",
+  "asset": "hwpx-editor-1190a7ed1522.zip",
   "rhwp": "0.8.6",
-  "builtAt": "2026-10-02T06:30:08.804Z",
+  "builtAt": "2026-10-02T12:19:11.688Z",
   "urls": [
-    "https://github.com/imsebeom/hwpx/releases/download/editor-fe3dbeafc3b1/hwpx-editor-fe3dbeafc3b1.zip",
-    "https://github.com/imsebeom/hwpx2/releases/download/editor-fe3dbeafc3b1/hwpx-editor-fe3dbeafc3b1.zip"
+    "https://github.com/imsebeom/hwpx/releases/download/editor-1190a7ed1522/hwpx-editor-1190a7ed1522.zip",
+    "https://github.com/imsebeom/hwpx2/releases/download/editor-1190a7ed1522/hwpx-editor-1190a7ed1522.zip"
   ]
 }
