@@ -51,11 +51,58 @@ export function coalesceOps(ops) {
   return outOps;
 }
 
+// 두벌식 자판 글쇠 → 자모. 한/영 전환 없이 친 한글(「rmfTl」 = 「글씨」)을 알아보는 데 쓴다
+const KEY = { r: 'ㄱ', R: 'ㄲ', s: 'ㄴ', e: 'ㄷ', E: 'ㄸ', f: 'ㄹ', a: 'ㅁ', q: 'ㅂ', Q: 'ㅃ', t: 'ㅅ', T: 'ㅆ', d: 'ㅇ', w: 'ㅈ', W: 'ㅉ', c: 'ㅊ', z: 'ㅋ', x: 'ㅌ', v: 'ㅍ', g: 'ㅎ',
+  k: 'ㅏ', o: 'ㅐ', i: 'ㅑ', O: 'ㅒ', j: 'ㅓ', p: 'ㅔ', u: 'ㅕ', P: 'ㅖ', h: 'ㅗ', y: 'ㅛ', n: 'ㅜ', b: 'ㅠ', m: 'ㅡ', l: 'ㅣ' };
+const CHO = 'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ';
+const JUNG = 'ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ';
+const JONG = ['', 'ㄱ', 'ㄲ', 'ㄳ', 'ㄴ', 'ㄵ', 'ㄶ', 'ㄷ', 'ㄹ', 'ㄺ', 'ㄻ', 'ㄼ', 'ㄽ', 'ㄾ', 'ㄿ', 'ㅀ', 'ㅁ', 'ㅂ', 'ㅄ', 'ㅅ', 'ㅆ', 'ㅇ', 'ㅈ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ'];
+const VV = { ㅗㅏ: 'ㅘ', ㅗㅐ: 'ㅙ', ㅗㅣ: 'ㅚ', ㅜㅓ: 'ㅝ', ㅜㅔ: 'ㅞ', ㅜㅣ: 'ㅟ', ㅡㅣ: 'ㅢ' };
+const CC = { ㄱㅅ: 'ㄳ', ㄴㅈ: 'ㄵ', ㄴㅎ: 'ㄶ', ㄹㄱ: 'ㄺ', ㄹㅁ: 'ㄻ', ㄹㅂ: 'ㄼ', ㄹㅅ: 'ㄽ', ㄹㅌ: 'ㄾ', ㄹㅍ: 'ㄿ', ㄹㅎ: 'ㅀ', ㅂㅅ: 'ㅄ' };
+const isV = (j) => !!j && JUNG.includes(j);
+
+/** 영문 글쇠 → 한글. 음절이 안 되는 자모가 남으면 null. */
+export function dubeolsik(word) {
+  const js = [...word].map((ch) => KEY[ch] ?? KEY[ch.toLowerCase()]);
+  if (js.some((j) => !j)) return null;
+  const out = [];
+  let i = 0;
+  while (i < js.length) {
+    const c = js[i];
+    if (!c || !CHO.includes(c) || !isV(js[i + 1])) return null;
+    let v = js[i + 1];
+    i += 2;
+    if (VV[v + js[i]]) { v = VV[v + js[i]]; i++; }
+    // 받침: 다음이 자음이고 그 뒤가 모음이 아니면 받침으로(겹받침 포함)
+    let t = '';
+    if (js[i] && !isV(js[i]) && !isV(js[i + 1] ?? '')) {
+      t = js[i]; i++;
+      if (js[i] && CC[t + js[i]] && !isV(js[i + 1] ?? '')) { t = CC[t + js[i]]; i++; }
+    }
+    const ti = JONG.indexOf(t);
+    if (ti < 0) return null;
+    out.push(String.fromCharCode(0xac00 + (CHO.indexOf(c) * 21 + JUNG.indexOf(v)) * 28 + ti));
+  }
+  return out.join('');
+}
+
+/** 한/영 전환 없이 친 한글로 보이면 한글 글, 아니면 null. 영어 모음이 없거나 낱말 중간에 대문자가 있을 때만 본다. */
+export function mistypedHangul(text) {
+  const s = String(text ?? '').trim();
+  if (!/^[A-Za-z]+(?: [A-Za-z]+)*$/.test(s) || s.replace(/ /g, '').length < 3) return null;
+  if (/[aeiou]/i.test(s) && !/[a-z][A-Z]/.test(s)) return null;
+  const words = s.split(' ').map(dubeolsik);
+  return words.every(Boolean) ? words.join(' ') : null;
+}
+
 /** 실시간 편집 기록 한 줄: [시각] 동작 자리 내용. 서식은 속성: 전 → 후 */
 export function formatOp(o) {
   const act = { undo: '되돌리기 ', redo: '다시 실행 ', reserve: '' }[o.act] ?? '';
   let what = '';
-  if (o.type === 'insertText') what = `「${o.text}」`;
+  if (o.type === 'insertText') {
+    const ko = o.src === 'user' ? mistypedHangul(o.text) : null;
+    what = `「${o.text}」${ko ? ` ⚠ 한/영 전환 없이 친 「${ko}」로 보인다 — 사용자에게 확인` : ''}`;
+  }
   else if (o.type === 'deleteText') what = o.text ? `「${o.text}」` : `${o.count}자`;
   if (o.props && Object.keys(o.props).length) what = Object.entries(o.props).map(([k, v]) => propText(k, v)).join(', ');
   return `[${localTime(o.t)}] ${act}${o.label}${o.at ? `  ${o.at}` : ''}${what ? `  ${what}` : ''}`;

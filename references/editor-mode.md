@@ -33,6 +33,7 @@ CLI 경로는 아래에서 `$E` 로 적는다: `node "<스킬>/editor/cli.mjs"`.
 ## 2. 대화 규칙
 
 - **사용자가 말을 걸면 답하기 전에 `$E changes` 부터 본다.** 사용자가 에디터에서 고친 내역이 좌표로 나온다(`~ p12 │ 전 → 후`, `~ T1r0c1 │ 전 → 후`, 표 모양이 바뀌면 `! 표`). 커서 자리(셀 안이면 셀 좌표)와 **선택한 글자**도 함께 나온다. "이거", "여기", "선택한 부분"은 그것을 가리킬 가능성이 높다. 지금 커서는 `$E state`.
+  사용자 입력이 한/영 전환 없이 친 한글로 보이면(`rmfTl` = 「글씨」) 그 줄에 `⚠ 한/영 전환 없이 친 「글씨」로 보인다`가 붙는다(2026-10-02). 에디터 창에 포커스가 남은 채 Claude 에게 보낼 말을 친 것일 수 있으니 고치기 전에 사용자에게 묻는다. 영어 모음이 섞이면 놓칠 수 있다(영어 낱말을 잘못 잡지 않으려는 조건).
   **편집 하나가 한 줄로 실시간 기록된다**(`plugin/edit-log.ts`, 2026-09-25). 플러그인이 rhwp 되돌리기 기록(CommandHistory)의 실행, 되돌리기, 다시 실행을 감싸고 글자 모양, 문단 모양 호출에서 **바뀐 속성의 전 → 후**를 잡아 0.2초 안에 `/api/ops` → `ops.jsonl` 로 보낸다. `changes` 는 이것을 먼저 보이고(이어 친 글자는 한 줄로), 그 아래 「글자 변화」로 문단, 셀 단위 글 diff 를 붙인다. 문서 전체를 다시 읽을 필요가 없다. 예:
   ```
   [21:28:45] 지움  T6r1c4 p0:22  「z」
@@ -67,6 +68,10 @@ op 는 네 가지다. **먼저 `tool` 을 쓰고, 도구에 없는 일만 `doc` 
 - 표: `set_cell`, **`fill_by_label`**(label, text, direction, occurrence — 좌표를 몰라도 라벨 옆 칸을 채운다), 행과 열 넣기/지우기, `merge_cells`, `split_cell`, `table_props`(page_break, repeat_header), `table_formula`(=SUM(B2:B5)), `create_table`(after_para, rows[][]), `delete_table`
 - 서식: `format_text`(at, text?, bold, size_pt, color …), `format_paragraph`(align, line_spacing, keep_with_next, page_break_before …), `apply_style`, `set_list`(number | bullet | none)
 - 문서 요소: `set_header_footer`(글만), `add_footnote`, `set_field`(누름틀)
+- **플러그인이 더한 것**(2026-10-02, 가이드북 세션 수정 요청):
+  - `clone_table`(model, after_para, rows) — 문서에 있는 표(그림 상자, 예시 프롬프트 상자)를 본보기로 복제하고 칸 글만 바꾼다. 테두리, 칸 크기, 글자 모양이 본보기와 같다. `rows` 의 `null` 칸은 본보기 글 그대로, 칸 안 그림도 복제된다(바꾸려면 `image … --replace`). `create_table` 로 만들면 글자 크기가 문서와 달라진다
+  - **표 속 표 좌표** `T15r0c0/T1r0c0`(바깥 칸 안 첫째 표의 0행 0열, `/` 로 더 깊이) — `format_text` 의 at, `set_cell` 은 `table:"T15r0c0/T1"` + row, col. `search_text` 가 이 좌표와 문맥을 돌려준다(종전에는 문단 번호와 빈 문맥). 칸 서식은 유지된다
+  - `insert_paragraphs` 를 **글 없는 문단(빈 문단, 표 문단) 뒤에** 하면 새 문단 글자 모양을 앞뒤 15문단의 같은 문단 모양 본문이 가장 많이 쓰는 것으로 맞추고 `style` 로 알린다(빈 문단의 소제목 12pt 를 물려받았다). 글 있는 문단 뒤는 종전대로 그 문단을 따른다
 
 도구에 들어 있는 안전장치: 글머리 기호 보존(keep_bullet), 마크다운 기호 제거, 빨간 작은 안내 문구 자리에 채우면 검은 본문 서식으로 돌리기, 셀 안 표가 든 셀 통째 교체 거부.
 ⚠ `set_header_footer` 는 쪽 번호가 든 글을 거부한다(형제 프로젝트는 쪽 번호를 못 살렸다). 쪽 번호는 아래 `doc` 경로의 `applyHfTemplate`/`insertFieldInHf` 로 넣는다 — 이 스킬에서는 저장본에 살아남는다(5절).
@@ -74,7 +79,8 @@ op 는 네 가지다. **먼저 `tool` 을 쓰고, 도구에 없는 일만 `doc` 
 `$E inspect` 는 문서 종류(공문, 계획서, 보고서, 가정통신문)를 알아내 날짜, 시간, 금액, 개인정보 표기를 검수하고, `$E slots` 는 아직 안 채운 칸을 좌표로 준다. 양식을 채운 뒤에는 둘 다 돌린다.
 `$E goto T1r2c1` 은 사용자 화면의 커서를 그 자리로 옮기고 글자를 선택한다 — "여기를 고쳤다"를 보여 줄 때만 쓴다. ⚠ 이동 직후 키보드로 바로 치면 첫 글자가 먹히고 선택이 바뀌지 않았다(2026-09-25 실측). 사용자에게 "선택된 글자를 바꿔 치라"고 안내하지 않는다.
 
-### 그림 넣기 `$E image <그림 파일> [좌표] [--end] [--width mm] [--desc 설명]`
+### 그림 넣기 `$E image <그림 파일> [좌표] [--end] [--replace] [--width mm] [--desc 설명]`
+**칸 그림 바꾸기는 `--replace`**(2026-10-02): 그 칸의 그림을 모두 지우고 그림이 남긴 빈 문단을 걷은 뒤 넣는다. 글이 없는 칸(그림 상자)은 빈 문단을 모두, 글이 있으면 그림이 있던 문단만 걷는다. 결과의 `replaced` 가 지운 그림 수다
 에디터를 닫지 않고 그림을 넣는다(2026-09-27 추가, 되돌리기 한 번). 좌표(`p12`, `T2r0c0`)를 주면 그 문단이나 칸의 앞, `--end` 면 끝에 넣고, 없으면 사용자 커서 자리에 넣는다. PNG, JPEG, GIF, BMP.
 폭을 안 주면 원본 픽셀 크기를 쓰되 본문 150mm, 칸은 칸 폭을 넘지 않게 줄인다. 본문 그림은 글자처럼 취급으로 들어간다.
 칸 좌표(`T2r0c0`)에 넣으면 칸 문단 안에 글자처럼 취급 그림으로 들어가고 표 높이가 함께 맞춰진다(엔진 패치 `cell-pic-inline-*`, 약속값 `paperOffsetXHu = -2147483648`). 스튜디오의 끌어 놓기는 여전히 칸 위에 뜬 그림으로 넣는다. `run` 의 `insertPicture` 는 그림 바이트를 넘길 수 없어 쓰지 않는다.
@@ -83,7 +89,7 @@ op 는 네 가지다. **먼저 `tool` 을 쓰고, 도구에 없는 일만 `doc` 
 
 **위치는 추측하지 않는다. 먼저 읽는다.** 문단 번호는 0부터, 구역도 0부터다. 글자 오프셋은 문단 안 글자 수 기준이다.
 
-⚠ **서식 JSON 을 문자열로 미리 만들어 넘길 때는 공백을 빼라**(2026-10-02 실측). rhwp 의 `json_str` 은 `"headType":"Bullet"` 처럼 쌍점 뒤 공백이 없는 꼴만 찾아, 파이썬 `json.dumps` 기본값(`": "`)으로 만든 `applyParaFormatInCell` 인자는 문자열 키(`headType`, `alignment` 등)가 **오류 없이 무시된다**(숫자 키는 적용됨). `separators=(",", ":")` 를 주거나, 객체 그대로 넘겨 CLI 가 직렬화하게 한다. 표 칸에 글머리표를 다는 값은 본문 예시 프롬프트 상자와 같은 `{"headType":"Bullet","numberingId":1,"paraLevel":0}` 이다.
+⚠ **서식 JSON 을 문자열로 미리 만들어 넘길 때는 공백을 빼라**(2026-10-02 실측). rhwp 의 `json_str` 은 `"headType":"Bullet"` 처럼 쌍점 뒤 공백이 없는 꼴만 찾아, 파이썬 `json.dumps` 기본값(`": "`)으로 만든 `applyParaFormatInCell` 인자는 문자열 키(`headType`, `alignment` 등)가 **오류 없이 무시된다**(숫자 키는 적용됨). `separators=(",", ":")` 를 주거나, 객체 그대로 넘겨 CLI 가 직렬화하게 한다. **같은 날 수정**: 플러그인이 `{`, `[` 로 시작하는 JSON 문자열 인자를 공백 없이 다시 직렬화한다. 글을 받는 메서드(이름에 Text, Html, search, replace, Field, memo, caption)는 건드리지 않는다(빌드가 매개변수 이름을 지워 `_json` 으로는 못 가린다). 표 칸에 글머리표를 다는 값은 본문 예시 프롬프트 상자와 같은 `{"headType":"Bullet","numberingId":1,"paraLevel":0}` 이다.
 
 ```json
 [{"doc":"getParagraphCount","a":[0]},
@@ -97,6 +103,7 @@ op 는 네 가지다. **먼저 `tool` 을 쓰고, 도구에 없는 일만 `doc` 
 
 | 목적 | 호출 |
 |------|------|
+| 쪽 수, 문단의 쪽 | `pageCount()`(`getPageCount` 는 없다), `getPageOfPosition(sec, para)` → `{page}`(0부터) |
 | 글 넣기 | `insertText(sec, para, offset, text)` |
 | 글 바꾸기 | `replaceText(sec, para, offset, length, newText)` / `replaceAll(query, newText, caseSensitive)` |
 | 글 지우기 | `deleteText(sec, para, offset, count)` |
@@ -155,6 +162,7 @@ rhwp 저장본은 기존 스크립트가 그대로 받는다(왕복 보존력 �
   원본 이름 끝의 `_YYMMDD`, `_YYMMDD_NN` 은 떼고 오늘 날짜의 최대 순번 + 1 을 붙인다(스킬 `build_version.py` 와 같은 규칙).
   예: `제출_문항1-2_…_임세범_260921.hwpx` → `…_임세범_260925_01.hwpx`, `_02`, `_03` …
 - 이미 있는 파일은 어떤 경우에도 덮어쓰지 않는다(`$E save <경로>` 로 지정해도 같다). 원본도 그대로 둔다.
+- **`$E save`(경로 없이) 뒤에는 화면 Ctrl+S 와 다시 열기도 새 판을 쓴다**(2026-10-02, 사용자 선택 「새 판으로」). 세션의 연결 원본이 새 판으로 옮겨진다. 경로를 준 `$E save <경로>` 는 내보내기라 연결을 바꾸지 않는다. 종전에는 처음 연 파일에 묶여 판을 올릴 때마다 `start` 로 다시 열어야 했다.
 - 저장 전에도 `~/.claude/cache/hwpx-editor/latest.hwpx` 는 수정할 때마다 갱신된다(검증용 사본).
 - 저장본은 기존 검증 도구를 그대로 쓴다: `verify_hwpx.py --result`, 모양은 `python scripts/rhwp_convert.py pdf <저장본> <out.pdf>` 로 확인.
 - 끝나면 `$E stop`.

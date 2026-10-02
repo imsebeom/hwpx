@@ -8,7 +8,7 @@
  *   node cli.mjs text                  현재 본문 텍스트
  *   node cli.mjs outline [시작 끝]      좌표(p12, T1r2c1)가 붙은 문서 개요
  *   node cli.mjs state                 문서 상태와 사용자 커서(셀 좌표, 선택한 글자)
- *   node cli.mjs image <그림> [좌표] [--end] [--width mm] [--desc 설명]
+ *   node cli.mjs image <그림> [좌표] [--end] [--replace] [--width mm] [--desc 설명]
  *                                       그림을 좌표(p7, T2r0c0) 앞(--end 면 끝)이나 사용자 커서에 넣는다. undo 1스텝
  *   node cli.mjs goto <좌표>            사용자 화면의 커서를 그 문단이나 셀로 옮긴다
  *   node cli.mjs inspect | slots       행정문서 표기 검수 / 아직 안 채운 칸
@@ -346,9 +346,9 @@ switch (sub) {
     break;
   }
   case 'image': {
-    // 그림 넣기: image <그림 파일> [좌표] [--end] [--width mm] [--desc 설명]. 자리를 안 주면 사용자 커서
+    // 그림 넣기: image <그림 파일> [좌표] [--end] [--replace] [--width mm] [--desc 설명]. 자리를 안 주면 사용자 커서
     const file = args[0];
-    if (!file || !fs.existsSync(file)) die('image <그림 파일> [좌표] [--end] [--width mm] [--desc 설명]');
+    if (!file || !fs.existsSync(file)) die('image <그림 파일> [좌표] [--end] [--replace] [--width mm] [--desc 설명]');
     const buf = fs.readFileSync(file);
     const ext = path.extname(file).slice(1).toLowerCase();
     const size = imageSize(buf);
@@ -356,7 +356,7 @@ switch (sub) {
     const opt = (name) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : undefined; };
     const at = args.slice(1).find((a, i, arr) => !a.startsWith('--') && !['--width', '--desc'].includes(arr[i - 1]));
     const image = { base64: buf.toString('base64'), ext: ext === 'jpeg' ? 'jpg' : ext, naturalW: size.w, naturalH: size.h,
-      at, end: args.includes('--end'), widthMm: opt('--width') ? Number(opt('--width')) : undefined, desc: opt('--desc') };
+      at, end: args.includes('--end'), replace: args.includes('--replace'), widthMm: opt('--width') ? Number(opt('--width')) : undefined, desc: opt('--desc') };
     out((await cmd({ type: 'run', ops: [{ image }] })).result);
     break;
   }
@@ -404,8 +404,12 @@ switch (sub) {
     if (fix.fixed) out(`머리말/꼬리말 쪽 번호 ${fix.fixed}개 보정`);
     for (const why of fix.skipped) out(`⚠ 쪽 번호 보정 못 함: ${why}`);
     await cmd({ type: 'saved', fileName: path.basename(target) });
+    // 새 판(_NN)으로 저장했으면 화면 저장(Ctrl+S)과 다시 열기도 새 판을 쓰게 연결을 옮긴다. 종전에는 처음 연 파일에
+    // 묶여 있어 판을 올릴 때마다 start 로 다시 열어야 했다(2026-10-02 가이드북 세션, 사용자 선택 「새 판으로」).
+    // 경로를 준 저장은 내보내기로 보고 연결을 그대로 둔다
+    if (!args[0]) fs.writeFileSync(SESSION, JSON.stringify({ ...JSON.parse(fs.readFileSync(SESSION, 'utf8')), source: target }, null, 2));
     await postLog('save', { by: 'claude', path: target, bytes: fix.buf.length, hfFixed: fix.fixed || undefined, imagesRestored: img?.restored });
-    out(`저장: ${target}`);
+    out(`저장: ${target}${args[0] ? '' : ' — 화면 Ctrl+S 도 이제 이 파일에 저장한다'}`);
     break;
   }
   case 'log': {                                     // 작업 기록. 기본 최근 30줄, --all 전부, 숫자로 줄 수
