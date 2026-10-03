@@ -69,7 +69,8 @@ function startCrop(ih) {
 
   const zoom = ih.viewportManager.getZoom();
   const vs = renderer.virtualScroll;
-  const left = (content.clientWidth - vs.getPageWidth(bbox.pageIndex)) / 2 + bbox.x * zoom;
+  // 여러 쪽 보기면 쪽이 가운데가 아니다 — 쪽 배치 좌표를 쓴다
+  const left = vs.getPageLeftResolved(bbox.pageIndex, content.clientWidth) + bbox.x * zoom;
   const top = vs.getPageOffset(bbox.pageIndex) + bbox.y * zoom;
   const W = bbox.w * zoom;
   const H = bbox.h * zoom;

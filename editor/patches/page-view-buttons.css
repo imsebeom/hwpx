@@ -1,0 +1,29 @@
+
+/* [claude-hwpx page-view-buttons] 한 쪽~네 쪽 보기 단추(patches/page-view-buttons.ts) */
+.stb-page-view-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-right: 8px;
+}
+.stb-icon-btn.stb-page-view-btn {
+  width: auto;
+  min-width: 24px;
+  padding: 0 4px;
+}
+.stb-page-view-icon {
+  display: block;
+  fill: none;
+  stroke: var(--color-text-secondary);
+  stroke-width: 1;
+}
+.stb-page-view-btn.active {
+  background: var(--ui-hover);
+  border-color: var(--ui-border-strong);
+}
+.stb-page-view-btn.active .stb-page-view-icon {
+  fill: var(--ui-border-strong);
+}
+@media (max-width: 767px) {
+  .stb-page-view-group { display: none; }
+}

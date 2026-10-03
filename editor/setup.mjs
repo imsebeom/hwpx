@@ -503,8 +503,10 @@ for (const [file, patch] of [['input-handler-table.ts', 'move-drop-table.ts'], [
 }
 
 // 그림 속성의 「본문과의 배치」 단추를 아이콘 대신 글자로(patches/wrap-text-labels.ts), 「본문 위치」 고르기(wrap-text-flow.ts),
-// 오른쪽/아래 정렬 개체를 끄는 방향대로 옮기기(wrap-move-sign.ts)
-for (const [id, rel] of [['wrap-text-labels', 'ui/picture-props-dialog.ts'], ['wrap-text-flow', 'ui/picture-props-dialog.ts'], ['wrap-move-sign', 'engine/input-handler-picture.ts']]) {
+// 오른쪽/아래 정렬 개체를 끄는 방향대로 옮기기(wrap-move-sign.ts),
+// 상태 표시줄 한 쪽~네 쪽 보기(page-view-cmd.ts 명령, page-view-buttons.ts 단추, 스타일은 아래 page-view-buttons.css)
+for (const [id, rel] of [['wrap-text-labels', 'ui/picture-props-dialog.ts'], ['wrap-text-flow', 'ui/picture-props-dialog.ts'], ['wrap-move-sign', 'engine/input-handler-picture.ts'],
+  ['page-view-cmd', 'command/commands/view.ts'], ['page-view-buttons', 'main.ts']]) {
   const f = path.join(STUDIO, 'src', ...rel.split('/'));
   let src = fs.readFileSync(f, 'utf8');
   if (src.includes(`[claude-hwpx ${id}]`)) continue;
@@ -517,6 +519,24 @@ for (const [id, rel] of [['wrap-text-labels', 'ui/picture-props-dialog.ts'], ['w
     src = src.replace(eol(find), () => eol(replace.replace(/\n$/, '')));
   }
   fs.writeFileSync(f, src);
+}
+// 여러 쪽 보기에서 개체 선택 상자, 칸 선택, 표 크기 조절선이 화면 가운데로 가던 것(사용자 보고 2026-10-03).
+// 세 렌더러가 쪽 왼쪽을 한 쪽 보기 식 (창 너비 − 쪽 너비) / 2 로 셈했다 — 캐럿처럼 쪽 배치 좌표(getPageLeftResolved)를 쓴다
+for (const [rel, count] of [['engine/table-object-renderer.ts', 5], ['engine/cell-selection-renderer.ts', 2], ['engine/table-resize-renderer.ts', 2]]) {
+  const f = path.join(STUDIO, 'src', ...rel.split('/'));
+  const src = fs.readFileSync(f, 'utf8');
+  if (src.includes('[claude-hwpx grid-page-left]')) continue;
+  const re = /const (\w+) = this\.virtualScroll\.getPageWidth\(([\w.]+)\);\r?\n\s*const (\w+) = \(contentWidth - \1\) \/ 2;/g;
+  const n = (src.match(re) || []).length;
+  if (n !== count) throw new Error(`${rel} 에서 패치 자리(grid-page-left)가 ${count}개가 아니라 ${n}개다`);
+  fs.writeFileSync(f, src.replace(re, 'const $3 = this.virtualScroll.getPageLeftResolved($2, contentWidth); // [claude-hwpx grid-page-left]'));
+}
+{
+  const f = path.join(STUDIO, 'src', 'styles', 'status-bar.css');
+  const src = fs.readFileSync(f, 'utf8');
+  if (!src.includes('[claude-hwpx page-view-buttons]')) {
+    fs.writeFileSync(f, src.replace(/\n*$/, '\n') + fs.readFileSync(path.join(HERE, 'patches', 'page-view-buttons.css'), 'utf8').replace(/\r\n/g, '\n'));
+  }
 }
 
 // 표 속 표를 마우스로 고르거나 크기를 바꿀 수 없던 것(patches/nested-table-*.ts, 엔진 nested-table-*.rs).
