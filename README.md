@@ -82,7 +82,7 @@ pip install pywebview                      # 앱 창(없으면 브라우저 탭�
 node ~/.claude/skills/hwpx/editor/setup.mjs   # 미리 빌드한 에디터 받기(17MB) → editor/studio-dist/
 ```
 
-**`setup.mjs` 는 먼저 GitHub 릴리스의 미리 빌드한 에디터를 받는다**(2026-10-02). `editor/prebuilt.json` 의 원본 지문(`patches/`, `plugin/`, `setup.mjs`)이 받은 스킬과 같으면 그 묶음(엔진 패치가 모두 든 WASM 과 화면)을 받아 sha256 을 확인하고 푼다 — Rust 도 rhwp 소스도 필요 없다. 지문이 다르거나 받기에 실패하면 직접 빌드한다: Rust(`~/.cargo` 의 cargo, wasm-pack)가 있으면 `editor/patches/` 를 넣어 WASM 을 빌드하고, 없으면 npm 의 공식 WASM 을 쓴다(그때는 아래 「에디터 모드」의 엔진 패치가 빠진다). `--build` 면 늘 직접 빌드한다.
+**`setup.mjs` 는 먼저 GitHub 릴리스의 미리 빌드한 에디터를 받는다**(2026-10-02). `editor/prebuilt.json` 의 원본 지문(`patches/`, `plugin/`, `setup.mjs`)이 받은 스킬과 같으면 그 묶음(엔진 패치가 모두 든 WASM 과 화면)을 받아 sha256 을 확인하고 푼다 — Rust 도 rhwp 소스도 필요 없다. 지문이 달라도(관리자가 릴리스를 빠뜨린 경우) 빌드하지 않고 지난 묶음을 받으며 경고만 낸다. 받기는 주소마다 세 번 시도하고, 그래도 실패하면 빌드로 넘어가지 않고 멈춘다(2026-10-03, 공유받은 PC 가 모르는 새 10분 넘게 빌드하던 것). 직접 빌드는 `--build` 일 때만 한다: Rust(`~/.cargo` 의 cargo, wasm-pack)가 있으면 `editor/patches/` 를 넣어 WASM 을 빌드하고, 없으면 npm 의 공식 WASM 을 쓴다(그때는 아래 「에디터 모드」의 엔진 패치가 빠진다).
 관리자는 엔진이나 플러그인을 고친 뒤 `node editor/setup.mjs --build` → `node editor/release.mjs`(gh 로그인 필요)로 hwpx, hwpx2 릴리스에 새 묶음을 올리고 `prebuilt.json` 을 커밋한다.
 
 **한글(한컴오피스)이 없어도 된다(2026-10-02).** HWP→HWPX 변환, 빌드 마지막 줄 배치 보정, 양식 미리보기 PDF 를 모두 rhwp 로 한다(`scripts/rhwp_convert.py`). 엔진은 처음 쓸 때 받아 캐시에 둔다.

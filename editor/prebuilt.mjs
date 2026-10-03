@@ -59,11 +59,17 @@ export async function installPrebuilt(log = console.log) {
   if (!fs.existsSync(MANIFEST)) return false;
   const m = JSON.parse(fs.readFileSync(MANIFEST, 'utf8'));
   const hash = sourceHash();
-  if (m.sourceHash !== hash) { log(`미리 빌드한 에디터는 다른 원본에서 만든 것이다(${m.sourceHash.slice(0, 12)} ≠ ${hash.slice(0, 12)}) — 빌드한다`); return false; }
   const stamp = path.join(HERE, 'studio-dist', '.source-hash');
-  if (fs.existsSync(stamp) && fs.readFileSync(stamp, 'utf8').trim() === hash) { log('에디터가 이미 최신이다'); return true; }
-  for (const url of m.urls) {
+  // 이 PC 가 직접 빌드한 것(hash)이나 이미 받은 묶음(m.sourceHash)이 있으면 그대로 쓴다
+  const have = fs.existsSync(stamp) ? fs.readFileSync(stamp, 'utf8').trim() : '';
+  if (have === hash || have === m.sourceHash) { log('에디터가 이미 설치돼 있다'); return true; }
+  // 원본이 묶음보다 새로워도(관리자가 release 를 빠뜨린 경우) 빌드하지 않고 지난 묶음을 쓴다 — 공유받은 PC 에서 빌드는 10분이 넘는다
+  if (m.sourceHash !== hash) log(`⚠ 미리 빌드한 에디터가 원본보다 오래됐다(${m.sourceHash.slice(0, 12)} ≠ ${hash.slice(0, 12)}) — 지난 묶음을 쓴다. 최신 원본으로 쓰려면 setup.mjs --build`);
+  const tries = [];
+  for (const url of m.urls) for (const wait of [0, 3000, 10000]) tries.push([url, wait]);   // 릴리스 직후 등 일시 실패에 대비해 주소마다 세 번
+  for (const [url, wait] of tries) {
     try {
+      if (wait) await new Promise((r) => setTimeout(r, wait));
       log(`미리 빌드한 에디터 받기: ${url}`);
       const res = await fetch(url);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -79,7 +85,7 @@ export async function installPrebuilt(log = console.log) {
         fs.mkdirSync(path.dirname(out), { recursive: true });
         fs.writeFileSync(out, e.data);
       }
-      fs.writeFileSync(stamp, hash);
+      fs.writeFileSync(stamp, m.sourceHash);
       log(`풀었다: 파일 ${entries.length}개, ${(buf.length / 1048576).toFixed(1)} MB`);
       return true;
     } catch (e) {

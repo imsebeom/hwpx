@@ -53,11 +53,17 @@ function copyDir(src, dst) {
   }
 }
 
-// 0. 미리 빌드한 에디터(prebuilt.json, GitHub 릴리스). 원본 지문이 같으면 받아서 풀고 끝낸다 — Rust 없는 PC 도
-//    엔진 패치가 든 에디터를 쓰고, 빌드(rhwp 소스, npm, Rust 8분 이상)를 건너뛴다. --build 면 늘 빌드한다
-if (!process.argv.includes('--build') && !process.argv.includes('--clean') && (await installPrebuilt())) {
-  console.log(`\n완료: 미리 빌드한 에디터 → ${path.join(HERE, 'studio-dist')}`);
-  process.exit(0);
+// 0. 미리 빌드한 에디터(prebuilt.json, GitHub 릴리스)를 받아서 풀고 끝낸다 — Rust 없는 PC 도
+//    엔진 패치가 든 에디터를 쓰고, 빌드(rhwp 소스, npm, Rust 8분 이상)를 건너뛴다. --build 면 늘 빌드한다.
+//    받지 못하면 빌드로 넘어가지 않고 멈춘다(공유받은 PC 가 모르는 새 10분 넘게 빌드하던 것, 2026-10-03)
+if (!process.argv.includes('--build') && !process.argv.includes('--clean')) {
+  if (await installPrebuilt()) {
+    console.log(`\n완료: 미리 빌드한 에디터 → ${path.join(HERE, 'studio-dist')}`);
+    process.exit(0);
+  }
+  console.error('\n실패: 미리 빌드한 에디터를 받지 못했다. 인터넷 연결을 확인하고 다시 돌린다.'
+    + '\n  직접 빌드하려면 node setup.mjs --build (rhwp 소스와 npm 을 받고, Rust 가 있으면 10분 넘게 걸린다)');
+  process.exit(1);
 }
 
 if (process.argv.includes('--clean')) rmrf(BUILD);
