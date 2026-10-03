@@ -53,9 +53,13 @@
   - 도구: `~/.cache/rhwp-devel/cmp.mjs`(2쪽 글자 줄과 셀 상자), `allpages.mjs <pkg> <a> <b>`(전 쪽 글자 좌표 대조), `variants.py`, `winshot.py`(에디터 창을 앞으로 올리지 않고 PrintWindow 로 캡처 — 사용자 화면을 뺏지 않는다)
 
 ## 컨텍스트 앵커
-- **10-03**: 사용자 요청 「오른쪽 아래 한쪽~네쪽 보기 단추」 + 보고 「여러 쪽 보기에서 왼쪽 그림을 눌렀는데 상자가 화면 가운데」 → 스킬 dc8845b(푸시 안 함, 릴리스 안 함 — 공유 PC 는 setup 이 직접 빌드로 떨어진다).
+- **10-03**: 사용자 요청 「오른쪽 아래 한쪽~네쪽 보기 단추」 + 보고 「여러 쪽 보기에서 왼쪽 그림을 눌렀는데 상자가 화면 가운데」 → 스킬 dc8845b.
   단추는 스튜디오에 이미 있는 쪽 배치(`multiple` columns=N rows=1) + 쪽 맞춤을 부른다. 상자 결함은 렌더러 셋(table-object, cell-selection, table-resize)과 플러그인 picture-crop 이 쪽 왼쪽을 `(창 너비 − 쪽 너비) / 2` 로 셈한 것 → `getPageLeftResolved`.
   검증: 보이지 않는 크로미움(scratchpad `pv_click.py`)으로 세 쪽 보기에서 1쪽 그림, 2쪽 그림 각각 상자 위치 확인
+  - 사용자 「푸시하고 릴리즈」 + 「공유받은 pc에서 에디터 빌드는 너무 부담」 → 스킬 b2bd82f 까지 hwpx, hwpx2 푸시, 릴리스 editor-884acbd40282.
+    릴리스 직후 GitHub 사본의 setup 이 받기에 실패하고 12분 직접 빌드했다(로그를 잘라 원인 오류는 못 봄, 다시 받으니 4초).
+    → setup 은 받기를 주소마다 세 번, 지문이 달라도 지난 묶음을 받고 경고, 받지 못하면 멈춤(빌드는 `--build` 만).
+    🔑 이 PC 스킬 저장소 `.git/hooks/pre-push`(추적 안 됨)가 원본 지문 ≠ prebuilt.json 이면 푸시를 막는다 — 엔진, 플러그인, setup.mjs 를 고치면 `setup.mjs --build` → `release.mjs` → prebuilt.json 커밋 뒤 푸시
 - **10-02 셋째**: 가이드북 세션 수정 요청 메모(`수정요청_20261002_가이드북세션.md`) 1번 「표가 한글과 다른 쪽에」 → 스킬 f982ae4(푸시 안 함), d0e90cf(그 세션의 editor-mode.md 함정 한 줄을 대신 커밋).
   원인은 낡은 저장 리셋(쪽 맨 위 vertpos=0): rhwp 는 편집 뒤에도 리셋을 남기고(`recalculate_section_vpos` delta=0 보존) 저장본에 다시 써, 한/글 원본에서 4쪽 맨 위였던 표 3-1이 내용이 줄어도 계속 다음 쪽으로 갔다.
   패치 `stale-reset-edit`(line_breaking.rs, 흐름이 밀리면 뒤 리셋을 풂), `stale-reset-fill`(typeset.rs, 직전 저장 끝이 본문의 50% 미만/110% 초과 + rhwp 로 반 미만이면 무시, 한 번 무시한 구역은 `st.claude_stale_reset_seen`)
