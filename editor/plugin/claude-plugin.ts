@@ -642,6 +642,27 @@ function installImeAnchor(getInputHandler) {
   };
   window.addEventListener('keydown', place, true);
   window.addEventListener('compositionupdate', place, true);
+
+  // 한자 키: 입력기가 조합 중인 「한」을 확정하고, 입력칸에서 그 글자를 지운 뒤 같은 글자로 조합을 새로 연다
+  // (compositionend 「한」 → deleteContentBackward → compositionstart → 「한」 → 「韓」, 2026-10-04 실측).
+  // rhwp 는 확정 때 입력칸을 비워 지우기가 문서에 닿지 않아 「한韓」이 됐다. 새 조합이 열릴 때 확정된 글자를 문서에서 지운다.
+  // 한자 키는 자판 설정에 따라 오른쪽 Ctrl(실측), HanjaMode, Lang2 로 온다.
+  let hanjaAt = 0;
+  let committed = '';
+  window.addEventListener('keydown', (e) => {
+    if (e.target !== getInputHandler()?.textarea || !e.isComposing) return;
+    if (['ControlRight', 'Lang2'].includes(e.code) || e.key === 'HanjaMode') hanjaAt = performance.now();
+  }, true);
+  window.addEventListener('compositionend', (e) => {
+    committed = e.target === getInputHandler()?.textarea && performance.now() - hanjaAt < 300 ? e.data || '' : '';
+  }, true);
+  window.addEventListener('compositionstart', (e) => {
+    const ih = getInputHandler();
+    if (!committed || e.target !== ih?.textarea) return;
+    const n = [...committed].length;
+    committed = '';
+    for (let i = 0; i < n; i++) ih.handleBackspace(ih.cursor.getPosition(), ih.cursor.isInCell());
+  }, true);
 }
 
 function installToolbarFixes(getInputHandler) {
