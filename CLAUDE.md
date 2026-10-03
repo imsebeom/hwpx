@@ -60,6 +60,7 @@
     릴리스 직후 GitHub 사본의 setup 이 받기에 실패하고 12분 직접 빌드했다(로그를 잘라 원인 오류는 못 봄, 다시 받으니 4초).
     → setup 은 받기를 주소마다 세 번, 지문이 달라도 지난 묶음을 받고 경고, 받지 못하면 멈춤(빌드는 `--build` 만).
     🔑 이 PC 스킬 저장소 `.git/hooks/pre-push`(추적 안 됨)가 원본 지문 ≠ prebuilt.json 이면 푸시를 막는다 — 엔진, 플러그인, setup.mjs 를 고치면 `setup.mjs --build` → `release.mjs` → prebuilt.json 커밋 뒤 푸시
+    - 사용자 「추천에 따르겠다」 → 릴리스는 저장소마다 최근 3개만(스킬 05dc934 `release.mjs` 가 올린 뒤 정리, `--prune` 은 정리만). 옛 3개(2ede, b2bd, fe3d) 지움
 - **10-02 셋째**: 가이드북 세션 수정 요청 메모(`수정요청_20261002_가이드북세션.md`) 1번 「표가 한글과 다른 쪽에」 → 스킬 f982ae4(푸시 안 함), d0e90cf(그 세션의 editor-mode.md 함정 한 줄을 대신 커밋).
   원인은 낡은 저장 리셋(쪽 맨 위 vertpos=0): rhwp 는 편집 뒤에도 리셋을 남기고(`recalculate_section_vpos` delta=0 보존) 저장본에 다시 써, 한/글 원본에서 4쪽 맨 위였던 표 3-1이 내용이 줄어도 계속 다음 쪽으로 갔다.
   패치 `stale-reset-edit`(line_breaking.rs, 흐름이 밀리면 뒤 리셋을 풂), `stale-reset-fill`(typeset.rs, 직전 저장 끝이 본문의 50% 미만/110% 초과 + rhwp 로 반 미만이면 무시, 한 번 무시한 구역은 `st.claude_stale_reset_seen`)
