@@ -53,6 +53,12 @@
   - 도구: `~/.cache/rhwp-devel/cmp.mjs`(2쪽 글자 줄과 셀 상자), `allpages.mjs <pkg> <a> <b>`(전 쪽 글자 좌표 대조), `variants.py`, `winshot.py`(에디터 창을 앞으로 올리지 않고 PrintWindow 로 캡처 — 사용자 화면을 뺏지 않는다)
 
 ## 컨텍스트 앵커
+- **10-04**: 사용자 보고 「한자 버튼이 작동되지 않는다」(한 글자 치고 바로 한자 키) → 스킬 216d5f7, 21d46ec, 릴리스 editor-9c8dbed2ac09(d7a5a54 까지 hwpx, hwpx2 푸시). 사용자가 실제 입력기로 확인 「이제 문제없군」
+  - ① 후보 창이 안 보였다: rhwp 숨은 입력칸이 `left:-9999px` 라 입력기 후보 창도 화면 밖에 떴다 → 플러그인 `installImeAnchor` 가 키를 누를 때마다 입력칸을 캐럿(조합 중이면 조합 상자) 자리로 옮긴다(투명, 클릭 통과)
+  - ② 그러자 「한韓」이 됐다. 시험 페이지(이벤트 기록)로 실측한 입력기 순서: 한자 키(이 PC 는 **오른쪽 Ctrl**, `code: ControlRight`) → compositionend 「한」 → deleteContentBackward → compositionstart → 「한」 → 「韓」 compositionend.
+    rhwp 는 확정 때 입력칸을 비워 지우기가 문서에 닿지 않는다 → 한자 키 300ms 안의 확정 뒤 새 조합이 열리면 확정 글자 수만큼 `handleBackspace`
+  - 검증: 보이지 않는 크로미움 + CDP `Input.imeSetComposition`/`insertText` 로 같은 순서 재현 → 「가韓」, 보통 입력 「가한글」 그대로. 시험 스크립트 scratchpad `ime_hanja.py`, `ime_trace/`
+  - ⚠ 시험 중 cli 를 `HWPX_EDITOR_INSTANCE=imetest` 로 띄울 때 옛 port 파일을 읽어 엉뚱한 포트로 붙을 뻔했다 — 시험 인스턴스는 port 파일을 지우고 start 가 새로 쓸 때까지 기다린다
 - **10-03**: 사용자 요청 「오른쪽 아래 한쪽~네쪽 보기 단추」 + 보고 「여러 쪽 보기에서 왼쪽 그림을 눌렀는데 상자가 화면 가운데」 → 스킬 dc8845b.
   단추는 스튜디오에 이미 있는 쪽 배치(`multiple` columns=N rows=1) + 쪽 맞춤을 부른다. 상자 결함은 렌더러 셋(table-object, cell-selection, table-resize)과 플러그인 picture-crop 이 쪽 왼쪽을 `(창 너비 − 쪽 너비) / 2` 로 셈한 것 → `getPageLeftResolved`.
   검증: 보이지 않는 크로미움(scratchpad `pv_click.py`)으로 세 쪽 보기에서 1쪽 그림, 2쪽 그림 각각 상자 위치 확인
