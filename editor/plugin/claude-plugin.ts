@@ -626,6 +626,24 @@ function installCellBlockDialogs(getInputHandler) {
   proto.__cellBlock = true;
 }
 
+/**
+ * rhwp 는 숨은 입력칸을 화면 밖(left:-9999px)에 둔다. Windows 입력기는 한자 후보 창을 입력칸 옆에 띄우므로
+ * 한 글자 치고 한자 키를 눌러도 후보 창이 화면 밖에 떠 보이지 않았다(2026-10-04 사용자 보고).
+ * 키를 누를 때마다 입력칸을 캐럿(조합 중이면 조합 상자) 자리로 옮긴다. 투명하고 클릭은 통과한다.
+ */
+function installImeAnchor(getInputHandler) {
+  const place = (e) => {
+    const ta = getInputHandler()?.textarea;
+    if (!ta || e.target !== ta) return;
+    const r = [...document.querySelectorAll('.caret-composition'), ...document.querySelectorAll('.caret')]
+      .map((el) => el.getBoundingClientRect()).find((b) => b.height > 0);
+    if (!r) return;
+    Object.assign(ta.style, { left: `${r.left}px`, top: `${r.top}px`, height: `${r.height}px`, pointerEvents: 'none' });
+  };
+  window.addEventListener('keydown', place, true);
+  window.addEventListener('compositionupdate', place, true);
+}
+
 function installToolbarFixes(getInputHandler) {
   let wired = false;
   const wire = () => {
@@ -709,6 +727,7 @@ export function createClaudePlugin(getInputHandler) {
       installNestedTableCreate(getInputHandler);
       installKCommands(host, getInputHandler);
       installToolbarFixes(getInputHandler);
+      installImeAnchor(getInputHandler);
       installCellBlockDialogs(getInputHandler);
       installColorPalettes(getInputHandler);
       installParaPreview();
