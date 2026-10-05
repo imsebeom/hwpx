@@ -21,6 +21,11 @@ fn walk<'a>(paras: &'a [Paragraph], out: &mut Vec<&'a Paragraph>) {
 #[test]
 #[ignore]
 fn claude_lb_probe() {
+    if let Ok(path) = std::env::var("CLAUDE_FONT_METRICS") {
+        let json = std::fs::read_to_string(path).unwrap();
+        let n = crate::renderer::font_metrics_data::claude_register_font_metrics(&json).unwrap();
+        println!("폭 표 등록 {n}");
+    }
     let list = std::env::var("CLAUDE_LB_FILES").expect("CLAUDE_LB_FILES");
     let verbose = std::env::var("CLAUDE_LB_VERBOSE").is_ok();
     let (mut tot_p, mut tot_same, mut tot_lines, mut tot_lines_same) = (0usize, 0usize, 0usize, 0usize);
@@ -195,6 +200,11 @@ fn claude_lb_probe() {
 #[test]
 #[ignore]
 fn claude_lb_one() {
+    if let Ok(path) = std::env::var("CLAUDE_FONT_METRICS") {
+        let json = std::fs::read_to_string(path).unwrap();
+        let n = crate::renderer::font_metrics_data::claude_register_font_metrics(&json).unwrap();
+        println!("폭 표 등록 {n}");
+    }
     let Ok(path) = std::env::var("CLAUDE_LB_ONE") else { return };
     let key = std::env::var("CLAUDE_LB_KEY").unwrap_or_default();
     let core = DocumentCore::from_bytes(&std::fs::read(&path).unwrap()).unwrap();
