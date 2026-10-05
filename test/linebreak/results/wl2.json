@@ -1,0 +1,1366 @@
+[
+ {
+  "text": "가 ----------",
+  "char": 45,
+  "est": 6273,
+  "span": 40
+ },
+ {
+  "text": "가 !!!!!!!!!!",
+  "char": 45,
+  "est": 5203,
+  "span": 1100
+ },
+ {
+  "text": "가가가가가가가가가가",
+  "char": 50,
+  "est": 9700,
+  "span": 32,
+  "v": {
+   "height": 1000,
+   "font": 4
+  }
+ },
+ {
+  "text": "가 가 가 가 가 가",
+  "char": 50,
+  "est": 8320,
+  "span": 32,
+  "v": {
+   "height": 1000,
+   "font": 4
+  }
+ },
+ {
+  "text": "가 0000000000",
+  "char": 50,
+  "est": 6970,
+  "span": 32,
+  "v": {
+   "height": 1000,
+   "font": 4
+  }
+ },
+ {
+  "text": "가 aaaaaaaaaa",
+  "char": 50,
+  "est": 7160,
+  "span": 32,
+  "v": {
+   "height": 1000,
+   "font": 4
+  }
+ },
+ {
+  "text": "가 ((((((((((",
+  "char": 50,
+  "est": 4670,
+  "span": 32,
+  "v": {
+   "height": 1000,
+   "font": 4
+  }
+ },
+ {
+  "text": "가 「「「「「「「「「「",
+  "char": 50,
+  "est": 6470,
+  "span": 32,
+  "v": {
+   "height": 1000,
+   "font": 4
+  }
+ },
+ {
+  "text": "가 eeeeeeeeee",
+  "char": 50,
+  "est": 6830,
+  "span": 32,
+  "v": {
+   "height": 1000,
+   "font": 4
+  }
+ },
+ {
+  "text": "가0가0가0가0가0",
+  "char": 50,
+  "est": 7600,
+  "span": 32,
+  "v": {
+   "height": 1000,
+   "font": 4
+  }
+ },
+ {
+  "text": "가가가가가가가가가가",
+  "char": 51,
+  "est": 9700,
+  "span": 32,
+  "v": {
+   "height": 1000,
+   "font": 4,
+   "bold": false
+  }
+ },
+ {
+  "text": "가 가 가 가 가 가",
+  "char": 51,
+  "est": 8320,
+  "span": 32,
+  "v": {
+   "height": 1000,
+   "font": 4,
+   "bold": false
+  }
+ },
+ {
+  "text": "가 0000000000",
+  "char": 51,
+  "est": 6970,
+  "span": 32,
+  "v": {
+   "height": 1000,
+   "font": 4,
+   "bold": false
+  }
+ },
+ {
+  "text": "가 aaaaaaaaaa",
+  "char": 51,
+  "est": 7160,
+  "span": 32,
+  "v": {
+   "height": 1000,
+   "font": 4,
+   "bold": false
+  }
+ },
+ {
+  "text": "가 ((((((((((",
+  "char": 51,
+  "est": 4670,
+  "span": 32,
+  "v": {
+   "height": 1000,
+   "font": 4,
+   "bold": false
+  }
+ },
+ {
+  "text": "가 「「「「「「「「「「",
+  "char": 51,
+  "est": 6470,
+  "span": 32,
+  "v": {
+   "height": 1000,
+   "font": 4,
+   "bold": false
+  }
+ },
+ {
+  "text": "가 eeeeeeeeee",
+  "char": 51,
+  "est": 6830,
+  "span": 32,
+  "v": {
+   "height": 1000,
+   "font": 4,
+   "bold": false
+  }
+ },
+ {
+  "text": "가0가0가0가0가0",
+  "char": 51,
+  "est": 7600,
+  "span": 32,
+  "v": {
+   "height": 1000,
+   "font": 4,
+   "bold": false
+  }
+ },
+ {
+  "text": "가가가가가가가가가가",
+  "char": 52,
+  "est": 8730,
+  "span": 32,
+  "v": {
+   "height": 900,
+   "font": 4,
+   "bold": false
+  }
+ },
+ {
+  "text": "가 가 가 가 가 가",
+  "char": 52,
+  "est": 7488,
+  "span": 32,
+  "v": {
+   "height": 900,
+   "font": 4,
+   "bold": false
+  }
+ },
+ {
+  "text": "가 0000000000",
+  "char": 52,
+  "est": 6273,
+  "span": 32,
+  "v": {
+   "height": 900,
+   "font": 4,
+   "bold": false
+  }
+ },
+ {
+  "text": "가 aaaaaaaaaa",
+  "char": 52,
+  "est": 6443,
+  "span": 32,
+  "v": {
+   "height": 900,
+   "font": 4,
+   "bold": false
+  }
+ },
+ {
+  "text": "가 ((((((((((",
+  "char": 52,
+  "est": 4203,
+  "span": 32,
+  "v": {
+   "height": 900,
+   "font": 4,
+   "bold": false
+  }
+ },
+ {
+  "text": "가 「「「「「「「「「「",
+  "char": 52,
+  "est": 5823,
+  "span": 32,
+  "v": {
+   "height": 900,
+   "font": 4,
+   "bold": false
+  }
+ },
+ {
+  "text": "가 eeeeeeeeee",
+  "char": 52,
+  "est": 6143,
+  "span": 32,
+  "v": {
+   "height": 900,
+   "font": 4,
+   "bold": false
+  }
+ },
+ {
+  "text": "가0가0가0가0가0",
+  "char": 52,
+  "est": 6840,
+  "span": 32,
+  "v": {
+   "height": 900,
+   "font": 4,
+   "bold": false
+  }
+ },
+ {
+  "text": "가가가가가가가가가가",
+  "char": 53,
+  "est": 10670,
+  "span": 32,
+  "v": {
+   "height": 1100,
+   "font": 4,
+   "bold": false
+  }
+ },
+ {
+  "text": "가 가 가 가 가 가",
+  "char": 53,
+  "est": 9152,
+  "span": 32,
+  "v": {
+   "height": 1100,
+   "font": 4,
+   "bold": false
+  }
+ },
+ {
+  "text": "가 0000000000",
+  "char": 53,
+  "est": 7667,
+  "span": 32,
+  "v": {
+   "height": 1100,
+   "font": 4,
+   "bold": false
+  }
+ },
+ {
+  "text": "가 aaaaaaaaaa",
+  "char": 53,
+  "est": 7867,
+  "span": 32,
+  "v": {
+   "height": 1100,
+   "font": 4,
+   "bold": false
+  }
+ },
+ {
+  "text": "가 ((((((((((",
+  "char": 53,
+  "est": 5137,
+  "span": 32,
+  "v": {
+   "height": 1100,
+   "font": 4,
+   "bold": false
+  }
+ },
+ {
+  "text": "가 「「「「「「「「「「",
+  "char": 53,
+  "est": 7117,
+  "span": 32,
+  "v": {
+   "height": 1100,
+   "font": 4,
+   "bold": false
+  }
+ },
+ {
+  "text": "가 eeeeeeeeee",
+  "char": 53,
+  "est": 7507,
+  "span": 32,
+  "v": {
+   "height": 1100,
+   "font": 4,
+   "bold": false
+  }
+ },
+ {
+  "text": "가0가0가0가0가0",
+  "char": 53,
+  "est": 8360,
+  "span": 32,
+  "v": {
+   "height": 1100,
+   "font": 4,
+   "bold": false
+  }
+ },
+ {
+  "text": "가가가가가가가가가가",
+  "char": 54,
+  "est": 11640,
+  "span": 32,
+  "v": {
+   "height": 1200,
+   "font": 4,
+   "bold": false
+  }
+ },
+ {
+  "text": "가 가 가 가 가 가",
+  "char": 54,
+  "est": 9984,
+  "span": 32,
+  "v": {
+   "height": 1200,
+   "font": 4,
+   "bold": false
+  }
+ },
+ {
+  "text": "가 0000000000",
+  "char": 54,
+  "est": 8364,
+  "span": 32,
+  "v": {
+   "height": 1200,
+   "font": 4,
+   "bold": false
+  }
+ },
+ {
+  "text": "가 aaaaaaaaaa",
+  "char": 54,
+  "est": 8584,
+  "span": 32,
+  "v": {
+   "height": 1200,
+   "font": 4,
+   "bold": false
+  }
+ },
+ {
+  "text": "가 ((((((((((",
+  "char": 54,
+  "est": 5604,
+  "span": 32,
+  "v": {
+   "height": 1200,
+   "font": 4,
+   "bold": false
+  }
+ },
+ {
+  "text": "가 「「「「「「「「「「",
+  "char": 54,
+  "est": 7764,
+  "span": 32,
+  "v": {
+   "height": 1200,
+   "font": 4,
+   "bold": false
+  }
+ },
+ {
+  "text": "가 eeeeeeeeee",
+  "char": 54,
+  "est": 8194,
+  "span": 32,
+  "v": {
+   "height": 1200,
+   "font": 4,
+   "bold": false
+  }
+ },
+ {
+  "text": "가0가0가0가0가0",
+  "char": 54,
+  "est": 9120,
+  "span": 32,
+  "v": {
+   "height": 1200,
+   "font": 4,
+   "bold": false
+  }
+ },
+ {
+  "text": "가가가가가가가가가가",
+  "char": 55,
+  "est": 9200,
+  "span": 80,
+  "v": {
+   "height": 1000,
+   "font": 4,
+   "bold": false,
+   "spacing": -5
+  }
+ },
+ {
+  "text": "가 가 가 가 가 가",
+  "char": 55,
+  "est": 7770,
+  "span": 80,
+  "v": {
+   "height": 1000,
+   "font": 4,
+   "bold": false,
+   "spacing": -5
+  }
+ },
+ {
+  "text": "가 0000000000",
+  "char": 55,
+  "est": 6370,
+  "span": 80,
+  "v": {
+   "height": 1000,
+   "font": 4,
+   "bold": false,
+   "spacing": -5
+  }
+ },
+ {
+  "text": "가 aaaaaaaaaa",
+  "char": 55,
+  "est": 6560,
+  "span": 80,
+  "v": {
+   "height": 1000,
+   "font": 4,
+   "bold": false,
+   "spacing": -5
+  }
+ },
+ {
+  "text": "가 ((((((((((",
+  "char": 55,
+  "est": 4070,
+  "span": 80,
+  "v": {
+   "height": 1000,
+   "font": 4,
+   "bold": false,
+   "spacing": -5
+  }
+ },
+ {
+  "text": "가 「「「「「「「「「「",
+  "char": 55,
+  "est": 5870,
+  "span": 80,
+  "v": {
+   "height": 1000,
+   "font": 4,
+   "bold": false,
+   "spacing": -5
+  }
+ },
+ {
+  "text": "가 eeeeeeeeee",
+  "char": 55,
+  "est": 6230,
+  "span": 80,
+  "v": {
+   "height": 1000,
+   "font": 4,
+   "bold": false,
+   "spacing": -5
+  }
+ },
+ {
+  "text": "가0가0가0가0가0",
+  "char": 55,
+  "est": 7100,
+  "span": 80,
+  "v": {
+   "height": 1000,
+   "font": 4,
+   "bold": false,
+   "spacing": -5
+  }
+ },
+ {
+  "text": "가가가가가가가가가가",
+  "char": 56,
+  "est": 8700,
+  "span": 80,
+  "v": {
+   "height": 1000,
+   "font": 4,
+   "bold": false,
+   "spacing": -10
+  }
+ },
+ {
+  "text": "가 가 가 가 가 가",
+  "char": 56,
+  "est": 7220,
+  "span": 80,
+  "v": {
+   "height": 1000,
+   "font": 4,
+   "bold": false,
+   "spacing": -10
+  }
+ },
+ {
+  "text": "가 0000000000",
+  "char": 56,
+  "est": 5770,
+  "span": 80,
+  "v": {
+   "height": 1000,
+   "font": 4,
+   "bold": false,
+   "spacing": -10
+  }
+ },
+ {
+  "text": "가 aaaaaaaaaa",
+  "char": 56,
+  "est": 5960,
+  "span": 80,
+  "v": {
+   "height": 1000,
+   "font": 4,
+   "bold": false,
+   "spacing": -10
+  }
+ },
+ {
+  "text": "가 ((((((((((",
+  "char": 56,
+  "est": 3470,
+  "span": 80,
+  "v": {
+   "height": 1000,
+   "font": 4,
+   "bold": false,
+   "spacing": -10
+  }
+ },
+ {
+  "text": "가 「「「「「「「「「「",
+  "char": 56,
+  "est": 5270,
+  "span": 80,
+  "v": {
+   "height": 1000,
+   "font": 4,
+   "bold": false,
+   "spacing": -10
+  }
+ },
+ {
+  "text": "가 eeeeeeeeee",
+  "char": 56,
+  "est": 5630,
+  "span": 80,
+  "v": {
+   "height": 1000,
+   "font": 4,
+   "bold": false,
+   "spacing": -10
+  }
+ },
+ {
+  "text": "가0가0가0가0가0",
+  "char": 56,
+  "est": 6600,
+  "span": 80,
+  "v": {
+   "height": 1000,
+   "font": 4,
+   "bold": false,
+   "spacing": -10
+  }
+ },
+ {
+  "text": "가가가가가가가가가가",
+  "char": 57,
+  "est": 9215,
+  "span": 32,
+  "v": {
+   "height": 1000,
+   "font": 4,
+   "bold": false,
+   "ratio": 95
+  }
+ },
+ {
+  "text": "가 가 가 가 가 가",
+  "char": 57,
+  "est": 7904,
+  "span": 32,
+  "v": {
+   "height": 1000,
+   "font": 4,
+   "bold": false,
+   "ratio": 95
+  }
+ },
+ {
+  "text": "가 0000000000",
+  "char": 57,
+  "est": 6622,
+  "span": 32,
+  "v": {
+   "height": 1000,
+   "font": 4,
+   "bold": false,
+   "ratio": 95
+  }
+ },
+ {
+  "text": "가 aaaaaaaaaa",
+  "char": 57,
+  "est": 6802,
+  "span": 32,
+  "v": {
+   "height": 1000,
+   "font": 4,
+   "bold": false,
+   "ratio": 95
+  }
+ },
+ {
+  "text": "가 ((((((((((",
+  "char": 57,
+  "est": 4436,
+  "span": 32,
+  "v": {
+   "height": 1000,
+   "font": 4,
+   "bold": false,
+   "ratio": 95
+  }
+ },
+ {
+  "text": "가 「「「「「「「「「「",
+  "char": 57,
+  "est": 6146,
+  "span": 32,
+  "v": {
+   "height": 1000,
+   "font": 4,
+   "bold": false,
+   "ratio": 95
+  }
+ },
+ {
+  "text": "가 eeeeeeeeee",
+  "char": 57,
+  "est": 6488,
+  "span": 32,
+  "v": {
+   "height": 1000,
+   "font": 4,
+   "bold": false,
+   "ratio": 95
+  }
+ },
+ {
+  "text": "가0가0가0가0가0",
+  "char": 57,
+  "est": 7220,
+  "span": 32,
+  "v": {
+   "height": 1000,
+   "font": 4,
+   "bold": false,
+   "ratio": 95
+  }
+ },
+ {
+  "text": "가가가가가가가가가가",
+  "char": 58,
+  "est": 8730,
+  "span": 32,
+  "v": {
+   "height": 1000,
+   "font": 4,
+   "bold": false,
+   "ratio": 90
+  }
+ },
+ {
+  "text": "가 가 가 가 가 가",
+  "char": 58,
+  "est": 7488,
+  "span": 32,
+  "v": {
+   "height": 1000,
+   "font": 4,
+   "bold": false,
+   "ratio": 90
+  }
+ },
+ {
+  "text": "가 0000000000",
+  "char": 58,
+  "est": 6273,
+  "span": 32,
+  "v": {
+   "height": 1000,
+   "font": 4,
+   "bold": false,
+   "ratio": 90
+  }
+ },
+ {
+  "text": "가 aaaaaaaaaa",
+  "char": 58,
+  "est": 6444,
+  "span": 32,
+  "v": {
+   "height": 1000,
+   "font": 4,
+   "bold": false,
+   "ratio": 90
+  }
+ },
+ {
+  "text": "가 ((((((((((",
+  "char": 58,
+  "est": 4203,
+  "span": 32,
+  "v": {
+   "height": 1000,
+   "font": 4,
+   "bold": false,
+   "ratio": 90
+  }
+ },
+ {
+  "text": "가 「「「「「「「「「「",
+  "char": 58,
+  "est": 5823,
+  "span": 32,
+  "v": {
+   "height": 1000,
+   "font": 4,
+   "bold": false,
+   "ratio": 90
+  }
+ },
+ {
+  "text": "가 eeeeeeeeee",
+  "char": 58,
+  "est": 6147,
+  "span": 32,
+  "v": {
+   "height": 1000,
+   "font": 4,
+   "bold": false,
+   "ratio": 90
+  }
+ },
+ {
+  "text": "가0가0가0가0가0",
+  "char": 58,
+  "est": 6840,
+  "span": 32,
+  "v": {
+   "height": 1000,
+   "font": 4,
+   "bold": false,
+   "ratio": 90
+  }
+ },
+ {
+  "text": "가가가가가가가가가가",
+  "char": 59,
+  "est": 10200,
+  "span": 80,
+  "v": {
+   "height": 1000,
+   "font": 4,
+   "bold": false,
+   "spacing": 5
+  }
+ },
+ {
+  "text": "가 가 가 가 가 가",
+  "char": 59,
+  "est": 8870,
+  "span": 80,
+  "v": {
+   "height": 1000,
+   "font": 4,
+   "bold": false,
+   "spacing": 5
+  }
+ },
+ {
+  "text": "가 0000000000",
+  "char": 59,
+  "est": 7570,
+  "span": 80,
+  "v": {
+   "height": 1000,
+   "font": 4,
+   "bold": false,
+   "spacing": 5
+  }
+ },
+ {
+  "text": "가 aaaaaaaaaa",
+  "char": 59,
+  "est": 7760,
+  "span": 80,
+  "v": {
+   "height": 1000,
+   "font": 4,
+   "bold": false,
+   "spacing": 5
+  }
+ },
+ {
+  "text": "가 ((((((((((",
+  "char": 59,
+  "est": 5270,
+  "span": 80,
+  "v": {
+   "height": 1000,
+   "font": 4,
+   "bold": false,
+   "spacing": 5
+  }
+ },
+ {
+  "text": "가 「「「「「「「「「「",
+  "char": 59,
+  "est": 7070,
+  "span": 80,
+  "v": {
+   "height": 1000,
+   "font": 4,
+   "bold": false,
+   "spacing": 5
+  }
+ },
+ {
+  "text": "가 eeeeeeeeee",
+  "char": 59,
+  "est": 7430,
+  "span": 80,
+  "v": {
+   "height": 1000,
+   "font": 4,
+   "bold": false,
+   "spacing": 5
+  }
+ },
+ {
+  "text": "가0가0가0가0가0",
+  "char": 59,
+  "est": 8100,
+  "span": 80,
+  "v": {
+   "height": 1000,
+   "font": 4,
+   "bold": false,
+   "spacing": 5
+  }
+ },
+ {
+  "text": "가가가가가가가가가가",
+  "char": 60,
+  "est": 12610,
+  "span": 32,
+  "v": {
+   "height": 1300,
+   "font": 4,
+   "bold": false
+  }
+ },
+ {
+  "text": "가 가 가 가 가 가",
+  "char": 60,
+  "est": 10816,
+  "span": 32,
+  "v": {
+   "height": 1300,
+   "font": 4,
+   "bold": false
+  }
+ },
+ {
+  "text": "가 0000000000",
+  "char": 60,
+  "est": 9051,
+  "span": 32,
+  "v": {
+   "height": 1300,
+   "font": 4,
+   "bold": false
+  }
+ },
+ {
+  "text": "가 aaaaaaaaaa",
+  "char": 60,
+  "est": 9301,
+  "span": 32,
+  "v": {
+   "height": 1300,
+   "font": 4,
+   "bold": false
+  }
+ },
+ {
+  "text": "가 ((((((((((",
+  "char": 60,
+  "est": 6061,
+  "span": 32,
+  "v": {
+   "height": 1300,
+   "font": 4,
+   "bold": false
+  }
+ },
+ {
+  "text": "가 「「「「「「「「「「",
+  "char": 60,
+  "est": 8411,
+  "span": 32,
+  "v": {
+   "height": 1300,
+   "font": 4,
+   "bold": false
+  }
+ },
+ {
+  "text": "가 eeeeeeeeee",
+  "char": 60,
+  "est": 8871,
+  "span": 32,
+  "v": {
+   "height": 1300,
+   "font": 4,
+   "bold": false
+  }
+ },
+ {
+  "text": "가0가0가0가0가0",
+  "char": 60,
+  "est": 9875,
+  "span": 32,
+  "v": {
+   "height": 1300,
+   "font": 4,
+   "bold": false
+  }
+ },
+ {
+  "text": "가가가가가가가가가가",
+  "char": 61,
+  "est": 10000,
+  "span": 32,
+  "v": {
+   "height": 1000,
+   "font": 0,
+   "bold": false
+  }
+ },
+ {
+  "text": "가 가 가 가 가 가",
+  "char": 61,
+  "est": 8500,
+  "span": 32,
+  "v": {
+   "height": 1000,
+   "font": 0,
+   "bold": false
+  }
+ },
+ {
+  "text": "가 0000000000",
+  "char": 61,
+  "est": 7240,
+  "span": 32,
+  "v": {
+   "height": 1000,
+   "font": 0,
+   "bold": false
+  }
+ },
+ {
+  "text": "가 aaaaaaaaaa",
+  "char": 61,
+  "est": 7120,
+  "span": 32,
+  "v": {
+   "height": 1000,
+   "font": 0,
+   "bold": false
+  }
+ },
+ {
+  "text": "가 ((((((((((",
+  "char": 61,
+  "est": 5250,
+  "span": 32,
+  "v": {
+   "height": 1000,
+   "font": 0,
+   "bold": false
+  }
+ },
+ {
+  "text": "가 「「「「「「「「「「",
+  "char": 61,
+  "est": 11500,
+  "span": 32,
+  "v": {
+   "height": 1000,
+   "font": 0,
+   "bold": false
+  }
+ },
+ {
+  "text": "가 eeeeeeeeee",
+  "char": 61,
+  "est": 7170,
+  "span": 32,
+  "v": {
+   "height": 1000,
+   "font": 0,
+   "bold": false
+  }
+ },
+ {
+  "text": "가0가0가0가0가0",
+  "char": 61,
+  "est": 7870,
+  "span": 32,
+  "v": {
+   "height": 1000,
+   "font": 0,
+   "bold": false
+  }
+ },
+ {
+  "text": "가가가가가가가가가가",
+  "char": 62,
+  "est": 10000,
+  "span": 32,
+  "v": {
+   "height": 1000,
+   "font": 1,
+   "bold": false
+  }
+ },
+ {
+  "text": "가 가 가 가 가 가",
+  "char": 62,
+  "est": 8500,
+  "span": 32,
+  "v": {
+   "height": 1000,
+   "font": 1,
+   "bold": false
+  }
+ },
+ {
+  "text": "가 0000000000",
+  "char": 62,
+  "est": 7330,
+  "span": 32,
+  "v": {
+   "height": 1000,
+   "font": 1,
+   "bold": false
+  }
+ },
+ {
+  "text": "가 aaaaaaaaaa",
+  "char": 62,
+  "est": 7330,
+  "span": 32,
+  "v": {
+   "height": 1000,
+   "font": 1,
+   "bold": false
+  }
+ },
+ {
+  "text": "가 ((((((((((",
+  "char": 62,
+  "est": 5250,
+  "span": 32,
+  "v": {
+   "height": 1000,
+   "font": 1,
+   "bold": false
+  }
+ },
+ {
+  "text": "가 「「「「「「「「「「",
+  "char": 62,
+  "est": 11500,
+  "span": 32,
+  "v": {
+   "height": 1000,
+   "font": 1,
+   "bold": false
+  }
+ },
+ {
+  "text": "가 eeeeeeeeee",
+  "char": 62,
+  "est": 7080,
+  "span": 32,
+  "v": {
+   "height": 1000,
+   "font": 1,
+   "bold": false
+  }
+ },
+ {
+  "text": "가0가0가0가0가0",
+  "char": 62,
+  "est": 7915,
+  "span": 32,
+  "v": {
+   "height": 1000,
+   "font": 1,
+   "bold": false
+  }
+ },
+ {
+  "text": "가가가가가가가가가가",
+  "char": 63,
+  "est": 10000,
+  "span": 32,
+  "v": {
+   "height": 1000,
+   "font": 2,
+   "bold": false
+  }
+ },
+ {
+  "text": "가 가 가 가 가 가",
+  "char": 63,
+  "est": 8500,
+  "span": 32,
+  "v": {
+   "height": 1000,
+   "font": 2,
+   "bold": false
+  }
+ },
+ {
+  "text": "가 0000000000",
+  "char": 63,
+  "est": 7450,
+  "span": 32,
+  "v": {
+   "height": 1000,
+   "font": 2,
+   "bold": false
+  }
+ },
+ {
+  "text": "가 aaaaaaaaaa",
+  "char": 63,
+  "est": 6910,
+  "span": 32,
+  "v": {
+   "height": 1000,
+   "font": 2,
+   "bold": false
+  }
+ },
+ {
+  "text": "가 ((((((((((",
+  "char": 63,
+  "est": 5260,
+  "span": 32,
+  "v": {
+   "height": 1000,
+   "font": 2,
+   "bold": false
+  }
+ },
+ {
+  "text": "가 「「「「「「「「「「",
+  "char": 63,
+  "est": 11500,
+  "span": 32,
+  "v": {
+   "height": 1000,
+   "font": 2,
+   "bold": false
+  }
+ },
+ {
+  "text": "가 eeeeeeeeee",
+  "char": 63,
+  "est": 7260,
+  "span": 32,
+  "v": {
+   "height": 1000,
+   "font": 2,
+   "bold": false
+  }
+ },
+ {
+  "text": "가0가0가0가0가0",
+  "char": 63,
+  "est": 7975,
+  "span": 32,
+  "v": {
+   "height": 1000,
+   "font": 2,
+   "bold": false
+  }
+ },
+ {
+  "text": "가가가가가가가가가가",
+  "char": 64,
+  "est": 8000,
+  "span": 32,
+  "v": {
+   "height": 800,
+   "font": 0,
+   "bold": false
+  }
+ },
+ {
+  "text": "가 가 가 가 가 가",
+  "char": 64,
+  "est": 6800,
+  "span": 32,
+  "v": {
+   "height": 800,
+   "font": 0,
+   "bold": false
+  }
+ },
+ {
+  "text": "가 0000000000",
+  "char": 64,
+  "est": 5790,
+  "span": 32,
+  "v": {
+   "height": 800,
+   "font": 0,
+   "bold": false
+  }
+ },
+ {
+  "text": "가 aaaaaaaaaa",
+  "char": 64,
+  "est": 5700,
+  "span": 32,
+  "v": {
+   "height": 800,
+   "font": 0,
+   "bold": false
+  }
+ },
+ {
+  "text": "가 ((((((((((",
+  "char": 64,
+  "est": 4200,
+  "span": 32,
+  "v": {
+   "height": 800,
+   "font": 0,
+   "bold": false
+  }
+ },
+ {
+  "text": "가 「「「「「「「「「「",
+  "char": 64,
+  "est": 9200,
+  "span": 32,
+  "v": {
+   "height": 800,
+   "font": 0,
+   "bold": false
+  }
+ },
+ {
+  "text": "가 eeeeeeeeee",
+  "char": 64,
+  "est": 5730,
+  "span": 32,
+  "v": {
+   "height": 800,
+   "font": 0,
+   "bold": false
+  }
+ },
+ {
+  "text": "가0가0가0가0가0",
+  "char": 64,
+  "est": 6295,
+  "span": 32,
+  "v": {
+   "height": 800,
+   "font": 0,
+   "bold": false
+  }
+ }
+]
