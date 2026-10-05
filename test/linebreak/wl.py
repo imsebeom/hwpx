@@ -14,6 +14,8 @@ from xml.sax.saxutils import escape
 
 sys.stdout.reconfigure(encoding="utf-8")
 HERE = Path(__file__).parent
+
+
 def steps(item):
     span = item.get("span", 28)
     return list(range(-span, span + 4, 4))
@@ -74,14 +76,17 @@ def make(spec_path, out):
             it.filename == "Contents/header.xml"
             and Path(spec_path).with_suffix(".charpr.json").exists()
         ):
-            data = add_charprs(
-                data.decode(),
-                json.loads(
-                    Path(spec_path)
-                    .with_suffix(".charpr.json")
-                    .read_text(encoding="utf-8")
-                ),
-            ).encode()
+            extra = json.loads(
+                Path(spec_path).with_suffix(".charpr.json").read_text(encoding="utf-8")
+            )
+            hdr = data.decode()
+            # {"fonts": [이름…], "variants": [{…, "face": 이름}]} 꼴이면 글꼴 목록부터 늘린다
+            if isinstance(extra, dict):
+                hdr, ids = add_fonts(hdr, extra["fonts"])
+                for v in extra["variants"]:
+                    v["fontref"] = ids[v["face"]]
+                extra = extra["variants"]
+            data = add_charprs(hdr, extra).encode()
         dst.writestr(
             it,
             data,
@@ -93,6 +98,31 @@ def make(spec_path, out):
     print("tables", len(paras))
 
 
+def add_fonts(hdr, faces):
+    """글꼴 이름들을 언어별 글꼴 목록 끝에 덧붙인다. 반환: (hdr, {이름: {LANG: id}})."""
+    ids = {f: {} for f in faces}
+
+    def one(m):
+        lang, cnt, body = m.group(1), int(m.group(2)), m.group(3)
+        add = ""
+        for i, f in enumerate(faces):
+            ids[f][lang] = cnt + i
+            add += (
+                f'<hh:font id="{cnt + i}" face="{f}" type="TTF" isEmbedded="0">'
+                '<hh:typeInfo familyType="FCAT_GOTHIC" weight="6" proportion="0" contrast="0" '
+                'strokeVariation="1" armStyle="1" letterform="1" midline="1" xHeight="1"/></hh:font>'
+            )
+        return f'<hh:fontface lang="{lang}" fontCnt="{cnt + len(faces)}">{body}{add}</hh:fontface>'
+
+    hdr = re.sub(
+        r'<hh:fontface lang="(\w+)" fontCnt="(\d+)">(.*?)</hh:fontface>',
+        one,
+        hdr,
+        flags=re.S,
+    )
+    return hdr, ids
+
+
 def add_charprs(hdr, extra):
     """extra: [{"id": 100, "height": 1000, "font": 4}] — charPr 45 를 본떠 크기와 글꼴만 바꾼 것을 덧붙인다."""
     m = re.search(r'<hh:charPr id="45".*?</hh:charPr>', hdr, re.S).group(0)
@@ -100,22 +130,11 @@ def add_charprs(hdr, extra):
     for e in extra:
         c = m.replace('id="45"', f'id="{e["id"]}"', 1)
         c = re.sub(r'height="\d+"', f'height="{e["height"]}"', c, count=1)
+        langs = ("hangul", "latin", "hanja", "japanese", "other", "symbol", "user")
+        ref = e.get("fontref") or {k.upper(): e["font"] for k in langs}
         c = re.sub(
             r"<hh:fontRef [^>]*/>",
-            "<hh:fontRef "
-            + " ".join(
-                f'{k}="{e["font"]}"'
-                for k in (
-                    "hangul",
-                    "latin",
-                    "hanja",
-                    "japanese",
-                    "other",
-                    "symbol",
-                    "user",
-                )
-            )
-            + "/>",
+            "<hh:fontRef " + " ".join(f'{k}="{ref[k.upper()]}"' for k in langs) + "/>",
             c,
             count=1,
         )
@@ -183,7 +202,10 @@ def read(spec_path, resaved):
     h = sec.find("2. 창의적 체험활동 평가 계획")
     tables = [m.start() for m in re.finditer(r"<hp:tbl ", sec[h:])]
     tables = [h + t for t in tables][1:]  # 첫 표는 원래 표
-    assert len(tables) >= sum(len(steps(i)) for i in spec), (len(tables), sum(len(steps(i)) for i in spec))
+    assert len(tables) >= sum(len(steps(i)) for i in spec), (
+        len(tables),
+        sum(len(steps(i)) for i in spec),
+    )
     at = 0
     out = []
     for i, item in enumerate(spec):

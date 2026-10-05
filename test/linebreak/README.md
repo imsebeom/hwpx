@@ -6,6 +6,7 @@
 | 파일 | 하는 일 |
 | --- | --- |
 | `wl.py`, `wl_spec*.py` | 글자 폭 사다리. 한 문서에 1×1 표를 칸 폭 4 HWPUNIT 씩 바꿔 넣고, 한/글 재저장본에서 줄 수를 읽어 「한 줄에 들어가는 가장 좁은 자리」를 얻는다 |
+| `wl_spec5.py`, `gen_font_patch.py` | 글꼴 파일(hmtx)의 폭으로 예상한 사다리(한컴산뜻돋움, 나눔스퀘어, 한컴 고딕 84건이 한/글과 모두 일치), 그 폭을 rhwp 폭 자료 패치 `patches/font-metrics-extra.rs` 로 만드는 생성기. `wl.py` 는 명세 옆 `.charpr.json` 에 `fonts` 가 있으면 글꼴 목록부터 늘린다 |
 | `wlb.py` | 글머리표 자리 사다리(글머리 문자, 본문과의 거리, 너비 보정, 자동 내어쓰기) |
 | `hwp_resave_many.py`, `hwp_resave.py`, `hwp2pdf.py`, `hwp_pages.py` | 한/글 COM: 다시 저장(쪽수를 먼저 물어야 조판된 줄 기록이 남는다), PDF, 쪽수 |
 | `hres_driver.py`, `hpages_driver.py` | 대조 문서 전체를 묶음으로 재저장, 쪽수 세기 |
@@ -15,4 +16,4 @@
 | `apply_blocks.py` | `patches/*.rs` 묶음 패치를 setup.mjs 와 같은 규칙으로 소스에 적용(시험용) |
 | `results/` | 사다리 명세와 한/글 실측 결과, 대조 문서 목록, 한/글 쪽수 |
 
-확정한 규칙은 스킬 `editor/patches/hancom-quantum-*.rs`, `char-kinsoku.rs`, `bullet-advance.rs`, `line-spacing-quantum.rs`, `cell-trailing-ls-synth.rs` 머리 주석에 있다.
+확정한 규칙은 스킬 `editor/patches/hancom-quantum-*.rs`, `char-kinsoku.rs`, `bullet-advance.rs`, `line-spacing-quantum.rs`, `cell-trailing-ls-synth.rs`, `font-metrics-extra.rs`, `condense-pull.rs` 머리 주석에 있다.
