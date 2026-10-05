@@ -53,6 +53,11 @@
   - 도구: `~/.cache/rhwp-devel/cmp.mjs`(2쪽 글자 줄과 셀 상자), `allpages.mjs <pkg> <a> <b>`(전 쪽 글자 좌표 대조), `variants.py`, `winshot.py`(에디터 창을 앞으로 올리지 않고 PrintWindow 로 캡처 — 사용자 화면을 뺏지 않는다)
 
 ## 컨텍스트 앵커
+- **10-05 둘째**: 사용자 보고 「표 안에서 Alt+Shift+A/Z 줄 간격이 안 된다」 → 스킬 6fa4f78(푸시, 릴리스 안 함. `setup.mjs --build` 는 돌려 로컬 studio-dist 는 새 판)
+  - 원인: 플러그인 칸 Ctrl+A(`selectCellContents`)가 1단 칸에서 평평한 `cellParaIndex` 만 바꾸고 `cellPath[0].cellParaIndex` 는 누른 자리로 남겼다. 문단 서식 대상(`getParaFormatTargetsForRange`)은 cellPath 를 먼저 봐서 누른 문단 하나만 바뀌고, 증감 키는 끝 문단 옛 값을 읽어 매번 같은 값을 넣었다(사용자 컨설팅 요청서 칸 줄 간격이 170/160/150 으로 섞임, ops.jsonl 에 `[160,150]` 반복)
+  - 🔑 `cli goto` 나 방향키로 놓은 커서는 cellPath 가 비어 재현되지 않는다 — **마우스 클릭**(CDP `click`)으로 놓아야 한다. 확인 도구 scratchpad `altkey.mjs`(Alt+Shift+글쇠)
+  - 사용자 질문 「4학년 평가 계획 가정통신문이 한글과 에디터에서 쪽 구성이 다르다」: 한글 3쪽(학교장 한 줄만 3쪽), 에디터 2쪽. 표 T4 머리 칸 「평가 시기」(글자 자리 3,934 HWPUNIT, 9pt 함초롬바탕)를 한글은 두 줄로 꺾고 rhwp 는 한 줄 — 띄어쓰기 폭 측정 차이로 추정. 사본에서 「평가시기」로 바꾸면 한글도 2쪽(확인). 엔진 측정 결함은 미조사
+  - next_steps: ① 칸 Ctrl+A 수정 릴리스(`release.mjs` → prebuilt.json 커밋, 푸시) 여부 사용자 확인 ② 띄어쓰기 폭(함초롬바탕) rhwp 측정 조사 여부
 - **10-05**: 사용자 보고 「표 속 표에서 Ctrl+A 오작동」, 「표 속 글머리표가 글자인 듯 아닌 듯」 → 스킬 e3dc644, c5e53d3, b8508ae, 1508e9e, 릴리스 editor-c49ee314737f(3f75b05 까지 hwpx, hwpx2 푸시)
   - ① 플러그인 `selectCellContents` 가 표 속 표 칸(cellPath 2단 이상)을 rhwp 기본(문서 전체 선택)에 넘겨 커서가 문서 끝으로 튀었다 → `*ByPath` API 로 그 칸만 고른다(평평한 좌표는 바깥 칸 것이라 두고 경로 끝만 바꿈)
   - ② 엔진 패치 `sel-skip-marker`: 글머리표 런은 `char_start: None` 인데 `cursor_nav.rs` 선택 음영 두 곳이 `unwrap_or(0)` 으로 0번 글자로 셌다(캐럿은 건너뜀). 「과정」을 골라도 글머리표만 칠해지던 것 해결
