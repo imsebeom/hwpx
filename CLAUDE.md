@@ -53,7 +53,7 @@
   - 도구: `~/.cache/rhwp-devel/cmp.mjs`(2쪽 글자 줄과 셀 상자), `allpages.mjs <pkg> <a> <b>`(전 쪽 글자 좌표 대조), `variants.py`, `winshot.py`(에디터 창을 앞으로 올리지 않고 PrintWindow 로 캡처 — 사용자 화면을 뺏지 않는다)
 
 ## 컨텍스트 앵커
-- **10-05**: 사용자 보고 「표 속 표에서 Ctrl+A 오작동」, 「표 속 글머리표가 글자인 듯 아닌 듯」 → 스킬 e3dc644, c5e53d3(푸시, 릴리스 안 함)
+- **10-05**: 사용자 보고 「표 속 표에서 Ctrl+A 오작동」, 「표 속 글머리표가 글자인 듯 아닌 듯」 → 스킬 e3dc644, c5e53d3(푸시와 릴리스 안 함)
   - ① 플러그인 `selectCellContents` 가 표 속 표 칸(cellPath 2단 이상)을 rhwp 기본(문서 전체 선택)에 넘겨 커서가 문서 끝으로 튀었다 → `*ByPath` API 로 그 칸만 고른다(평평한 좌표는 바깥 칸 것이라 두고 경로 끝만 바꿈)
   - ② 엔진 패치 `sel-skip-marker`: 글머리표 런은 `char_start: None` 인데 `cursor_nav.rs` 선택 음영 두 곳이 `unwrap_or(0)` 으로 0번 글자로 셌다(캐럿은 건너뜀). 「과정」을 골라도 글머리표만 칠해지던 것 해결
   - 검증: 아궁이 문항카드 사본, `start --no-browser` + 보이지 않는 크로미움(CDP 9333, scratchpad `hold.py`, `cdp.mjs` 키, 클릭, 캡처). 1단 칸, 본문, 표 속 표 회귀 확인. `cargo test --lib` 3,889 통과
