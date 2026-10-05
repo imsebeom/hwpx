@@ -1,0 +1,702 @@
+[
+ {
+  "text": "가가가가가가가가가가",
+  "char": 50,
+  "est": 9409,
+  "span": 48,
+  "v": {
+   "height": 1000,
+   "ratio": 97
+  }
+ },
+ {
+  "text": "가 가 가 가 가 가",
+  "char": 50,
+  "est": 8070,
+  "span": 48,
+  "v": {
+   "height": 1000,
+   "ratio": 97
+  }
+ },
+ {
+  "text": "가 0000000000",
+  "char": 50,
+  "est": 6761,
+  "span": 48,
+  "v": {
+   "height": 1000,
+   "ratio": 97
+  }
+ },
+ {
+  "text": "가 aaaaaaaaaa",
+  "char": 50,
+  "est": 6945,
+  "span": 48,
+  "v": {
+   "height": 1000,
+   "ratio": 97
+  }
+ },
+ {
+  "text": "가 ((((((((((",
+  "char": 50,
+  "est": 4530,
+  "span": 48,
+  "v": {
+   "height": 1000,
+   "ratio": 97
+  }
+ },
+ {
+  "text": "가 「「「「「「「「「「",
+  "char": 50,
+  "est": 6276,
+  "span": 48,
+  "v": {
+   "height": 1000,
+   "ratio": 97
+  }
+ },
+ {
+  "text": "가 eeeeeeeeee",
+  "char": 50,
+  "est": 6625,
+  "span": 48,
+  "v": {
+   "height": 1000,
+   "ratio": 97
+  }
+ },
+ {
+  "text": "가가가가가가가가가가",
+  "char": 51,
+  "est": 7760,
+  "span": 48,
+  "v": {
+   "height": 1000,
+   "ratio": 80
+  }
+ },
+ {
+  "text": "가 가 가 가 가 가",
+  "char": 51,
+  "est": 6656,
+  "span": 48,
+  "v": {
+   "height": 1000,
+   "ratio": 80
+  }
+ },
+ {
+  "text": "가 0000000000",
+  "char": 51,
+  "est": 5576,
+  "span": 48,
+  "v": {
+   "height": 1000,
+   "ratio": 80
+  }
+ },
+ {
+  "text": "가 aaaaaaaaaa",
+  "char": 51,
+  "est": 5728,
+  "span": 48,
+  "v": {
+   "height": 1000,
+   "ratio": 80
+  }
+ },
+ {
+  "text": "가 ((((((((((",
+  "char": 51,
+  "est": 3736,
+  "span": 48,
+  "v": {
+   "height": 1000,
+   "ratio": 80
+  }
+ },
+ {
+  "text": "가 「「「「「「「「「「",
+  "char": 51,
+  "est": 5176,
+  "span": 48,
+  "v": {
+   "height": 1000,
+   "ratio": 80
+  }
+ },
+ {
+  "text": "가 eeeeeeeeee",
+  "char": 51,
+  "est": 5464,
+  "span": 48,
+  "v": {
+   "height": 1000,
+   "ratio": 80
+  }
+ },
+ {
+  "text": "가가가가가가가가가가",
+  "char": 52,
+  "est": 4850,
+  "span": 48,
+  "v": {
+   "height": 1000,
+   "ratio": 50
+  }
+ },
+ {
+  "text": "가 가 가 가 가 가",
+  "char": 52,
+  "est": 4160,
+  "span": 48,
+  "v": {
+   "height": 1000,
+   "ratio": 50
+  }
+ },
+ {
+  "text": "가 0000000000",
+  "char": 52,
+  "est": 3485,
+  "span": 48,
+  "v": {
+   "height": 1000,
+   "ratio": 50
+  }
+ },
+ {
+  "text": "가 aaaaaaaaaa",
+  "char": 52,
+  "est": 3580,
+  "span": 48,
+  "v": {
+   "height": 1000,
+   "ratio": 50
+  }
+ },
+ {
+  "text": "가 ((((((((((",
+  "char": 52,
+  "est": 2335,
+  "span": 48,
+  "v": {
+   "height": 1000,
+   "ratio": 50
+  }
+ },
+ {
+  "text": "가 「「「「「「「「「「",
+  "char": 52,
+  "est": 3235,
+  "span": 48,
+  "v": {
+   "height": 1000,
+   "ratio": 50
+  }
+ },
+ {
+  "text": "가 eeeeeeeeee",
+  "char": 52,
+  "est": 3415,
+  "span": 48,
+  "v": {
+   "height": 1000,
+   "ratio": 50
+  }
+ },
+ {
+  "text": "가가가가가가가가가가",
+  "char": 53,
+  "est": 10670,
+  "span": 48,
+  "v": {
+   "height": 1000,
+   "ratio": 110
+  }
+ },
+ {
+  "text": "가 가 가 가 가 가",
+  "char": 53,
+  "est": 9152,
+  "span": 48,
+  "v": {
+   "height": 1000,
+   "ratio": 110
+  }
+ },
+ {
+  "text": "가 0000000000",
+  "char": 53,
+  "est": 7667,
+  "span": 48,
+  "v": {
+   "height": 1000,
+   "ratio": 110
+  }
+ },
+ {
+  "text": "가 aaaaaaaaaa",
+  "char": 53,
+  "est": 7876,
+  "span": 48,
+  "v": {
+   "height": 1000,
+   "ratio": 110
+  }
+ },
+ {
+  "text": "가 ((((((((((",
+  "char": 53,
+  "est": 5137,
+  "span": 48,
+  "v": {
+   "height": 1000,
+   "ratio": 110
+  }
+ },
+ {
+  "text": "가 「「「「「「「「「「",
+  "char": 53,
+  "est": 7117,
+  "span": 48,
+  "v": {
+   "height": 1000,
+   "ratio": 110
+  }
+ },
+ {
+  "text": "가 eeeeeeeeee",
+  "char": 53,
+  "est": 7513,
+  "span": 48,
+  "v": {
+   "height": 1000,
+   "ratio": 110
+  }
+ },
+ {
+  "text": "가가가가가가가가가가",
+  "char": 54,
+  "est": 11640,
+  "span": 48,
+  "v": {
+   "height": 1000,
+   "ratio": 120
+  }
+ },
+ {
+  "text": "가 가 가 가 가 가",
+  "char": 54,
+  "est": 9984,
+  "span": 48,
+  "v": {
+   "height": 1000,
+   "ratio": 120
+  }
+ },
+ {
+  "text": "가 0000000000",
+  "char": 54,
+  "est": 8364,
+  "span": 48,
+  "v": {
+   "height": 1000,
+   "ratio": 120
+  }
+ },
+ {
+  "text": "가 aaaaaaaaaa",
+  "char": 54,
+  "est": 8592,
+  "span": 48,
+  "v": {
+   "height": 1000,
+   "ratio": 120
+  }
+ },
+ {
+  "text": "가 ((((((((((",
+  "char": 54,
+  "est": 5604,
+  "span": 48,
+  "v": {
+   "height": 1000,
+   "ratio": 120
+  }
+ },
+ {
+  "text": "가 「「「「「「「「「「",
+  "char": 54,
+  "est": 7764,
+  "span": 48,
+  "v": {
+   "height": 1000,
+   "ratio": 120
+  }
+ },
+ {
+  "text": "가 eeeeeeeeee",
+  "char": 54,
+  "est": 8196,
+  "span": 48,
+  "v": {
+   "height": 1000,
+   "ratio": 120
+  }
+ },
+ {
+  "text": "가가가가가가가가가가",
+  "char": 55,
+  "est": 8294,
+  "span": 48,
+  "v": {
+   "height": 900,
+   "ratio": 95
+  }
+ },
+ {
+  "text": "가 가 가 가 가 가",
+  "char": 55,
+  "est": 7114,
+  "span": 48,
+  "v": {
+   "height": 900,
+   "ratio": 95
+  }
+ },
+ {
+  "text": "가 0000000000",
+  "char": 55,
+  "est": 5959,
+  "span": 48,
+  "v": {
+   "height": 900,
+   "ratio": 95
+  }
+ },
+ {
+  "text": "가 aaaaaaaaaa",
+  "char": 55,
+  "est": 6121,
+  "span": 48,
+  "v": {
+   "height": 900,
+   "ratio": 95
+  }
+ },
+ {
+  "text": "가 ((((((((((",
+  "char": 55,
+  "est": 3993,
+  "span": 48,
+  "v": {
+   "height": 900,
+   "ratio": 95
+  }
+ },
+ {
+  "text": "가 「「「「「「「「「「",
+  "char": 55,
+  "est": 5532,
+  "span": 48,
+  "v": {
+   "height": 900,
+   "ratio": 95
+  }
+ },
+ {
+  "text": "가 eeeeeeeeee",
+  "char": 55,
+  "est": 5836,
+  "span": 48,
+  "v": {
+   "height": 900,
+   "ratio": 95
+  }
+ },
+ {
+  "text": "가가가가가가가가가가",
+  "char": 56,
+  "est": 7857,
+  "span": 48,
+  "v": {
+   "height": 900,
+   "ratio": 90
+  }
+ },
+ {
+  "text": "가 가 가 가 가 가",
+  "char": 56,
+  "est": 6739,
+  "span": 48,
+  "v": {
+   "height": 900,
+   "ratio": 90
+  }
+ },
+ {
+  "text": "가 0000000000",
+  "char": 56,
+  "est": 5646,
+  "span": 48,
+  "v": {
+   "height": 900,
+   "ratio": 90
+  }
+ },
+ {
+  "text": "가 aaaaaaaaaa",
+  "char": 56,
+  "est": 5799,
+  "span": 48,
+  "v": {
+   "height": 900,
+   "ratio": 90
+  }
+ },
+ {
+  "text": "가 ((((((((((",
+  "char": 56,
+  "est": 3783,
+  "span": 48,
+  "v": {
+   "height": 900,
+   "ratio": 90
+  }
+ },
+ {
+  "text": "가 「「「「「「「「「「",
+  "char": 56,
+  "est": 5241,
+  "span": 48,
+  "v": {
+   "height": 900,
+   "ratio": 90
+  }
+ },
+ {
+  "text": "가 eeeeeeeeee",
+  "char": 56,
+  "est": 5529,
+  "span": 48,
+  "v": {
+   "height": 900,
+   "ratio": 90
+  }
+ },
+ {
+  "text": "가가가가가가가가가가",
+  "char": 57,
+  "est": 11058,
+  "span": 48,
+  "v": {
+   "height": 1200,
+   "ratio": 95
+  }
+ },
+ {
+  "text": "가 가 가 가 가 가",
+  "char": 57,
+  "est": 9485,
+  "span": 48,
+  "v": {
+   "height": 1200,
+   "ratio": 95
+  }
+ },
+ {
+  "text": "가 0000000000",
+  "char": 57,
+  "est": 7946,
+  "span": 48,
+  "v": {
+   "height": 1200,
+   "ratio": 95
+  }
+ },
+ {
+  "text": "가 aaaaaaaaaa",
+  "char": 57,
+  "est": 8155,
+  "span": 48,
+  "v": {
+   "height": 1200,
+   "ratio": 95
+  }
+ },
+ {
+  "text": "가 ((((((((((",
+  "char": 57,
+  "est": 5324,
+  "span": 48,
+  "v": {
+   "height": 1200,
+   "ratio": 95
+  }
+ },
+ {
+  "text": "가 「「「「「「「「「「",
+  "char": 57,
+  "est": 7376,
+  "span": 48,
+  "v": {
+   "height": 1200,
+   "ratio": 95
+  }
+ },
+ {
+  "text": "가 eeeeeeeeee",
+  "char": 57,
+  "est": 7784,
+  "span": 48,
+  "v": {
+   "height": 1200,
+   "ratio": 95
+  }
+ },
+ {
+  "text": "가가가가가가가가가가",
+  "char": 58,
+  "est": 9603,
+  "span": 48,
+  "v": {
+   "height": 1000,
+   "ratio": 99
+  }
+ },
+ {
+  "text": "가 가 가 가 가 가",
+  "char": 58,
+  "est": 8237,
+  "span": 48,
+  "v": {
+   "height": 1000,
+   "ratio": 99
+  }
+ },
+ {
+  "text": "가 0000000000",
+  "char": 58,
+  "est": 6900,
+  "span": 48,
+  "v": {
+   "height": 1000,
+   "ratio": 99
+  }
+ },
+ {
+  "text": "가 aaaaaaaaaa",
+  "char": 58,
+  "est": 7088,
+  "span": 48,
+  "v": {
+   "height": 1000,
+   "ratio": 99
+  }
+ },
+ {
+  "text": "가 ((((((((((",
+  "char": 58,
+  "est": 4623,
+  "span": 48,
+  "v": {
+   "height": 1000,
+   "ratio": 99
+  }
+ },
+ {
+  "text": "가 「「「「「「「「「「",
+  "char": 58,
+  "est": 6405,
+  "span": 48,
+  "v": {
+   "height": 1000,
+   "ratio": 99
+  }
+ },
+ {
+  "text": "가 eeeeeeeeee",
+  "char": 58,
+  "est": 6762,
+  "span": 48,
+  "v": {
+   "height": 1000,
+   "ratio": 99
+  }
+ },
+ {
+  "text": "가가가가가가가가가가",
+  "char": 59,
+  "est": 9021,
+  "span": 48,
+  "v": {
+   "height": 1000,
+   "ratio": 93
+  }
+ },
+ {
+  "text": "가 가 가 가 가 가",
+  "char": 59,
+  "est": 7738,
+  "span": 48,
+  "v": {
+   "height": 1000,
+   "ratio": 93
+  }
+ },
+ {
+  "text": "가 0000000000",
+  "char": 59,
+  "est": 6482,
+  "span": 48,
+  "v": {
+   "height": 1000,
+   "ratio": 93
+  }
+ },
+ {
+  "text": "가 aaaaaaaaaa",
+  "char": 59,
+  "est": 6659,
+  "span": 48,
+  "v": {
+   "height": 1000,
+   "ratio": 93
+  }
+ },
+ {
+  "text": "가 ((((((((((",
+  "char": 59,
+  "est": 4343,
+  "span": 48,
+  "v": {
+   "height": 1000,
+   "ratio": 93
+  }
+ },
+ {
+  "text": "가 「「「「「「「「「「",
+  "char": 59,
+  "est": 6017,
+  "span": 48,
+  "v": {
+   "height": 1000,
+   "ratio": 93
+  }
+ },
+ {
+  "text": "가 eeeeeeeeee",
+  "char": 59,
+  "est": 6352,
+  "span": 48,
+  "v": {
+   "height": 1000,
+   "ratio": 93
+  }
+ }
+]
