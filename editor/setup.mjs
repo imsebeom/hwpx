@@ -361,6 +361,10 @@ const RUST_PATCHES = [
     ['bullet-advance', 'src/renderer/composer/line_breaking.rs'],
     // 줄 간격을 4 HWPUNIT 단위로, 「줄 간격에 영향」이 켜진 글자처럼 취급 개체 줄은 줄 간격 % 를 개체 높이에(머리 표 아래가 좁아 뒤가 당겨졌다)
     ['line-spacing-quantum', 'src/renderer/composer/line_breaking.rs'],
+    // 한컴산뜻돋움, 한컴 고딕, 나눔스퀘어의 글자 폭(글꼴 파일 hmtx 에서 뽑음 — 개발 폴더 test/linebreak/gen_font_patch.py 가 만든다)
+    ['font-metrics-extra', 'src/renderer/font_metrics_overlays.rs'],
+    // 최소 공백: 쪼개지는 낱말은 공백을 줄여 마저 담고, 이미 줄여 채운 줄에는 새 낱말을 당겨 오지 않는다
+    ['condense-pull', 'src/renderer/composer/line_breaking.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));

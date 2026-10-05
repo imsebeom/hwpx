@@ -33,7 +33,18 @@ fn claude_hancom_advance_units(ch: char, style: &TextStyle) -> Option<(i64, i64)
     const UNIT: f64 = 75.0 / 4.0;
     const EPS: f64 = 1e-6;
     let plain = (ratio - 1.0).abs() < 1e-9;
-    let glyph = if ch == ' ' && (decision.base_width_px - font_size * 0.5).abs() < 1e-9 {
+    // 폭 표에서 온 값은 HWPUNIT 로 한 번 버림돼 있다(quantize_hwp_px). 장평을 곱하기 전에 버리면 한 단위 어긋날 수
+    // 있으므로 표의 원래 값을 다시 읽는다. 덮어쓴 값(반각 구두점 등)과 어림값은 그대로 쓴다.
+    let base_px = match (decision.width_source, decision.metric) {
+        ("embeddedMetric", Some(lookup)) => lookup
+            .metric
+            .get_width(ch)
+            .map(|width| f64::from(width) * font_size / f64::from(lookup.metric.em_size)),
+        _ => None,
+    }
+    .unwrap_or(decision.base_width_px);
+    // 반 칸 띄어쓰기(글자 크기의 절반). 버림된 값과도 한 HWPUNIT 안에서 맞춰 본다.
+    let glyph = if ch == ' ' && (decision.base_width_px - font_size * 0.5).abs() < 1.0 / 75.0 + 1e-9 {
         let half = (font_size * UNIT / 2.0 + EPS).floor();
         if plain {
             half
@@ -41,9 +52,9 @@ fn claude_hancom_advance_units(ch: char, style: &TextStyle) -> Option<(i64, i64)
             (half * ratio + 0.5 + EPS).floor()
         }
     } else if plain {
-        (decision.base_width_px * UNIT + 0.5 + EPS).floor()
+        (base_px * UNIT + 0.5 + EPS).floor()
     } else {
-        (decision.base_width_px * ratio * UNIT + EPS).floor()
+        (base_px * ratio * UNIT + EPS).floor()
     };
     let spacing = if style.letter_spacing == 0.0 {
         0.0
