@@ -19,7 +19,8 @@ import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { readZip, stripDummyLinesegs, fixHfFields } from './hwpx-zip.mjs';
-import { rhwpLayout } from './rhwp_layout.mjs';
+import { rhwpLayout, engineModule } from './rhwp_layout.mjs';
+import { docFontMetrics } from './font-metrics.mjs';
 import { makeProxy, restoreImages, PROXY_MIN_BYTES } from './image-proxy.mjs';
 import { formatLog, formatOp, coalesceOps } from './log-format.mjs';
 
@@ -379,7 +380,19 @@ const server = http.createServer(async (req, res) => {
         }
       }
       writeSession({ proxyMap: proxy?.map ?? null });
-      return sendJson(res, 200, { ok: true, fileName: path.basename(s.source), proxyImages: proxy?.images ?? 0, base64: buf.toString('base64') });
+      // 엔진에 폭 표가 없는 글꼴은 설치된 글꼴 파일에서 읽어 함께 보낸다(font-metrics.mjs).
+      // 호스트 페이지가 문서를 열기 전에 브라우저 엔진에 등록한다 — 한/글처럼 실제 글꼴 폭으로 줄을 나눈다
+      let fontMetrics = [];
+      if (/\.hwpx$/i.test(s.source)) {
+        try {
+          const fonts = docFontMetrics(buf, await engineModule());
+          fontMetrics = fonts.metrics;
+          if (fonts.read.length) logEvent('fonts', { read: fonts.read, missing: fonts.missing });
+        } catch (e) {
+          logEvent('error', { where: '글꼴 폭 표', error: String(e?.message || e).slice(0, 300) });
+        }
+      }
+      return sendJson(res, 200, { ok: true, fileName: path.basename(s.source), proxyImages: proxy?.images ?? 0, fontMetrics, base64: buf.toString('base64') });
     }
     return serveStatic(req, res, p);
   } catch (e) {

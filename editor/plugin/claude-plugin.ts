@@ -31,6 +31,7 @@ import { installParaPreview } from './para-preview';
 import { installDialogEnter } from './dialog-enter';
 import { installCellBlockErase } from './cell-block-erase';
 import { installPictureCrop } from './picture-crop';
+import * as rhwpWasm from '@wasm/rhwp.js';
 
 // 이름이 이렇게 시작하는 WASM 메서드는 문서를 바꾸지 않는다고 본다.
 const READ_DOC = /^(get|search|export|render|is|has|list|find|measure|hitTest|pageCount)/;
@@ -884,6 +885,11 @@ export function createClaudePlugin(getInputHandler) {
         },
 
         mutations: () => mutations,
+        /**
+         * 글꼴 폭 표 등록(엔진 패치 font-metrics-runtime). 서버가 설치된 글꼴 파일에서 읽은 것을 호스트가 문서를 열기 전에
+         * 넘긴다. 엔진에 폭 표가 없는 글꼴도 한/글처럼 실제 글꼴 폭으로 줄을 나눈다. 반환: 새로 등록한 얼굴 수
+         */
+        registerFontMetrics: (metrics) => (typeof rhwpWasm.registerFontMetrics === 'function' ? rhwpWasm.registerFontMetrics(JSON.stringify(metrics)) : 0),
         tools: () => [...TOOLS, ...EXTRA_TOOLS],
         outline: (opts) => host.read((doc) => outline(doc, opts || {})),
         model: () => host.read((doc) => modelOf(doc)),

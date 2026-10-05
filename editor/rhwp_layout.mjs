@@ -18,18 +18,20 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { readZip, writeZip, stripDummyLinesegs } from './hwpx-zip.mjs';
+import { docFontMetrics, registerInto } from './font-metrics.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-let HwpDocument = null;
+let engineMod = null;
 
-async function engine() {
-  if (HwpDocument) return HwpDocument;
+/** 엔진 모듈(rhwp.js 의 내보내기 전부). 서버가 글꼴 폭 표를 고를 때도 같은 것을 쓴다 */
+export async function engineModule() {
+  if (engineMod) return engineMod;
   // setup.mjs 가 번들과 같은 WASM 을 둔다. 에디터를 빌드하지 않은 PC 에서 빌드 마지막 보정을 할 때는
   // scripts/rhwp_convert.py 가 받아 둔 npm @rhwp/core 폴더를 RHWP_ENGINE 으로 넘긴다.
   const dir = process.env.RHWP_ENGINE || path.join(HERE, 'studio-dist', 'node');
   const m = await import(pathToFileURL(path.join(dir, 'rhwp.js')).href);
   m.initSync({ module: fs.readFileSync(path.join(dir, 'rhwp_bg.wasm')) });
-  return (HwpDocument = m.HwpDocument);
+  return (engineMod = m);
 }
 
 /**
@@ -135,7 +137,10 @@ function setHeights(xml, heightOf) {
 
 /** 반환: { buf, tables } — 고칠 표가 없으면 더미만 걷은 buf, tables 0. */
 export async function rhwpLayout(input) {
-  const Doc = await engine();
+  const mod = await engineModule();
+  const Doc = mod.HwpDocument;
+  // 엔진에 폭 표가 없는 글꼴은 설치된 글꼴 파일에서 읽어 등록한다(브라우저 엔진과 같은 폭으로 재야 표 높이가 맞는다)
+  registerInto(mod, docFontMetrics(input, mod).metrics);
   const entries = readZip(stripDummyLinesegs(input).buf);
   const secs = entries.filter((e) => /^Contents\/section\d+\.xml$/.test(e.name))
     .sort((a, b) => Number(a.name.match(/\d+/)[0]) - Number(b.name.match(/\d+/)[0]));

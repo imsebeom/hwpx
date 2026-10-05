@@ -11,6 +11,7 @@ export function formatLog(e) {
     case 'load': return `${t}  불러옴    ${e.doc} — ${LAYOUT[e.layout] ?? e.layout}${e.tables ? ` ${e.tables}개` : ''}${e.note ? ` (${e.note})` : ''}${e.error ? ` (${e.error})` : ''}`;
     case 'open': return `${t}  열림      ${e.doc} ${kb(e.bytes)}`;
     case 'proxy': return `${t}  그림 축소 ${e.images}장, ${e.fromMB}MB → ${e.toMB}MB${e.cached ? ' (캐시)' : ''}`;
+    case 'fonts': return `${t}  글꼴 폭   파일에서 읽음: ${e.read.join(', ')}${e.missing?.length ? ` / 이 PC 에 없어 어림: ${e.missing.join(', ')}` : ''}`;
     case 'edit': return `${t}  ${who} 편집 ${e.formatOnly ? '서식이나 개체만' : `${e.count}곳 ${e.refs.join(' ')}${e.count > e.refs.length ? ' …' : ''}`}${e.at ? ` (커서 ${e.at})` : ''}`;
     case 'save': return `${t}  ${who} 저장 ${e.path ?? e.name} ${kb(e.bytes)}${e.via ? ` (${e.via})` : ''}${e.imagesRestored ? ` 그림 원본 ${e.imagesRestored}장 복원` : ''}`;
     case 'open-file': return `${t}  ${who} 다른 파일 열기 ${e.names.join(', ')} (${e.via})`;

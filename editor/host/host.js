@@ -145,6 +145,10 @@ function bindSourceHandle(fileName) {
 async function openFromServer() {
   const r = await fetch('/api/doc').then((x) => x.json());
   if (!r.ok) { setStatus('열 문서 없음', 'err'); return { ok: false, error: '세션에 문서가 없다' }; }
+  // 엔진에 폭 표가 없는 글꼴은 서버가 설치된 글꼴 파일에서 읽어 보낸다. 문서를 열기 전에 등록해야 그 폭으로 줄을 나눈다
+  if (r.fontMetrics?.length) {
+    try { await plugin('registerFontMetrics', r.fontMetrics); } catch (e) { log(`글꼴 폭 표 등록 실패: ${e?.message || e}`); }
+  }
   const res = await studio.loadFile(fromBase64(r.base64), r.fileName, { skipUnsavedGuard: true });
   bindSourceHandle(r.fileName);
   $('doc').textContent = r.proxyImages ? `${r.fileName} · 그림 축소 보기(저장하면 원본 그림으로)` : r.fileName;
