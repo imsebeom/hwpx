@@ -138,16 +138,25 @@ export function installHancomKeys(host, getInputHandler) {
     if (!ih) return false;
     const pos = ih.getCursorPosition?.();
     if (!pos || pos.parentParaIndex == null) return false;
-    if ((pos.cellPath?.length ?? 1) > 1) return false; // 셀 안 표의 셀은 rhwp 기본 동작에 맡긴다
+    // 셀 안 표의 셀은 경로 API 로 잰다. rhwp 기본 동작(문서 전체 선택)에 넘기면 커서가 문서 끝으로 튄다(2026-10-05 사용자 보고).
+    // 평평한 좌표(cellParaIndex 등)는 바깥 칸(cellPath[0]) 것이라 그대로 두고 경로 끝만 바꾼다.
+    const path = (pos.cellPath?.length ?? 0) > 1 ? pos.cellPath : null;
+    const at = (cpi, charOffset) => (path
+      ? { ...pos, charOffset, cellPath: path.map((e, i) => (i < path.length - 1 ? e : { ...e, cellParaIndex: cpi })) }
+      : { ...pos, cellParaIndex: cpi, charOffset });
     const range = host.read((doc) => {
+      if (path) {
+        const last = Math.max(0, doc.getCellParagraphCountByPath(pos.sectionIndex, pos.parentParaIndex, JSON.stringify(path)) - 1);
+        return { last, len: doc.getCellParagraphLengthByPath(pos.sectionIndex, pos.parentParaIndex, JSON.stringify(at(last, 0).cellPath)) };
+      }
       const n = doc.getCellParagraphCount(pos.sectionIndex, pos.parentParaIndex, pos.controlIndex, pos.cellIndex);
       const last = Math.max(0, n - 1);
       return { last, len: doc.getCellParagraphLength(pos.sectionIndex, pos.parentParaIndex, pos.controlIndex, pos.cellIndex, last) };
     });
     ih.cursor.clearSelection();
-    ih.cursor.moveTo({ ...pos, cellParaIndex: 0, charOffset: 0 });
+    ih.cursor.moveTo(at(0, 0));
     ih.cursor.setAnchor();
-    ih.cursor.moveTo({ ...pos, cellParaIndex: range.last, charOffset: range.len });
+    ih.cursor.moveTo(at(range.last, range.len));
     ih.cursor.resetPreferredX?.();
     ih.updateCaret?.(true);
     return true;
