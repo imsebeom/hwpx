@@ -53,11 +53,19 @@
   - 도구: `~/.cache/rhwp-devel/cmp.mjs`(2쪽 글자 줄과 셀 상자), `allpages.mjs <pkg> <a> <b>`(전 쪽 글자 좌표 대조), `variants.py`, `winshot.py`(에디터 창을 앞으로 올리지 않고 PrintWindow 로 캡처 — 사용자 화면을 뺏지 않는다)
 
 ## 컨텍스트 앵커
-- **10-05 둘째**: 사용자 보고 「표 안에서 Alt+Shift+A/Z 줄 간격이 안 된다」 → 스킬 6fa4f78(푸시와 릴리스는 아직 안 함. `setup.mjs --build` 는 돌려 로컬 studio-dist 는 새 판)
-  - 원인: 플러그인 칸 Ctrl+A(`selectCellContents`)가 1단 칸에서 평평한 `cellParaIndex` 만 바꾸고 `cellPath[0].cellParaIndex` 는 누른 자리로 남겼다. 문단 서식 대상(`getParaFormatTargetsForRange`)은 cellPath 를 먼저 봐서 누른 문단 하나만 바뀌고, 증감 키는 끝 문단 옛 값을 읽어 매번 같은 값을 넣었다(사용자 컨설팅 요청서 칸 줄 간격이 170/160/150 으로 섞임, ops.jsonl 에 `[160,150]` 반복)
-  - 🔑 `cli goto` 나 방향키로 놓은 커서는 cellPath 가 비어 재현되지 않는다 — **마우스 클릭**(CDP `click`)으로 놓아야 한다. 확인 도구 scratchpad `altkey.mjs`(Alt+Shift+글쇠)
-  - 사용자 질문 「4학년 평가 계획 가정통신문이 한글과 에디터에서 쪽 구성이 다르다」: 한글 3쪽(학교장 한 줄만 3쪽), 에디터 2쪽. 표 T4 머리 칸 「평가 시기」(글자 자리 3,934 HWPUNIT, 9pt 함초롬바탕)를 한글은 두 줄로 꺾고 rhwp 는 한 줄 — 띄어쓰기 폭 측정 차이로 추정. 사본에서 「평가시기」로 바꾸면 한글도 2쪽(확인). 엔진 측정 결함은 미조사
-  - next_steps: ① 칸 Ctrl+A 수정 릴리스(`release.mjs` → prebuilt.json 커밋, 푸시) 여부 사용자 확인 ② 띄어쓰기 폭(함초롬바탕) rhwp 측정 조사 여부
+- **10-05 둘째 ~ 10-06**: 사용자 보고 넷 → 스킬 6fa4f78, 892b48b, d55a0da(**푸시와 릴리스 안 함**, `setup.mjs --build` 는 돌려 이 PC studio-dist 는 새 판)
+  - ① 「표 안에서 Alt+Shift+A/Z 줄 간격이 안 된다」(6fa4f78): 플러그인 칸 Ctrl+A 가 1단 칸에서 `cellPath[0].cellParaIndex` 를 누른 자리로 남겨, 문단 서식이 누른 문단 하나에만 들어가고 증감 키가 매번 같은 값을 넣었다. 🔑 `cli goto`, 방향키 커서는 cellPath 가 비어 재현 안 됨 — **마우스 클릭**(CDP)으로 놓는다
+  - ② 「문항카드가 에디터에서만 깨져 보인다」(892b48b): 엔진 `cell-load-inline`(RowBreak 표 보강 줄이 한 줄 문단의 끝 글자를 밀던 것, 표 안 표의 그림 문단 높이 0) + `rhwp_layout.mjs`(칸 안 표 높이도 잼, 줄 배치가 섞인 칸은 걷음, 본문 표 상자를 그 표의 쪽 범위로만 받음 — 엔진 `getTableCellBboxes` 가 (문단, 컨트롤) 번호가 같은 **다른 표 속의 표**까지 집는다)
+  - ③ 「가정통신문 4학년, 5학년이 한글과 쪽 구성이 다르다, 원인 해결」(d55a0da). 🔑 **한/글의 조판 단위는 4 HWPUNIT(1/1800 인치)다.** 실측으로 확정한 규칙과 패치:
+    - `hancom-quantum`: 글자 폭 = 장평 100% 면 반올림, 아니면 (폭 x 장평) 버림. 띄어쓰기 = 반 칸 버림(장평이면 곱해 반올림). 자간 = 그 글자 폭의 % 반올림(줄 끝 글자 것은 안 셈). 허용치 0
+    - `char-kinsoku`: 글자 단위 줄 나눔에서도 줄 머리 금칙 문자를 앞 글자와 묶음. `bullet-advance`: 글머리표 자리 = 반올림(글머리 칸[전각 em, ASCII 는 em/2, 글꼴 실제 폭과 무관] + em x 본문과의 거리 %) + 너비 보정, 자동 내어쓰기면 모든 줄
+    - `line-spacing-quantum`: 줄 간격 4 단위 반올림(9pt 130% = 272). `affectLSpacing="1"` 인 글자처럼 취급 개체 줄은 줄 간격 % 를 **개체 높이**에 건다(5학년 문서 원인: 107% 문단의 머리 표 아래 584). `cell-trailing-ls-synth`: 줄 기록 없는 문단은 TAC 표 여러 문단 칸에서도 칸 마지막 줄 간격 제외
+    - 검증: 한/글 재저장 317개 문단 51,813개 줄 나눔 일치 95.05 → 96.69%, 쪽수 일치 292 → 294(멀어짐 0), `cargo test --lib` 3,889 통과
+  - ④ 「에디터에서 메모 볼 수 있나」: 안 보인다(스튜디오에 메모 표시 없음, 저장 때 보존만). 만들지는 묻기만 함
+  - 🔑 측정 방법(`test/linebreak/`): **사다리** `wl.py`, `wlb.py` — 한 문서에 1×1 표 수천 개를 칸 폭 4 씩 바꿔 넣고 `hidden_desktop.py` + `hwp_resave_many.py` 로 한/글 재저장해 줄 수를 읽는다(폭 한 건 = 표 15개, 3천 개도 5분). **한/글 기준 사본** `hres_driver.py`(317개 재저장), 엔진 진단 `claude_lb_probe.rs`(line_breaking.rs 끝에 `#[cfg(test)] #[path] mod` 로 붙여 `CLAUDE_LB_FILES`, `CLAUDE_LB_VERBOSE`, `CLAUDE_LB_HEAD`, `CLAUDE_LB_ONE/KEY`), 분류 `resid2.py`, 쪽수 세 방향 `cmp3.py`
+  - 🔑 함정: 대조 문서에 에디터 저장판이 섞이면 줄 기록이 rhwp 것이라 기준이 못 된다(한/글 재저장본만 기준). Git Bash `grep -c $'\r'` 는 CRLF 를 0 으로 센다(height_measurer.rs 는 CRLF — 파이썬 `newline=""` 로 본다). 진단 중 `cargo build` 가 디스크를 채워 `No space left` 가 한 번 났다(`.build` 16GB)
+  - 남은 원인(미해결): 폭 자료 없는 글꼴(**한컴산뜻돋움** 13%, 나눔스퀘어 17.7%, 한컴 고딕 — 한글 1.0, 나머지 0.5 어림), 번호 문단 표식 자리, 들여쓰기 첫 줄(389건), 칸 「한 줄로 입력」, 붙임표 연속과 `!` 폭, 그리는 쪽 글머리표 글 시작 x(줄 나눔만 맞춤), 자동 내어쓰기 끈 글머리표
+  - next_steps: ① **릴리스와 푸시 여부 사용자 확인**(`release.mjs` → prebuilt.json 커밋 → 푸시. 지문이 바뀌어 pre-push 가 막는다) ② 한컴산뜻돋움 등 폭 자료 넣기 여부 ③ 메모 표시 기능 여부 ④ rhwp 에 보고할 만한 것: getTableCellBboxes 중첩 표 오인, affectLSpacing 무시, 4 단위 폭 ⑤ 이전 next_steps(rhwp 이슈 #7535~7537, #7492, #7484 답 확인 등)는 아래 10-03 블록
 - **10-05**: 사용자 보고 「표 속 표에서 Ctrl+A 오작동」, 「표 속 글머리표가 글자인 듯 아닌 듯」 → 스킬 e3dc644, c5e53d3, b8508ae, 1508e9e, 릴리스 editor-c49ee314737f(3f75b05 까지 hwpx, hwpx2 푸시)
   - ① 플러그인 `selectCellContents` 가 표 속 표 칸(cellPath 2단 이상)을 rhwp 기본(문서 전체 선택)에 넘겨 커서가 문서 끝으로 튀었다 → `*ByPath` API 로 그 칸만 고른다(평평한 좌표는 바깥 칸 것이라 두고 경로 끝만 바꿈)
   - ② 엔진 패치 `sel-skip-marker`: 글머리표 런은 `char_start: None` 인데 `cursor_nav.rs` 선택 음영 두 곳이 `unwrap_or(0)` 으로 0번 글자로 셌다(캐럿은 건너뜀). 「과정」을 골라도 글머리표만 칠해지던 것 해결
