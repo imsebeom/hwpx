@@ -53,6 +53,12 @@
   - 도구: `~/.cache/rhwp-devel/cmp.mjs`(2쪽 글자 줄과 셀 상자), `allpages.mjs <pkg> <a> <b>`(전 쪽 글자 좌표 대조), `variants.py`, `winshot.py`(에디터 창을 앞으로 올리지 않고 PrintWindow 로 캡처 — 사용자 화면을 뺏지 않는다)
 
 ## 컨텍스트 앵커
+- **10-05**: 사용자 보고 「표 속 표에서 Ctrl+A 오작동」, 「표 속 글머리표가 글자인 듯 아닌 듯」 → 스킬 e3dc644, c5e53d3(푸시, 릴리스 안 함)
+  - ① 플러그인 `selectCellContents` 가 표 속 표 칸(cellPath 2단 이상)을 rhwp 기본(문서 전체 선택)에 넘겨 커서가 문서 끝으로 튀었다 → `*ByPath` API 로 그 칸만 고른다(평평한 좌표는 바깥 칸 것이라 두고 경로 끝만 바꿈)
+  - ② 엔진 패치 `sel-skip-marker`: 글머리표 런은 `char_start: None` 인데 `cursor_nav.rs` 선택 음영 두 곳이 `unwrap_or(0)` 으로 0번 글자로 셌다(캐럿은 건너뜀). 「과정」을 골라도 글머리표만 칠해지던 것 해결
+  - 검증: 아궁이 문항카드 사본, `start --no-browser` + 보이지 않는 크로미움(CDP 9333, scratchpad `hold.py`, `cdp.mjs` 키, 클릭, 캡처). 1단 칸, 본문, 표 속 표 회귀 확인. `cargo test --lib` 3,889 통과
+  - 남은 것: 표 속 표 칸 끝 문단이 그림뿐이면 길이 0 이라 Ctrl+A 가 그림을 포함하지 않는다(1단 칸도 같은 규칙). CLI `state` 의 `selectedText` 는 여러 문단 칸 선택을 빈 값으로 보인다
+  - next_steps: 공유 사용자에게 보내려면 `setup.mjs --build`(완료) → `release.mjs` → prebuilt.json 커밋, 푸시(사용자 지시 시). 사용자 에디터 guide3, guide4 는 저장 뒤 다시 열어야 새 빌드가 적용된다
 - **10-04**: 사용자 보고 「한자 버튼이 작동되지 않는다」(한 글자 치고 바로 한자 키) → 스킬 216d5f7, 21d46ec, 릴리스 editor-9c8dbed2ac09(d7a5a54 까지 hwpx, hwpx2 푸시). 사용자가 실제 입력기로 확인 「이제 문제없군」
   - ① 후보 창이 안 보였다: rhwp 숨은 입력칸이 `left:-9999px` 라 입력기 후보 창도 화면 밖에 떴다 → 플러그인 `installImeAnchor` 가 키를 누를 때마다 입력칸을 캐럿(조합 중이면 조합 상자) 자리로 옮긴다(투명, 클릭 통과)
   - ② 그러자 「한韓」이 됐다. 시험 페이지(이벤트 기록)로 실측한 입력기 순서: 한자 키(이 PC 는 **오른쪽 Ctrl**, `code: ControlRight`) → compositionend 「한」 → deleteContentBackward → compositionstart → 「한」 → 「韓」 compositionend.
