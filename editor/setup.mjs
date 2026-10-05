@@ -349,6 +349,18 @@ const RUST_PATCHES = [
     ['cell-caret-skip-marker', 'src/document_core/queries/cursor_rect.rs'],
     // 줄 배치 없는 칸: 표 안 표의 그림 문단 높이 0(그래프 잘림), RowBreak 표 보강 줄이 한 줄 문단의 끝 글자를 다음 줄로 밀던 것
     ['cell-load-inline', 'src/document_core/commands/document.rs'],
+    // 줄 나눔을 한/글과 같게: 글자 폭 4 HWPUNIT 단위(장평 100% 반올림, 아니면 버림, 띄어쓰기는 반 칸 버림, 자간은 글자 폭의 %),
+    // 허용치 0. 2026-10-05 한/글 폭 사다리 190여 건 실측(가정통신문 칸 글 「평가 시기」가 한/글에서만 두 줄이라 쪽이 밀렸다)
+    ['hancom-quantum-measure', 'src/renderer/layout/text_measurement.rs'],
+    ['hancom-quantum-export', 'src/renderer/layout.rs'],
+    ['hancom-quantum-break', 'src/renderer/composer/line_breaking.rs'],
+    ['hancom-quantum-test', 'src/renderer/composer/tests.rs'],
+    // 글자 단위 줄 나눔에서도 줄 머리 금칙 문자를 앞 글자와 묶는다(한/글은 「다.」를 함께 내린다)
+    ['char-kinsoku', 'src/renderer/composer/line_breaking.rs'],
+    // 글머리표 문단은 표식 자리(글머리 칸 + 본문과의 거리)만큼 좁은 폭에서 줄을 채운다(종전에는 표식이 없는 것처럼 채웠다)
+    ['bullet-advance', 'src/renderer/composer/line_breaking.rs'],
+    // 줄 간격을 4 HWPUNIT 단위로, 「줄 간격에 영향」이 켜진 글자처럼 취급 개체 줄은 줄 간격 % 를 개체 높이에(머리 표 아래가 좁아 뒤가 당겨졌다)
+    ['line-spacing-quantum', 'src/renderer/composer/line_breaking.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));
@@ -359,6 +371,12 @@ const RUST_PATCHES = [
     const parts = blocks.map(([find, replace]) => ({ find, replace: replace.replace(/\n$/, '') }));
     return [{ id, file, blocks: parts, done: marker ?? parts[0].replace }];
   }),
+  // 한/글 줄 기록이 없는 문단은 글자처럼 취급 표의 여러 문단 칸에서도 칸 마지막 줄 간격을 빼고 잰다
+  // (행마다 줄 간격 하나씩 커서 표가 한/글보다 길었다. patches/cell-trailing-ls-synth.rs, 두 곳)
+  (() => {
+    const [find, replace] = fs.readFileSync(path.join(HERE, 'patches', 'cell-trailing-ls-synth.rs'), 'utf8').replace(/\r\n/g, '\n').split('\n// ==== replace ====\n');
+    return { id: 'cell-trailing-ls-synth', file: 'src/renderer/height_measurer.rs', find: find.replace(/^\/\/ ==== find ====\n/, ''), replace: replace.replace(/\n$/, ''), all: true, done: '[claude-hwpx cell-trailing-ls-synth]' };
+  })(),
 ];
 const builtMark = path.join(pkgDir, '.claude-patched');
 const builtIds = fs.existsSync(builtMark) ? fs.readFileSync(builtMark, 'utf8') : '';
