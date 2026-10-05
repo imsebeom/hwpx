@@ -11,6 +11,7 @@
  *   node cli.mjs image <그림> [좌표] [--end] [--replace] [--width mm] [--desc 설명]
  *                                       그림을 좌표(p7, T2r0c0) 앞(--end 면 끝)이나 사용자 커서에 넣는다. undo 1스텝
  *   node cli.mjs goto <좌표>            사용자 화면의 커서를 그 문단이나 셀로 옮긴다
+ *   node cli.mjs memos [번호] [--json]  문서에 달린 메모(작성자, 날짜, 걸린 글, 본문). 번호를 주면 그 메모가 걸린 글로 화면을 옮긴다
  *   node cli.mjs inspect | slots       행정문서 표기 검수 / 아직 안 채운 칸
  *   node cli.mjs tools                 편집 도구 25종 정의(이름, 설명, 인자)
  *   node cli.mjs changes [--all]       아직 안 읽은 사용자 수정 내역 (읽으면 읽음 처리)
@@ -368,6 +369,19 @@ switch (sub) {
     break;
   }
   case 'goto': out((await cmd({ type: 'goto', ref: args[0] })).result ? `이동: ${args[0]}` : `못 찾음: ${args[0]}`); break;
+  case 'memos': {
+    // 문서에 달린 메모(검토 의견). 번호는 문서 순서이고 에디터 메모 패널의 번호와 같다
+    const n = args.find((a) => /^\d+$/.test(a));
+    if (n) { out((await cmd({ type: 'memos', n: Number(n) })).result ? `이동: 메모 ${n}` : `못 찾음: 메모 ${n}`); break; }
+    const list = (await cmd({ type: 'memos' })).result ?? [];
+    if (args.includes('--json')) { out(list); break; }
+    out(list.length ? [`메모 ${list.length}개`, ...list.map((m) => [
+      `[${m.n}] ${m.where}${m.page ? ` ${m.page}쪽` : ''} · ${m.author || '작성자 없음'}${m.when ? ` · ${m.when}` : ''}`,
+      `    걸린 글: ${m.anchor.trim() ? `「${m.anchor.replace(/\s+/g, ' ').trim()}」` : '(글 없음)'}`,
+      `    메모: ${(m.text || '(본문 없음)').replace(/\n/g, '\n          ')}`,
+    ].join('\n'))].join('\n') : '메모 없음');
+    break;
+  }
   case 'inspect': { const r = await cmd({ type: 'inspect' }); out({ docType: r.docType, result: r.result }); break; }
   case 'slots': out((await cmd({ type: 'slots' })).result); break;
   case 'tools': out((await cmd({ type: 'tools' })).result); break;
@@ -452,5 +466,5 @@ switch (sub) {
     out(pid ? '서버 종료, 앱 창 닫음' : '서버 종료');
     break;
   }
-  default: out(fs.readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').slice(2, 17).join('\n'));
+  default: out(fs.readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').slice(2, 18).join('\n'));
 }

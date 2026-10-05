@@ -25,6 +25,7 @@ import { ParaShapeDialog } from '@/ui/para-shape-dialog';
 import { TableCellPropsDialog } from '@/ui/table-cell-props-dialog';
 import { installKCommands } from './k-commands';
 import { installLogPanel } from './log-panel';
+import { installMemoPanel } from './memo-panel';
 import { installColorPalettes } from './color-palette';
 import { installParaPreview } from './para-preview';
 import { installDialogEnter } from './dialog-enter';
@@ -756,6 +757,7 @@ export function createClaudePlugin(getInputHandler) {
       installCellBlockErase(getInputHandler);
       installPictureCrop(getInputHandler);
       installLogPanel();
+      const memoPanel = installMemoPanel(host, getInputHandler);   // 메모 보기(패널, 걸린 글 표시, `$E memos`)
       installEditLog(host, getInputHandler);   // 사용자 편집을 하나하나 /api/ops 로(`$E changes`)
       // 진단용: 디버그 포트로 붙었을 때 입력 처리기를 볼 수 있게(tests/cdp_eval.mjs 의 S.__claudeIH())
       (window as any).__claudeIH = getInputHandler;
@@ -889,6 +891,15 @@ export function createClaudePlugin(getInputHandler) {
         slots: () => host.read((doc) => findSlots(doc)),
         inspect: (type) => host.read((doc) => inspect(doc, type)),
 
+        /** 메모 목록(`$E memos`). 번호를 주면 그 메모가 걸린 글로 사용자 화면과 커서를 옮긴다. */
+        memos(n) {
+          if (n != null) return memoPanel.go(Number(n));
+          const list = memoPanel.list();
+          return host.read((doc) => list.map(({ sectionIndex, paraIndex, path, startPara, endPara, ...m }) => ({
+            ...m, where: memoWhere(doc, { sectionIndex, paraIndex, path, startPara, endPara }),
+          })));
+        },
+
         /** 좌표(p12, T1r2c1)로 커서를 옮기고 그 문단이나 셀 글자를 선택한다. */
         goto(ref) {
           const ih = getInputHandler();
@@ -964,6 +975,17 @@ export function createClaudePlugin(getInputHandler) {
       };
     },
   };
+}
+
+/** 메모가 걸린 자리의 좌표 표기: 본문 문단(p12, p12-p14), 칸(T1r2c1), 표 속 표는 바깥 칸에 「안쪽 표」를 붙인다. */
+function memoWhere(doc, m) {
+  if (!m.path.length) return m.startPara === m.endPara ? `p${m.startPara}` : `p${m.startPara}-p${m.endPara}`;
+  const top = m.path[0];
+  if (top.textbox) return `p${m.paraIndex} 글상자`;
+  const t = outlineTableId(doc, m.sectionIndex, m.paraIndex, top.controlIndex);
+  const info = parseMaybe(doc.getCellInfo(m.sectionIndex, m.paraIndex, top.controlIndex, top.cellIndex));
+  const ref = t && info ? `${t}r${info.row}c${info.col}` : `p${m.paraIndex} 표`;
+  return m.path.length > 1 ? `${ref} 안쪽 표` : ref;
 }
 
 /** 본문 표 번호(T1, T2 …). 셀 안 표는 번호가 없다(doc-tools listTables 규칙). */
