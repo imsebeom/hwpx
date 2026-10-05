@@ -53,7 +53,7 @@
   - 도구: `~/.cache/rhwp-devel/cmp.mjs`(2쪽 글자 줄과 셀 상자), `allpages.mjs <pkg> <a> <b>`(전 쪽 글자 좌표 대조), `variants.py`, `winshot.py`(에디터 창을 앞으로 올리지 않고 PrintWindow 로 캡처 — 사용자 화면을 뺏지 않는다)
 
 ## 컨텍스트 앵커
-- **10-05 둘째**: 사용자 보고 「표 안에서 Alt+Shift+A/Z 줄 간격이 안 된다」 → 스킬 6fa4f78(푸시, 릴리스 안 함. `setup.mjs --build` 는 돌려 로컬 studio-dist 는 새 판)
+- **10-05 둘째**: 사용자 보고 「표 안에서 Alt+Shift+A/Z 줄 간격이 안 된다」 → 스킬 6fa4f78(푸시와 릴리스는 아직 안 함. `setup.mjs --build` 는 돌려 로컬 studio-dist 는 새 판)
   - 원인: 플러그인 칸 Ctrl+A(`selectCellContents`)가 1단 칸에서 평평한 `cellParaIndex` 만 바꾸고 `cellPath[0].cellParaIndex` 는 누른 자리로 남겼다. 문단 서식 대상(`getParaFormatTargetsForRange`)은 cellPath 를 먼저 봐서 누른 문단 하나만 바뀌고, 증감 키는 끝 문단 옛 값을 읽어 매번 같은 값을 넣었다(사용자 컨설팅 요청서 칸 줄 간격이 170/160/150 으로 섞임, ops.jsonl 에 `[160,150]` 반복)
   - 🔑 `cli goto` 나 방향키로 놓은 커서는 cellPath 가 비어 재현되지 않는다 — **마우스 클릭**(CDP `click`)으로 놓아야 한다. 확인 도구 scratchpad `altkey.mjs`(Alt+Shift+글쇠)
   - 사용자 질문 「4학년 평가 계획 가정통신문이 한글과 에디터에서 쪽 구성이 다르다」: 한글 3쪽(학교장 한 줄만 3쪽), 에디터 2쪽. 표 T4 머리 칸 「평가 시기」(글자 자리 3,934 HWPUNIT, 9pt 함초롬바탕)를 한글은 두 줄로 꺾고 rhwp 는 한 줄 — 띄어쓰기 폭 측정 차이로 추정. 사본에서 「평가시기」로 바꾸면 한글도 2쪽(확인). 엔진 측정 결함은 미조사
