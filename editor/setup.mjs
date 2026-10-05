@@ -282,6 +282,11 @@ const RUST_PATCHES = [
     const [find, replace] = fs.readFileSync(path.join(HERE, 'patches', 'sel-left-at-glyph.rs'), 'utf8').replace(/\r\n/g, '\n').split('\n// ==== replace ====\n');
     return { id: 'sel-left-at-glyph', file: 'src/document_core/queries/cursor_nav.rs', find: find.replace(/^\/\/ ==== find ====\n/, ''), replace, done: '[claude-hwpx sel-left-at-glyph]' };
   })(),
+  // 글머리표, 문단 번호가 있는 문단의 선택 음영이 글머리표 자리로 밀리던 것(patches/sel-skip-marker.rs, 본문과 칸 두 곳)
+  (() => {
+    const [find, replace] = fs.readFileSync(path.join(HERE, 'patches', 'sel-skip-marker.rs'), 'utf8').replace(/\r\n/g, '\n').split('\n// ==== replace ====\n');
+    return { id: 'sel-skip-marker', file: 'src/document_core/queries/cursor_nav.rs', find: find.replace(/^\/\/ ==== find ====\n/, ''), replace: replace.replace(/\n$/, ''), all: true, done: '[claude-hwpx sel-skip-marker]' };
+  })(),
   // 쪽을 넘는 칸에서 문단 끝 글자처럼 취급 그림이 칸 왼쪽에 한 번 더 그려지던 것(patches/cell-pic-split-dup.rs)
   (() => {
     const [find, replace] = fs.readFileSync(path.join(HERE, 'patches', 'cell-pic-split-dup.rs'), 'utf8').replace(/\r\n/g, '\n').split('\n// ==== replace ====\n');
