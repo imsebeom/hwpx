@@ -53,14 +53,14 @@
   - 도구: `~/.cache/rhwp-devel/cmp.mjs`(2쪽 글자 줄과 셀 상자), `allpages.mjs <pkg> <a> <b>`(전 쪽 글자 좌표 대조), `variants.py`, `winshot.py`(에디터 창을 앞으로 올리지 않고 PrintWindow 로 캡처 — 사용자 화면을 뺏지 않는다)
 
 ## 컨텍스트 앵커
-- **10-05**: 사용자 보고 「표 속 표에서 Ctrl+A 오작동」, 「표 속 글머리표가 글자인 듯 아닌 듯」 → 스킬 e3dc644, c5e53d3, b8508ae, 1508e9e(푸시와 릴리스 안 함)
+- **10-05**: 사용자 보고 「표 속 표에서 Ctrl+A 오작동」, 「표 속 글머리표가 글자인 듯 아닌 듯」 → 스킬 e3dc644, c5e53d3, b8508ae, 1508e9e, 릴리스 editor-c49ee314737f(3f75b05 까지 hwpx, hwpx2 푸시)
   - ① 플러그인 `selectCellContents` 가 표 속 표 칸(cellPath 2단 이상)을 rhwp 기본(문서 전체 선택)에 넘겨 커서가 문서 끝으로 튀었다 → `*ByPath` API 로 그 칸만 고른다(평평한 좌표는 바깥 칸 것이라 두고 경로 끝만 바꿈)
   - ② 엔진 패치 `sel-skip-marker`: 글머리표 런은 `char_start: None` 인데 `cursor_nav.rs` 선택 음영 두 곳이 `unwrap_or(0)` 으로 0번 글자로 셌다(캐럿은 건너뜀). 「과정」을 골라도 글머리표만 칠해지던 것 해결
   - 검증: 아궁이 문항카드 사본, `start --no-browser` + 보이지 않는 크로미움(CDP 9333, scratchpad `hold.py`, `cdp.mjs` 키, 클릭, 캡처). 1단 칸, 본문, 표 속 표 회귀 확인. `cargo test --lib` 3,889 통과
   - 사용자 「선택해 복사, 붙여넣기, 지우기도 잘 안 된다」 → 스킬 b8508ae 엔진 패치 `cell-caret-skip-marker`(`cursor_rect.rs` 1단 칸, 표 속 표 칸 캐럿 두 곳이 같은 `unwrap_or(0)`). 「• 」 런 때문에 0~2번 캐럿이 글머리표 위에 그려져 화면 캐럿이 실제 편집 위치보다 두 글자까지 앞섰다. 편집 자체는 바른 위치였다(Delete, 복사, 붙여넣기 실측)
   - 사용자 「끝 문단에 그림만 있어도 글자처럼 취급이면 선택돼야지. 표도」 → 스킬 1508e9e: 칸 Ctrl+A 끝을 `convertCaretOffset` mode 5(캐럿 축 길이)로. 표 속 표 칸의 끝 그림에 음영 확인, 1단 칸 Ctrl+A → 복사 → 지우기 → 붙여넣기 왕복 원문 그대로. ⚠ 칸 끝 글자처럼 취급 **표**는 시험 문서에 없어 실측하지 않았다(같은 길이 계산)
   - 남은 것: CLI `state` 의 `selectedText` 는 여러 문단 칸 선택을 빈 값으로 보인다
-  - next_steps: 공유 사용자에게 보내려면 `setup.mjs --build`(완료) → `release.mjs` → prebuilt.json 커밋, 푸시(사용자 지시 시). 사용자 에디터 guide3, guide4 는 저장 뒤 다시 열어야 새 빌드가 적용된다
+  - next_steps: 사용자 에디터 guide3, guide4 는 저장 뒤 다시 열어야 새 빌드가 적용된다
 - **10-04**: 사용자 보고 「한자 버튼이 작동되지 않는다」(한 글자 치고 바로 한자 키) → 스킬 216d5f7, 21d46ec, 릴리스 editor-9c8dbed2ac09(d7a5a54 까지 hwpx, hwpx2 푸시). 사용자가 실제 입력기로 확인 「이제 문제없군」
   - ① 후보 창이 안 보였다: rhwp 숨은 입력칸이 `left:-9999px` 라 입력기 후보 창도 화면 밖에 떴다 → 플러그인 `installImeAnchor` 가 키를 누를 때마다 입력칸을 캐럿(조합 중이면 조합 상자) 자리로 옮긴다(투명, 클릭 통과)
   - ② 그러자 「한韓」이 됐다. 시험 페이지(이벤트 기록)로 실측한 입력기 순서: 한자 키(이 PC 는 **오른쪽 Ctrl**, `code: ControlRight`) → compositionend 「한」 → deleteContentBackward → compositionstart → 「한」 → 「韓」 compositionend.
