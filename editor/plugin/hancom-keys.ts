@@ -144,14 +144,12 @@ export function installHancomKeys(host, getInputHandler) {
     const at = (cpi, charOffset) => (path
       ? { ...pos, charOffset, cellPath: path.map((e, i) => (i < path.length - 1 ? e : { ...e, cellParaIndex: cpi })) }
       : { ...pos, cellParaIndex: cpi, charOffset });
+    // 끝 위치는 캐럿 축 길이(mode 5)로 잡는다. 글자 길이로 잡으면 칸 끝의 글자처럼 취급 그림, 표가 선택에서 빠졌다(2026-10-05 사용자 지적).
     const range = host.read((doc) => {
-      if (path) {
-        const last = Math.max(0, doc.getCellParagraphCountByPath(pos.sectionIndex, pos.parentParaIndex, JSON.stringify(path)) - 1);
-        return { last, len: doc.getCellParagraphLengthByPath(pos.sectionIndex, pos.parentParaIndex, JSON.stringify(at(last, 0).cellPath)) };
-      }
-      const n = doc.getCellParagraphCount(pos.sectionIndex, pos.parentParaIndex, pos.controlIndex, pos.cellIndex);
-      const last = Math.max(0, n - 1);
-      return { last, len: doc.getCellParagraphLength(pos.sectionIndex, pos.parentParaIndex, pos.controlIndex, pos.cellIndex, last) };
+      const full = path ?? [{ controlIndex: pos.controlIndex, cellIndex: pos.cellIndex, cellParaIndex: 0 }];
+      const json = (cpi) => JSON.stringify(full.map((e, i) => (i < full.length - 1 ? e : { ...e, cellParaIndex: cpi })));
+      const last = Math.max(0, doc.getCellParagraphCountByPath(pos.sectionIndex, pos.parentParaIndex, json(0)) - 1);
+      return { last, len: doc.convertCaretOffset(pos.sectionIndex, pos.parentParaIndex, json(last), 0, 5) };
     });
     ih.cursor.clearSelection();
     ih.cursor.moveTo(at(0, 0));
