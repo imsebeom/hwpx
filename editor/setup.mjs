@@ -365,6 +365,12 @@ const RUST_PATCHES = [
     ['font-metrics-extra', 'src/renderer/font_metrics_overlays.rs'],
     // 최소 공백: 쪼개지는 낱말은 공백을 줄여 마저 담고, 이미 줄여 채운 줄에는 새 낱말을 당겨 오지 않는다
     ['condense-pull', 'src/renderer/composer/line_breaking.rs'],
+    // 메모 보기: 메모 목록 API(본문, 작성자, 일시, 걸린 글 범위 — 문단을 넘는 메모 포함), python-hwpx 메모 묶음 읽기,
+    // 저장할 때 메모 필드 zorder(한/글은 이 값이 메모 번호와 다르면 메모의 끝 표식을 버린다)
+    ['memo-list', 'src/document_core/queries/field_query.rs'],
+    ['memo-list-wasm', 'src/wasm_api.rs'],
+    ['memogroup-read', 'src/parser/hwpx/section.rs'],
+    ['memo-zorder', 'src/serializer/hwpx/field.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));
