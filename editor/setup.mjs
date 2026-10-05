@@ -371,6 +371,9 @@ const RUST_PATCHES = [
     ['memo-list-wasm', 'src/wasm_api.rs'],
     ['memogroup-read', 'src/parser/hwpx/section.rs'],
     ['memo-zorder', 'src/serializer/hwpx/field.rs'],
+    // 폭 표가 빌드에 없는 글꼴: 서버가 설치된 글꼴 파일에서 읽은 폭 표(font-metrics.mjs)를 실행 중에 등록해 쓴다(한/글과 같은 방식)
+    ['font-metrics-runtime', 'src/renderer/font_metrics_data.rs'],
+    ['font-metrics-runtime-wasm', 'src/wasm_api.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));
