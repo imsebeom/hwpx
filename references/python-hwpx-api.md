@@ -157,6 +157,11 @@ author=None, ...) -> tuple[HwpxOxmlMemo, HwpxOxmlParagraph, str]`
 
 → 학생 작품 자동 첨삭 헬퍼로 활용 가치 있음.
 
+⚠ 함정 두 가지(2026-10-06 한/글 2024 실측) — **직접 부르지 말고 `scripts/add_review_memo.py` 를 거친다**:
+
+- 이 함수가 쓴 메모는 한/글에서 본문 대신 메모 id 숫자가 보인다. 본문을 구역 끝 `<hp:memogroup>` 에 두고 필드 subList 에는 id 만 적는데 한/글은 그 묶음을 읽지 않는다. `Number` 도 모두 1 이다. `add_review_memo.memos_to_hancom_shape` 가 저장 뒤 한/글 모양으로 바꾼다.
+- `paragraph_text` 는 「그 글이 든 문단 찾기」가 아니다. `paragraph` 없이 주면 **구역 끝에 그 글로 새 문단을 만들어** 메모를 걸고, `paragraph` 와 함께 주면 그 문단의 글을 바꾼다.
+
 ### 스타일 필터 치환 (2.x)
 
 ```python

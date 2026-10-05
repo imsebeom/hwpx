@@ -170,7 +170,7 @@ $E stop
 |------|-----------------|
 | `scripts/zip_replace_all.py` (워크플로 L) | airmang 이식. lineSegArray 더미 자동 주입 통합 (polaris-dvc strict JID 11004 방지) |
 | `scripts/style_filter_replace.py` (워크플로 M) | `HwpxDocument.replace_text_in_runs(text_color=..., underline_type=..., limit=...)` |
-| `scripts/add_review_memo.py` (워크플로 N) | `HwpxDocument.add_memo_with_anchor(...)` + 저장 후 lineseg 후처리 |
+| `scripts/add_review_memo.py` (워크플로 N) | `HwpxDocument.add_memo_with_anchor(...)` + 저장 후 메모를 한/글이 읽는 모양으로 변환, lineseg 후처리 |
 | `references/python-hwpx-api.md` | 라이브러리 1.9 ↔ 2.x API 시그니처 + 마이그레이션 노트 |
 
 자세한 검증·회귀 테스트 결과는 작업 폴더 `.test/20260505-085332-airmang-스킬반영/CHANGES.md`

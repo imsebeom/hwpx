@@ -1520,7 +1520,7 @@ python3 "${CLAUDE_SKILL_DIR}/scripts/add_review_memo.py" \
 
 위치 지정 두 가지:
 
-- `paragraph_text`: 해당 텍스트가 들어 있는 첫 paragraph 자동 매칭 (간편)
+- `paragraph_text`: 해당 텍스트가 들어 있는 첫 paragraph 자동 매칭 (간편, 표 칸 안 문단 포함. 못 찾으면 WARN 후 skip)
 - `section + paragraph` 인덱스: 정밀 지정 (0-based)
 
 `paragraph_text` 가 우선 적용되며, 둘 다 있으면 paragraph_text 우선.
@@ -1543,6 +1543,8 @@ print(f"{added}개 메모 추가됨")
 ### 안전망
 
 - 저장 직후 `inject_dummy_linesegs()` 자동 적용 → polaris-dvc strict (JID 11004) 통과
+- 🔴 **저장 직후 메모를 한/글이 읽는 모양으로 바꾼다**(`memos_to_hancom_shape`, 2026-10-06). python-hwpx 가 쓴 그대로는 한/글에서 메모 본문 대신 id 숫자가 보이고 걸린 범위도 사라진다(본문을 한/글이 읽지 않는 `<hp:memogroup>` 에 둔다). 본문을 필드 subList 로 옮기고 번호를 기존 메모 다음부터 매긴다(`zorder` = 번호). 문서에 「메모」 스타일이 있으면 그 모양을 쓴다. `add_memo_with_anchor` 를 직접 부르지 말고 이 스크립트를 거친다
+- 작성자 이름의 `/ \ : ; ? # |` 는 뺀다(WARN). 한/글이 작성자를 Command 값에서 읽는데 이 글자들이 메모 매개변수를 깨뜨린다(한/글 2024 변형 시험)
 - paragraph 인덱스 범위 밖이면 WARN 출력 후 skip (전체 실패 X)
 - text 누락된 메모 spec 도 WARN + skip
 
