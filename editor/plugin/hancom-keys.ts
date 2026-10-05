@@ -140,10 +140,16 @@ export function installHancomKeys(host, getInputHandler) {
     if (!pos || pos.parentParaIndex == null) return false;
     // 셀 안 표의 셀은 경로 API 로 잰다. rhwp 기본 동작(문서 전체 선택)에 넘기면 커서가 문서 끝으로 튄다(2026-10-05 사용자 보고).
     // 평평한 좌표(cellParaIndex 등)는 바깥 칸(cellPath[0]) 것이라 그대로 두고 경로 끝만 바꾼다.
-    const path = (pos.cellPath?.length ?? 0) > 1 ? pos.cellPath : null;
-    const at = (cpi, charOffset) => (path
-      ? { ...pos, charOffset, cellPath: path.map((e, i) => (i < path.length - 1 ? e : { ...e, cellParaIndex: cpi })) }
-      : { ...pos, cellParaIndex: cpi, charOffset });
+    // 1단 칸도 마우스로 누르면 cellPath 가 한 칸짜리로 채워진다. 문단 서식 대상은 cellPath 를 먼저 보므로 둘 다 바꾼다 —
+    // 평평한 좌표만 바꾸면 Alt+Shift+A/Z 가 누른 문단 하나에만 들어가고 다음 키도 끝 문단의 옛 값을 읽었다(2026-10-05 사용자 보고).
+    const path = pos.cellPath?.length ? pos.cellPath : null;
+    const nested = path && path.length > 1;
+    const at = (cpi, charOffset) => ({
+      ...pos,
+      charOffset,
+      ...(nested ? {} : { cellParaIndex: cpi }),
+      ...(path ? { cellPath: path.map((e, i) => (i < path.length - 1 ? e : { ...e, cellParaIndex: cpi })) } : {}),
+    });
     // 끝 위치는 캐럿 축 길이(mode 5)로 잡는다. 글자 길이로 잡으면 칸 끝의 글자처럼 취급 그림, 표가 선택에서 빠졌다(2026-10-05 사용자 지적).
     const range = host.read((doc) => {
       const full = path ?? [{ controlIndex: pos.controlIndex, cellIndex: pos.cellIndex, cellParaIndex: 0 }];
