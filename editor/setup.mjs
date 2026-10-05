@@ -345,6 +345,8 @@ const RUST_PATCHES = [
     ['split-empty-stale', 'src/document_core/commands/table_ops.rs'],
     // 화면 배치가 빈 문단 뒤 줄 간격을 이중으로 셈해 저장 위치로 8px 씩 밀던 것
     ['lazy-base-empty-bridge', 'src/renderer/height_cursor.rs'],
+    // 칸 안 글머리표 문단의 캐럿이 글머리표 위에 그려져 실제 위치와 두 글자까지 어긋나던 것(1단 칸, 표 속 표 칸)
+    ['cell-caret-skip-marker', 'src/document_core/queries/cursor_rect.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));
