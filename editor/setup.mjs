@@ -431,6 +431,9 @@ const RUST_PATCHES = [
     ['empty-host-object-max-partial', 'src/renderer/layout/table_partial.rs'],
     // HTML 붙이기가 태그 사이 소스 줄바꿈을 글자로 넣던 것(칸 블록 붙이기, 웹 페이지 붙이기)
     ['html-paste-whitespace', 'src/document_core/commands/html_import.rs'],
+    // HTML 붙이기 칸 경로판이 붙인 문단을 다시 나누지 않던 것(긴 글이 한 줄에 눌림), 칸 블록 복사가 칸마다 쓰는 내부 클립보드 보관함
+    ['html-paste-path-reflow', 'src/document_core/commands/html_import.rs'],
+    ['clipboard-stash', 'src/wasm_api.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));

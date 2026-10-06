@@ -4,8 +4,8 @@
  * 「여러 셀이든 한 셀이든 ctrl-c v x 이런게 되야지」).
  * rhwp 는 칸 선택 중에 이 키를 받으면 칸 선택을 풀고 글 선택 복사로 넘겨, 고른 칸이 하나도 복사되지 않았다.
  *
- *   복사    칸마다 서식 있는 HTML 과 글을 모은다. 시스템 클립보드에는 탭으로 나눈 글과 <table> HTML 을 함께 둔다
- *           (엑셀, 한/글에 붙여도 칸이 나뉜다)
+ *   복사    칸마다 엔진 내부 클립보드로 복사해 보관한다(엔진 패치 clipboard-stash) — 같은 문서에 붙일 때 이것을 써서 글자 모양과
+ *           그림이 그대로 간다. 시스템 클립보드에는 탭으로 나눈 글과 <table> HTML 을 함께 둔다(엑셀, 한/글에 붙여도 칸이 나뉜다)
  *   오려두기 복사한 뒤 고른 칸의 내용만 지운다(칸은 남는다)
  *   붙이기  칸 블록 또는 커서가 있는 칸을 왼쪽 위로 삼아 칸마다 내용을 바꾼다. 칸 하나를 복사해 여러 칸을 고르고 붙이면
  *           고른 칸 모두에 넣는다. 밖에서 복사한 표 HTML, 탭으로 나눈 글도 칸에 나눠 넣는다. 표 밖으로 넘치는 칸, 병합으로
@@ -91,9 +91,23 @@ function collect(ih, block) {
   const c0 = Math.min(...infos.map((x) => x.col));
   const rows = Math.max(...infos.map((x) => x.row + Math.max(1, x.rowSpan))) - r0;
   const cols = Math.max(...infos.map((x) => x.col + Math.max(1, x.colSpan))) - c0;
+  // 칸마다 엔진 내부 클립보드로 복사해 보관해 둔다 — 같은 문서에 붙일 때는 이것을 쓴다(글자 모양 번호, 그림이 그대로 간다).
+  // HTML 은 바깥 프로그램용이다. HTML 로 되붙이면 글자 모양이 「글꼴과 크기가 같은 다른 번호」로 바뀌고 그림이 「[이미지]」 글이 됐다
+  wasm.doc?.claudeClipboardStashClear?.();
+  const stashOf = (idx) => {
+    if (typeof wasm.doc?.claudeClipboardStash !== 'function') return -1;
+    try {
+      const { n, lastLen } = cellExtent(wasm, block, idx);
+      if (n <= 0) return -1;
+      wasm.copySelectionInCellByPath(block.sec, block.ppi, JSON.stringify(pathFor(block, idx)), 0, 0, n - 1, lastLen);
+      return wasm.doc.claudeClipboardStash();
+    } catch {
+      return -1;
+    }
+  };
   const cells = infos.map((x) => ({
     r: x.row - r0, c: x.col - c0, rs: Math.max(1, x.rowSpan), cs: Math.max(1, x.colSpan),
-    html: cellHtml(wasm, block, x.idx), text: cellText(wasm, block, x.idx),
+    html: cellHtml(wasm, block, x.idx), text: cellText(wasm, block, x.idx), stash: stashOf(x.idx),
   }));
   return { id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, rows, cols, cells };
 }
@@ -153,14 +167,27 @@ function fromClipboard(e) {
 
 function clearCell(wasm, block, idx) {
   const { n, lastLen } = cellExtent(wasm, block, idx);
-  if (n === 0 || (n === 1 && lastLen === 0)) return;
-  wasm.deleteRangeInCellByPath(block.sec, block.ppi, JSON.stringify(pathFor(block, idx)), 0, 0, n - 1, lastLen);
+  if (n > 1 || lastLen > 0) {
+    wasm.deleteRangeInCellByPath(block.sec, block.ppi, JSON.stringify(pathFor(block, idx)), 0, 0, n - 1, lastLen);
+  }
+  // 글자처럼 취급하지 않는(떠 있는) 그림은 글 범위에 들지 않아 남는다 — 남은 문단의 그림을 뒤에서부터 지운다
+  if (typeof wasm.deleteCellPictureControlByPath !== 'function' && typeof wasm.doc?.deleteCellPictureControlByPath !== 'function') return;
+  const del = (pj, ci) => (wasm.doc?.deleteCellPictureControlByPath ?? wasm.deleteCellPictureControlByPath).call(wasm.doc ?? wasm, block.sec, block.ppi, pj, ci);
+  const left = wasm.getCellParagraphCountByPath(block.sec, block.ppi, JSON.stringify(pathFor(block, idx)));
+  for (let k = 0; k < left; k++) {
+    const pj = JSON.stringify(pathFor(block, idx, k));
+    for (let ci = 15; ci >= 0; ci--) {
+      try { del(pj, ci); } catch { /* 그 번호에 그림이 없다 */ }
+    }
+  }
 }
 
 function fillCell(wasm, block, idx, src) {
   clearCell(wasm, block, idx);
   const pj = JSON.stringify(pathFor(block, idx));
-  if (src.html) {
+  if (src.stash !== undefined && src.stash >= 0 && wasm.doc?.claudeClipboardRestore?.(src.stash)) {
+    wasm.pasteInternalInCellByPath(block.sec, block.ppi, pj, 0);
+  } else if (src.html) {
     wasm.pasteHtmlInCellByPath(block.sec, block.ppi, pj, 0, src.html);
   } else if (src.text) {
     const paras = src.text.split('\n');

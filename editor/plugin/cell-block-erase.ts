@@ -122,9 +122,13 @@ function eraseLines(ih, block, kind) {
   });
 }
 
+// 칸 블록에서 Del 도 같은 창을 연다(2026-10-06 사용자 요청 「셀 여러 개 선택하고 del 키도 ctrl-e 처럼」).
+// rhwp 는 칸 선택 중 Del 을 받으면 칸 선택을 풀고 커서 자리 글자 하나를 지웠다
+const isDel = (e) => !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && (e.key === 'Delete' || e.code === 'Delete');
+
 export function installCellBlockErase(getInputHandler) {
   window.addEventListener('keydown', (e) => {
-    if (!isCtrlE(e)) return;
+    if (!isCtrlE(e) && !isDel(e)) return;
     const ih = getInputHandler();
     const block = ih?.getSelectedCellBlock?.();
     if (!block || !block.cellIndices.length) return;
