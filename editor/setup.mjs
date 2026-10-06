@@ -379,6 +379,10 @@ const RUST_PATCHES = [
     ['nested-table-skip-bbox', 'src/document_core/commands/table_ops.rs'],
     ['nested-table-skip-cells', 'src/document_core/commands/object_ops/table.rs'],
     ['nested-table-skip-cursor', 'src/document_core/queries/cursor_rect.rs'],
+    // 표 속 표 칸의 그림 크기를 바꾸면 줄을 다시 나누고 안쪽 표 높이를 다시 잰다. 바깥 표가 글자처럼 취급이 아니어도
+    // 그 안의 표 속 표를 편집 뒤 맞춤 대상에 넣는다(그림을 줄이거나 글을 지워도 상자가 안 줄었다)
+    ['cell-pic-resize-nested', 'src/document_core/commands/object_ops/table.rs'],
+    ['nested-sync-nontac', 'src/document_core/commands/text_editing.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));
