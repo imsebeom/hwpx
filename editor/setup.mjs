@@ -374,6 +374,11 @@ const RUST_PATCHES = [
     // 폭 표가 빌드에 없는 글꼴: 서버가 설치된 글꼴 파일에서 읽은 폭 표(font-metrics.mjs)를 실행 중에 등록해 쓴다(한/글과 같은 방식)
     ['font-metrics-runtime', 'src/renderer/font_metrics_data.rs'],
     ['font-metrics-runtime-wasm', 'src/wasm_api.rs'],
+    // 번호(문단, 컨트롤)로 표를 찾는 조회는 최외곽 표만: 표 속 표는 칸 안 문단 번호를 써서 본문 표와 번호가 겹치면
+    // 다른 쪽에 선택 상자가 하나 더 그려지고 그 안의 그림이 눌리지 않았다(문항카드 3쪽 표와 2쪽 그래프 상자)
+    ['nested-table-skip-bbox', 'src/document_core/commands/table_ops.rs'],
+    ['nested-table-skip-cells', 'src/document_core/commands/object_ops/table.rs'],
+    ['nested-table-skip-cursor', 'src/document_core/queries/cursor_rect.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));
