@@ -55,13 +55,13 @@
   - 도구: `~/.cache/rhwp-devel/cmp.mjs`(2쪽 글자 줄과 셀 상자), `allpages.mjs <pkg> <a> <b>`(전 쪽 글자 좌표 대조), `variants.py`, `winshot.py`(에디터 창을 앞으로 올리지 않고 PrintWindow 로 캡처 — 사용자 화면을 뺏지 않는다)
 
 ## 컨텍스트 앵커
-- **10-07**: 사용자 보고 「표 속에 표를 드래그 이동시켰는데 상위 표까지 같이 이동되네」 → 스킬 b0dbdaf(**푸시, 릴리스 안 함** — 미푸시 b51bb30, 58f6a5b, 839b31a, b0dbdaf)
+- **10-07**: 사용자 보고 「표 속에 표를 드래그 이동시켰는데 상위 표까지 같이 이동되네」 → 스킬 b0dbdaf. 사용자 「좋아 릴리스 푸시」 → 릴리스 **editor-d37819d8e1f9**(85ee01c 까지 hwpx, hwpx2 푸시 — b51bb30, 58f6a5b, 839b31a 포함, GitHub 새 사본 3.5초 설치와 지문 확인, 옛 editor-08b2ac806e2d 정리)
   - 원인: 스튜디오 끌기 상태(`moveDragState`)가 바깥 표 `{sec, ppi, ci}` 만 들고 cellPath 를 버려 선택 상자 판정, 놓일 자리 선, 옮기기가 모두 바깥 표에 걸렸다
   - 처방: 엔진 `move-control-cell(-wasm)`(`moveControlInCellByPath` — 같은 칸 안 문단 사이로, 홀로 든 개체 문단만, 칸 다시 싸기 + 쪽 나누기, 되돌리기 1번), 스튜디오 패치 `patches/move-drop-nested.ts`(표 속 표면 `updateCellDropLine`/`applyCellDrop`, 마우스 쪽 `getTableBBoxAtPage` 두 곳 → `claudeSelectedTableBBox`), `plugin/move-drop.ts`
   - 옮긴 뒤 표가 칸 맨 위 그림과 겹쳤다 → 엔진 `cell-tac-object-preceding`: 칸 문단 배치의 `has_preceding_text` 가 글만 세서, 글자처럼 취급 그림만 든 문단 뒤의 위아래 배치 표가 `inner_area.y`(칸 맨 위)로 갔다. 한/글 PDF(`hwp2pdf.py` 를 `hidden_desktop`)는 그림 아래. 고친 뒤 에디터도 그림 → 표 → 설명 글
   - 검증: `scratchpad clip/drag_test.py <포트>`(12단원 사본, 바깥 표 그대로, 표 속 표 칸 문단 2 → 1, 글 문단 아래로, Ctrl+Z 4항목 통과), 문서 321개 1,955쪽 SVG 해시 직전 엔진과 동일(새 도구 `scratchpad u14/reg/svghash.mjs <wasm폴더> <목록> <출력>` — 쪽 배치 대조가 못 잡는 칸 안 위치 변화까지 본다, 두 번 돌려 결정적 확인), `cargo test --lib` 3,889, issue_2069 10
   - 🔑 시험 함정: 표 속 표는 왼쪽 테두리 정확히(x)가 아니라 x+2 를 눌러야 골라진다. 예열 클릭이 화면을 스크롤하니 좌표는 예열 뒤에 잰다. Git Bash 에서 `cargo` 가 PATH 에 없어 `timeout … cargo check | grep` 이 조용히 「통과」처럼 보였다 — `export PATH="$HOME/.cargo/bin:$PATH"`
-  - next_steps: ① 사용자 시험(표 속 표 끌기) 뒤 요청 시 `release.mjs` → prebuilt.json 커밋 → 푸시 ② 표 속 표를 칸 밖(본문, 다른 칸)으로 끌기는 아직 안 된다(같은 칸 안만) — 요청 오면 ③ 이 CLAUDE.md 48k자 — 10-05 이전 블록을 `trim_anchor.py` 로 `CLAUDE-ARCHIVE.md` 에 내린다 ④ 10-06 넷째 next_steps ②③
+  - next_steps: ① (끝남: 릴리스, 푸시) ② 표 속 표를 칸 밖(본문, 다른 칸)으로 끌기는 아직 안 된다(같은 칸 안만) — 요청 오면 ③ 이 CLAUDE.md 48k자 — 10-05 이전 블록을 `trim_anchor.py` 로 `CLAUDE-ARCHIVE.md` 에 내린다 ④ 10-06 넷째 next_steps ②③
 - **10-06 넷째**: 사용자 「여러 셀이든 한 셀이든 ctrl-c v x 이런게 되야지」, 「에디터 core_silj 가 또 페이지가 밀린다」 → 스킬 b51bb30, 58f6a5b(**푸시, 릴리스 안 함**)
   - CORE 실적표(`2026 수업/교육연구/2026 교육력제고/실적_임세범/…_261006_02.hwpx`, 한/글 9쪽, 에디터 13쪽 → 9쪽). 엔진 패치 8개:
     `table-zero-pad(-measure,-layout,-float)` — HWPX 표 inMargin 네 방향 0 을 rhwp 가 「미지정 → 칸 여백(141)」(#2195 stage50, 근거 86712 HWP)으로 세로에 써 행마다 282 커졌다. 한/글 사다리(`scratchpad core/rowmin.py`): hasMargin 0 + 표 여백 0 이면 칸 여백 141/500 모두 무시(900/1000), HWP 로 저장했다 다시 열어도 같음. HWPX 에서 읽은 표(`raw_ctrl_data` 빈 표)에만 적용, HWP5 원본은 종전대로.
