@@ -55,7 +55,7 @@
   - 도구: `~/.cache/rhwp-devel/cmp.mjs`(2쪽 글자 줄과 셀 상자), `allpages.mjs <pkg> <a> <b>`(전 쪽 글자 좌표 대조), `variants.py`, `winshot.py`(에디터 창을 앞으로 올리지 않고 PrintWindow 로 캡처 — 사용자 화면을 뺏지 않는다)
 
 ## 컨텍스트 앵커
-- **10-06 셋째**: 사용자 보고 「u14a 마지막 쪽 왜 이렇게 되나」(그림 옆 [더 알아봐요] 표가 그림 위에 겹침), 「u12a 도 밀리네」(첫 쪽 [열어봐요] 아래가 빔, 6쪽 → 9쪽) → 스킬 c02906a, e4b5d6c(**푸시, 릴리스 안 함** — 원본 지문이 바뀌어 pre-push 훅이 막는다. `setup.mjs --build` 는 이 PC 에서 완료). 문서는 `2026 한국문화교재개발/삽입본/(1006) 한국문화 1{2,4}단원 삽화 삽입본.hwpx`(삽화 삽입 스크립트 산출물)
+- **10-06 셋째**: 사용자 보고 「u14a 마지막 쪽 왜 이렇게 되나」(그림 옆 [더 알아봐요] 표가 그림 위에 겹침), 「u12a 도 밀리네」(첫 쪽 [열어봐요] 아래가 빔, 6쪽 → 9쪽) → 스킬 c02906a, e4b5d6c, 릴리스 **editor-a41aab5691fe**(10abc09 까지 hwpx, hwpx2 푸시, 새 사본 3초 설치 확인). 사용자 창에서 확인 「이상없군」. 문서는 `2026 한국문화교재개발/삽입본/(1006) 한국문화 1{2,4}단원 삽화 삽입본.hwpx`(삽화 삽입 스크립트 산출물)
   - 엔진 패치 13개(setup.mjs 맨 끝 묶음, 생성기 scratchpad `mkpatch.py` — 그날 첫 edit-backup 과 지금 소스 차이로 조각을 뽑고 `verify.py` 로 원본에 넣어 같은지 확인):
     u14a: `empty-para`(스스로 닫힌 `<hp:p/>` 를 버리던 것 — 한/글은 본문, 칸, 글상자 모두 빈 문단으로 남김을 재저장으로 확인), `empty-para-charpr`(run 없는 문단 12px → 0번 글자 모양), `load-picture-band(-export,-load)`(열 때 합성 줄을 어울림 그림 띠로, 띠 안 TAC 표 문단 허용, 문서 끝까지), `tac-table-band`(띠 줄 TAC 표를 띠 왼쪽에, 한/글은 넘쳐도 그대로 둔다), `square-band-ladder`(한/글 저장판 u14b: 그림 문단 뒤가 빈 문단이어도 저장 사다리로 그림 문단 줄 1920 을 센다. **그림만** — OLE 는 개체 항목이 이미 전진해 issue_2069 Enter 시험이 두 줄이 됐다)
     u12a: `stale-declared-grow(-layout)`(칸 문단 줄 배치가 합성이면 표 선언 높이를 최소 높이로 안 씀. 한/글 재저장 58275 → 32423, 칸 cellSz 는 그대로), `empty-host-nested-tab(-valign)`(빈 문단 하나의 위아래 배치 칸 속 표: 빈 줄을 표 윗자리에 겹침 — 측정과 세로 가운데 정렬 둘 다), `no-ls-row-pad`(칸 선언이 여백뿐인 282 인 칸의 행을 줄인 여백으로 재던 것 17.1 ← 15.2px), `control-line-charpr`(TAC 개체만 있는 줄의 줄 간격 540 → 600)
@@ -63,7 +63,7 @@
   - 🔑 함정: 등록된 통합 시험(`cargo test --tests`)은 `tests/generated/regression_suite_*.rs` 가 없어 이 사본에서 컴파일되지 않는다. `tests/cases/issue_5797_*` 는 어느 시험 대상에도 없다(빈 `<hp:p/>` 를 버리는 기대값 — 한/글과 다름). Cargo.toml 은 `autotests = false`
   - 🔑 진단: `examples/claude_probe.rs`(임시, 지웠다) — `DocumentCore::dump_page_items`, `get_page_control_layout_native`, `export_hwpx_native` 왕복. 화면 경로 어긋남은 `RHWP_VPOS_DEBUG=1`(lazy base 재설정), 칸 행은 `RHWP_DIAG_ROWH`
   - 남은 것: u12a 제목 줄(테두리 글자 「12」, 20pt) 높이 rhwp 2000 / 한/글 2113 이라 첫 쪽 전체가 3.3px 위(별개 결함, 안 고침). 2-9절 문단 57 은 여전히 한 쪽 앞
-  - next_steps: ① 사용자에게 에디터 창을 다시 열어 확인받기(열린 u12a, u14a, u12b, u14b 창은 옛 엔진) ② 푸시와 릴리스는 사용자 승인 뒤(`release.mjs` → prebuilt.json 커밋 → 푸시) ③ rhwp 에 보고할 만한 것: `<hp:p/>` 누락, 표 선언 높이를 최소 높이로 쓰는 규칙(#2070)이 합성 줄 칸에도 걸림, 띠 안 TAC 표 x
+  - next_steps: ① rhwp 에 보고할 만한 것: `<hp:p/>` 누락, 표 선언 높이를 최소 높이로 쓰는 규칙(#2070)이 합성 줄 칸에도 걸림, 띠 안 TAC 표 x
 - **10-05 둘째 ~ 10-06**: 사용자 보고 넷 → 스킬 6fa4f78, 892b48b, d55a0da, 릴리스 editor-ad1179241115(7c6bd72). 이어 사용자 「1, 2, 3 그래」, 「다 끝나면 푸시도 해라」 → 글꼴 폭 3671c82, 메모 bc4e3c6, ad74376, 릴리스 editor-89eadf817bad(26cab51). 이어 메모 스크립트 b37dcc4, 글꼴 파일 폭 표 읽기 56687c3, 2bfa8c0, 릴리스 editor-f40a3b201997(2445c9c), 표 속 표 번호 오인 3ac4ddc, 릴리스 editor-08b2ac806e2d(bea1cdb), 표 속 표 칸 그림 크기 조절 47a12ee, 릴리스 **editor-f9dd411d4321**(e29bcba 까지 hwpx, hwpx2 푸시, 새 사본 설치 확인)
   - ① 「표 안에서 Alt+Shift+A/Z 줄 간격이 안 된다」(6fa4f78): 플러그인 칸 Ctrl+A 가 1단 칸에서 `cellPath[0].cellParaIndex` 를 누른 자리로 남겨, 문단 서식이 누른 문단 하나에만 들어가고 증감 키가 매번 같은 값을 넣었다. 🔑 `cli goto`, 방향키 커서는 cellPath 가 비어 재현 안 됨 — **마우스 클릭**(CDP)으로 놓는다
   - ② 「문항카드가 에디터에서만 깨져 보인다」(892b48b): 엔진 `cell-load-inline`(RowBreak 표 보강 줄이 한 줄 문단의 끝 글자를 밀던 것, 표 안 표의 그림 문단 높이 0) + `rhwp_layout.mjs`(칸 안 표 높이도 잼, 줄 배치가 섞인 칸은 걷음, 본문 표 상자를 그 표의 쪽 범위로만 받음 — 엔진 `getTableCellBboxes` 가 (문단, 컨트롤) 번호가 같은 **다른 표 속의 표**까지 집는다)
