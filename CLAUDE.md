@@ -3,6 +3,8 @@
 `/hwpx` 스킬(`~/.claude/skills/hwpx`, 저장소 imsebeom/hwpx2)에 rhwp 에디터 모드를 붙이는 개발 폴더.
 사용자는 브라우저의 rhwp 에디터로 문서를 보고, 터미널 Claude 가 같은 문서를 실시간으로 고친다.
 **2026-09-25 스킬로 통합 완료** — 코드 원본은 이제 `~/.claude/skills/hwpx/editor/`(설명서 `references/editor-mode.md`, 시험 `editor/tests/`)이다. 이 폴더의 `editor/` 는 개발 당시 사본이고 **여기서 고치지 않는다.** `.build/`(rhwp 소스, Rust 빌드 캐시)는 이 폴더에만 있다.
+- 노션: https://app.notion.com/p/3f1b9a4fc96d81799519c353c423deee (「hwpx 스킬 개발」 — 2026-10-06 사용자 결정으로 스킬 전체 범위, 2026-03-21 시작, **상태는 「관리」**(운영 중이 아니라는 사용자 지시 — 세션정리가 「진행 중」으로 바꾸지 않는다). 세션정리 2단계의 프로젝트 relation 은 여기)
+- 구분: 앱 개발
 
 ## 구조
 - `editor/plugin/claude-plugin.ts` — rhwp-studio 플러그인. JSON op(`doc`/`m`/`run`)를 한 트랜잭션으로 적용
