@@ -399,6 +399,34 @@ const RUST_PATCHES = [
     const [find, replace] = fs.readFileSync(path.join(HERE, 'patches', 'cell-trailing-ls-synth.rs'), 'utf8').replace(/\r\n/g, '\n').split('\n// ==== replace ====\n');
     return { id: 'cell-trailing-ls-synth', file: 'src/renderer/height_measurer.rs', find: find.replace(/^\/\/ ==== find ====\n/, ''), replace: replace.replace(/\n$/, ''), all: true, done: '[claude-hwpx cell-trailing-ls-synth]' };
   })(),
+  // 삽화 삽입 스크립트 산출물(한국문화 12, 14단원)이 한/글과 다르게 그려지던 것(2026-10-06). 위 패치를 모두 넣은 소스 기준으로
+  // 만든 조각이라 맨 끝에 넣는다
+  ...[
+    // 스스로 닫힌 빈 문단 <hp:p/> 를 버리던 것, 글자 모양 없는 빈 문단과 개체만 있는 줄을 12px 로 재던 것
+    ['empty-para', 'src/parser/hwpx/section.rs'],
+    ['empty-para-charpr', 'src/renderer/composer/line_breaking.rs'],
+    ['control-line-charpr', 'src/renderer/composer/line_breaking.rs'],
+    // 칸 내용을 바꿔 줄 배치가 없는 표의 낡은 선언 높이를 최소 높이로 쓰던 것, 빈 앵커 문단의 위아래 배치 표 높이에 빈 줄을 더하던 것
+    ['stale-declared-grow', 'src/renderer/height_measurer.rs'],
+    ['stale-declared-grow-layout', 'src/renderer/layout/table_layout.rs'],
+    ['empty-host-nested-tab', 'src/renderer/height_measurer.rs'],
+    // 같은 칸 속 표를 그리는 쪽: 칸 선언이 여백뿐인 줄 배치 없는 칸의 행을 줄인 여백으로 재던 것, 가운데 정렬 칸이 그 표 높이를 빼고 재던 것
+    ['no-ls-row-pad', 'src/renderer/layout/table_layout.rs'],
+    ['empty-host-nested-tab-valign', 'src/renderer/layout/table_layout.rs'],
+    // 열 때 줄 배치를 합성한 문단을 어울림 그림 옆 띠로 짜고, 띠 안 글자처럼 취급 표를 띠 왼쪽에 두기
+    ['load-picture-band', 'src/renderer/composer/line_breaking.rs'],
+    ['load-picture-band-export', 'src/renderer/composer.rs'],
+    ['load-picture-band-load', 'src/document_core/commands/document.rs'],
+    ['tac-table-band', 'src/renderer/layout.rs'],
+    // 한/글이 저장한 판: 글 없는 어울림 그림 문단 뒤 문단도 빈 문단이면 저장 사다리를 묻지 않아 그림 문단 줄이 빠지던 것
+    ['square-band-ladder', 'src/renderer/layout.rs'],
+  ].flatMap(([id, file]) => {
+    const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
+      .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));
+    const marker = (blocks[0][1].match(/\[claude-hwpx [\w-]+\]/) ?? [])[0];
+    const parts = blocks.map(([find, replace]) => ({ find, replace: replace.replace(/\n$/, '') }));
+    return [{ id, file, blocks: parts, done: marker ?? parts[0].replace }];
+  }),
 ];
 const builtMark = path.join(pkgDir, '.claude-patched');
 const builtIds = fs.existsSync(builtMark) ? fs.readFileSync(builtMark, 'utf8') : '';
