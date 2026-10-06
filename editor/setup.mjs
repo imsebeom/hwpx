@@ -420,6 +420,17 @@ const RUST_PATCHES = [
     ['tac-table-band', 'src/renderer/layout.rs'],
     // 한/글이 저장한 판: 글 없는 어울림 그림 문단 뒤 문단도 빈 문단이면 저장 사다리를 묻지 않아 그림 문단 줄이 빠지던 것
     ['square-band-ladder', 'src/renderer/layout.rs'],
+    // CORE 실적표가 한/글 9쪽인데 13쪽이던 것(2026-10-06): HWPX 표의 안쪽 여백 네 방향 0 을 미지정으로 보고 칸 여백을 세로에 쓰던 것,
+    // 칸 안 빈 문단의 위아래 배치 그림 높이에 빈 줄을 더하던 것(한/글은 max)
+    ['table-zero-pad', 'src/model/table.rs'],
+    ['table-zero-pad-measure', 'src/renderer/height_measurer.rs'],
+    ['table-zero-pad-layout', 'src/renderer/layout/table_layout.rs'],
+    ['table-zero-pad-float', 'src/renderer/float_placement.rs'],
+    ['empty-host-object-max', 'src/renderer/height_measurer.rs'],
+    ['empty-host-object-max-layout', 'src/renderer/layout/table_layout.rs'],
+    ['empty-host-object-max-partial', 'src/renderer/layout/table_partial.rs'],
+    // HTML 붙이기가 태그 사이 소스 줄바꿈을 글자로 넣던 것(칸 블록 붙이기, 웹 페이지 붙이기)
+    ['html-paste-whitespace', 'src/document_core/commands/html_import.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));
@@ -464,7 +475,7 @@ if (hasRust && RUST_PATCHES.some((p) => !builtIds.includes(p.id))) {
 }
 
 // 3. claude 플러그인 복사와 allowlist 등록
-for (const f of ['claude-plugin.ts', 'hancom-keys.ts', 'edit-log.ts', 'k-commands.ts', 'log-panel.ts', 'memo-panel.ts', 'color-palette.ts', 'para-preview.ts', 'dialog-enter.ts', 'cell-block-erase.ts', 'picture-crop.ts', 'move-drop.ts']) fs.copyFileSync(path.join(HERE, 'plugin', f), path.join(STUDIO, 'src', 'plugin', f));
+for (const f of ['claude-plugin.ts', 'hancom-keys.ts', 'edit-log.ts', 'k-commands.ts', 'log-panel.ts', 'memo-panel.ts', 'color-palette.ts', 'para-preview.ts', 'dialog-enter.ts', 'cell-block-erase.ts', 'cell-clipboard.ts', 'picture-crop.ts', 'move-drop.ts']) fs.copyFileSync(path.join(HERE, 'plugin', f), path.join(STUDIO, 'src', 'plugin', f));
 // 편집 도구 라이브러리(lib/SOURCE.md)도 같은 자리로. 플러그인이 './doc-tools.js' 로 부른다.
 for (const f of ['doc-tools.js', 'doc-rules.js', 'collab-ops.js']) {
   fs.copyFileSync(path.join(HERE, 'plugin', 'lib', f), path.join(STUDIO, 'src', 'plugin', f));

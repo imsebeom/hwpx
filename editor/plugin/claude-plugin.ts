@@ -30,6 +30,7 @@ import { installColorPalettes } from './color-palette';
 import { installParaPreview } from './para-preview';
 import { installDialogEnter } from './dialog-enter';
 import { installCellBlockErase } from './cell-block-erase';
+import { installCellClipboard } from './cell-clipboard';
 import { installPictureCrop } from './picture-crop';
 import * as rhwpWasm from '@wasm/rhwp.js';
 
@@ -756,6 +757,7 @@ export function createClaudePlugin(getInputHandler) {
       installParaPreview();
       installDialogEnter();
       installCellBlockErase(getInputHandler);
+      installCellClipboard(getInputHandler);   // 칸 블록 Ctrl+C, X, V
       installPictureCrop(getInputHandler);
       installLogPanel();
       const memoPanel = installMemoPanel(host, getInputHandler);   // 메모 보기(패널, 걸린 글 표시, `$E memos`)
