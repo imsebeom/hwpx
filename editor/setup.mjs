@@ -434,6 +434,10 @@ const RUST_PATCHES = [
     // HTML 붙이기 칸 경로판이 붙인 문단을 다시 나누지 않던 것(긴 글이 한 줄에 눌림), 칸 블록 복사가 칸마다 쓰는 내부 클립보드 보관함
     ['html-paste-path-reflow', 'src/document_core/commands/html_import.rs'],
     ['clipboard-stash', 'src/wasm_api.rs'],
+    // 표 속 표 끌어 옮기기를 같은 칸 안 문단 자리로(스튜디오 move-drop-nested 와 짝)
+    ['move-control-cell', 'src/document_core/commands/clipboard.rs'],
+    ['move-control-cell-wasm', 'src/wasm_api.rs'],
+    ['cell-tac-object-preceding', 'src/renderer/layout/table_layout.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));
@@ -571,6 +575,27 @@ for (const [file, patch] of [['input-handler-table.ts', 'move-drop-table.ts'], [
     src = src.replace(eol(find), () => eol(replace.replace(/\n$/, '')));
   }
   fs.writeFileSync(f, src);
+}
+
+// 표 속 표를 끌면 바깥 표가 옮겨지던 것(patches/move-drop-nested.ts, 엔진 move-control-cell). 위 move-drop-* 뒤에 넣는다.
+// 「table」 조각은 input-handler-table.ts, 「mouse」 조각은 input-handler-mouse.ts(「all」 은 같은 줄을 모두 바꾼다)
+{
+  const text = fs.readFileSync(path.join(HERE, 'patches', 'move-drop-nested.ts'), 'utf8').replace(/\r\n/g, '\n');
+  const [, tablePart, mousePart] = text.split(/\n\/\/ ==== (?:table|mouse) ====\n/);
+  for (const [file, part] of [['input-handler-table.ts', tablePart], ['input-handler-mouse.ts', mousePart]]) {
+    const f = path.join(STUDIO, 'src', 'engine', file);
+    let src = fs.readFileSync(f, 'utf8');
+    if (src.includes('[claude-hwpx move-drop-nested]') || src.includes('claudeSelectedTableBBox')) continue;
+    const eol = (t) => (src.includes('\r\n') ? t.replace(/\r?\n/g, '\r\n') : t);
+    for (const b of part.replace(/^\/\/ ==== find ====\n/, '').split(/\n\/\/ ==== (?:next|all) ====\n/)) {
+      const all = part.includes(`// ==== all ====\n${b.split('\n// ==== replace ====\n')[0]}`);
+      const [find, replace] = b.split('\n// ==== replace ====\n');
+      const n = src.split(eol(find)).length - 1;
+      if (all ? n < 1 : n !== 1) throw new Error(`${file} 에서 패치 자리(move-drop-nested)를 못 찾았다(${n})`);
+      src = all ? src.split(eol(find)).join(eol(replace.replace(/\n$/, ''))) : src.replace(eol(find), () => eol(replace.replace(/\n$/, '')));
+    }
+    fs.writeFileSync(f, src);
+  }
 }
 
 // Ctrl+방향키 칸/줄 전체 조절에 최소 크기 검사가 없어 줄일 수 없는 크기에서 칸마다 따로 멈추며 어긋나던 것(patches/column-resize-min.ts)
