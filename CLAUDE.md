@@ -62,6 +62,7 @@
   - 🔑 `.build` 는 이 폴더 바로 아래가 아니라 `editor/.build` 다. `~/.cache/rhwp-devel`(14GB)의 `rhwp` 와 `latest` 는 rhwp 작업 트리와 worktree(#7419 브랜치)라 빌드 폴더(1GB)만 캐시다
   - 사용자 「진행해」 → `editor/.build/rhwp` 를 `~/.cache/rhwp-devel/rhwp` 의 worktree 로 바꿈(옛 `.git` 1.9GB 삭제, 작업 파일과 `target` 은 제자리). 이 worktree 만 `core.autocrlf=true`(`extensions.worktreeConfig`, 작업 파일이 CRLF). 전환 전후 `status --ignored` 25,446줄과 diff(57파일 +5991/−322) 동일
   - ⚠ 처음 「5GB 안팎」이라 했으나 `mydocs`, `pdf` 는 작업 트리마다 있어야 하는 파일이라 줄어든 것은 `.git` 뿐이었다. `setup.mjs --clean` 은 다시 얕은 clone(1.9GB)을 만든다 — 쓸 일이 있으면 그때 worktree 로 바꾼다
+  - next_steps: ① 스킬 75b115c, 9e2cba6 푸시(사용자 요청 시). 릴리스 대상 아님(cli.mjs, app.py 는 저장소 파일) ② 다음 에디터 첫 실행 때 `hwpx-editor/webview` 공용 프로필로 두 쪽 보기, 확대 비율 설정이 유지되는지 확인 ③ 10-07 블록 next_steps ②③
 - **10-07**: 사용자 보고 「표 속에 표를 드래그 이동시켰는데 상위 표까지 같이 이동되네」 → 스킬 b0dbdaf. 사용자 「좋아 릴리스 푸시」 → 릴리스 **editor-d37819d8e1f9**(85ee01c 까지 hwpx, hwpx2 푸시 — b51bb30, 58f6a5b, 839b31a 포함, GitHub 새 사본 3.5초 설치와 지문 확인, 옛 editor-08b2ac806e2d 정리)
   - 원인: 스튜디오 끌기 상태(`moveDragState`)가 바깥 표 `{sec, ppi, ci}` 만 들고 cellPath 를 버려 선택 상자 판정, 놓일 자리 선, 옮기기가 모두 바깥 표에 걸렸다
   - 처방: 엔진 `move-control-cell(-wasm)`(`moveControlInCellByPath` — 같은 칸 안 문단 사이로, 홀로 든 개체 문단만, 칸 다시 싸기 + 쪽 나누기, 되돌리기 1번), 스튜디오 패치 `patches/move-drop-nested.ts`(표 속 표면 `updateCellDropLine`/`applyCellDrop`, 마우스 쪽 `getTableBBoxAtPage` 두 곳 → `claudeSelectedTableBBox`), `plugin/move-drop.ts`
