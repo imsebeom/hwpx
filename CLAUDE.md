@@ -55,6 +55,11 @@
   - 도구: `~/.cache/rhwp-devel/cmp.mjs`(2쪽 글자 줄과 셀 상자), `allpages.mjs <pkg> <a> <b>`(전 쪽 글자 좌표 대조), `variants.py`, `winshot.py`(에디터 창을 앞으로 올리지 않고 PrintWindow 로 캡처 — 사용자 화면을 뺏지 않는다)
 
 ## 컨텍스트 앵커
+- **10-10**: 사용자 「에디터 열 때마다 너무 오래 걸린다」 → 시작 시간 실측 후 UserPromptSubmit 훅 `~/.claude/scripts/hwpx-editor-open.py`(settings.json 등록, scripts와 settings.json은 `~/.claude` 저장소에서 gitignore라 커밋되지 않음. 글로벌 CLAUDE.md 한 줄은 6fd3b14)
+  - 실측: 서버 기동→응답 0.2초(빈 node 0.08초), 앱 창(pywebview, WebView2, 화면 38MB) 약 2.1초, 그리기 0.8초 → 처음 열기 3.5초, 떠 있는 창 재사용 0.7초. editor-log 336건 중앙값: 일반 문서(`stored`) 3.4초, 스킬 산출물(`rhwp`) 7.4초(서버 표 높이 재기 첫 회 0.5초 + 그리기 2초). `pruneStale` 0.2초. **느림의 대부분은 모델 턴이었다**
+  - 훅: 여는 말뿐인 프롬프트(「에디터 열어」, `"x.hwpx" 에디터로 열어`)는 열고 block(모델 턴 없음), 다른 요청이 붙으면 파일을 찾았을 때만 열고 넘김. 인스턴스 = 세션 ID 앞 8자(cli 의 `CLAUDE_CODE_SESSION_ID` 와 같음), 막힌 프롬프트는 다음 프롬프트에 「훅이 이미 열었다」 알림. 분류 13건, 실제 4.5초, 실사용 1회(같은 세션에서 `.test/새 문서.hwpx`) 확인
+  - decisions: 빈 문서는 작업 폴더에 둔다(사용자 승인) — 플레이그라운드 하위 폴더 규칙은 훅이 모른다. 탐색기 오른쪽 클릭 열기, 창 상주(숨겼다 보이기)는 제안만 하고 보류
+  - next_steps: ① 스킬 산출물 7.4초가 거슬리면 창 상주(앱 창 2초 제거) 검토 ② 훅이 놓치거나 잘못 잡는 문장이 나오면 `TRIGGER`, `FILLER` 정규식 조정(시험 `scratchpad hooktest.py` 는 세션 임시 폴더라 남지 않음)
 - **10-08**: 사용자 「너가 차지하는 용량이 너무 큰데 왜인가」 → 정리 약 22GB, 스킬 75b115c, 9e2cba6(**푸시와 릴리스는 안 함**)
   - 원인: 에디터 인스턴스 폴더가 세션마다 생기고 지워지지 않았고(130개 9.3GB), 폴더마다 WebView2 프로필(60~400MB, Code Cache와 Cache)이 따로 있었다. 그 밖에 `editor/.build/rhwp/target` 22GB, 폐기한 `~/.cache/whisper` 5.1GB
   - 정리: 7일 넘은 인스턴스 48개 삭제와 나머지의 `webview` 삭제(→ 1.1GB), `target/debug/incremental`, `examples` 삭제(→ 13GB, `deps` 는 남김), whisper 삭제
