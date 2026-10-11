@@ -64,7 +64,7 @@
     - 종전: 엔진은 본문 표를 글자 한 칸으로 건너뛰고, 마지막 칸 → 는 다음 문단 처음, 첫 칸 ← 는 표 문단 0번. 표 앞뒤 캐럿(엔진 좌표)은 테두리와 겹친 12px 막대라 안 보였다
     - 처방: 표 앞 캐럿 칸은 `convertCaretOffset` 모드 7(컨트롤 번호 → 그 개체 앞 캐럿 칸), 표 판정은 `getTableDimensionsByPath`, 첫/끝 칸은 `cellCount`. 표 앞뒤 캐럿은 칸 상자 합집합 바깥 2px 에 표 높이. Shift 선택 중은 종전(표를 글자로 고름), Tab 은 종전(마지막 칸에서 줄 추가)
     - 시험: 화면 없는 playwright 로 사본 인스턴스(arrowtest)에 키 — 본문 1×1(T13), 2×2(T14), 표 속 표(T13 머리표) 들어가기/나오기 모두 통과. 도구는 세션 scratchpad `g3/at/arrow.py <포트> <cases.json>`(남지 않음)
-    - next_steps: ① 떠 있는 에디터 창은 옛 스튜디오라 다시 열어야 반영 ② 다른 PC 용 릴리스(`release.mjs`)와 푸시는 사용자 요청 시
+    - (릴리스, 푸시는 아래 세션정리에서 끝남)
   - 사용자 「표 앞에 텍스트 하나를 입력했는데 표가 아래로 지나치게 이동」(udlB, 2-9 읽을거리 — 문서 전체가 큰 표 T1 한 칸, 칸 문단 9 의 그림 표 앞) → 스킬 a2b42a7(엔진 패치 `cell-tac-table-line`, **릴리스 안 함**)
     - 원인: 쪽에 걸친 칸은 `table_partial.rs` 로 그리는데, 글 있는 문단의 칸 안 표를 글 줄을 다 그린 뒤의 `para_y` 에 놓았다. 그 줄 높이가 이미 표 높이라 표가 제 줄 아래로 한 번 더 내려갔다. `table_layout.rs`(쪽 안 나뉜 칸)는 표 줄 vpos 로 놓아 맞다
     - 처방: 표 띠와 높이가 맞는 줄(없으면 마지막 줄) vpos + 바깥 위 여백, 표의 첫 조각일 때만(`mixed_nested_split` 이 start_row 0, 오프셋 0). 표 뒤 `para_y` 는 글 줄 끝과 max
@@ -72,7 +72,8 @@
     - 회귀: 문서 367개 2,145쪽 SVG 해시 직전 엔진과 동일(`reg_corpus.txt` + 보정 문서 62개)
     - 🔑 rhwp `exportHwpx` 의 zip 은 header.xml CRC 가 틀려 파이썬 zipfile 이 거부한다(한/글은 연다) — 변형은 `hwpx-zip.mjs` 로 만든다. 네이티브 진단은 `cargo build --bin rhwp`(1분, `target/debug/rhwp.exe export-svg`)
   - 사용자 「표 안에서 셀선택 상태가 아닌데도 p 를 누르면 표/셀 속성 메뉴가 열린다」 → 스킬 0bb34ae. da9eadc 가 도구 모음 「개체 속성」을 칸 안에서 쓰려고 `format:object-properties` 실행 조건을 `inTable` 로 넓혔는데 맨 글쇠 P 도 그 명령이라 칸에서 p 가 글자로 안 들어갔다. 처리 중인 키(`window.event`)가 수식키 없는 P 면 넓히지 않음. 칸 커서 p 입력, F5 중 P 대화상자, 도구 모음 단추 셋 다 시험 통과
-  - next_steps(10-11 이후): ① 1자 앞 글 + 넓은 표를 한/글처럼 같은 줄에 ② 에디터 창 다시 열어 새 빌드 반영(사용자) ③ 릴리스, 푸시는 요청 시(feed1d1, a2b42a7, 0bb34ae 미푸시)
+  - 세션정리 「푸시」 → pre-push 훅(원본 지문 ≠ prebuilt.json)에 막혀 `release.mjs` 로 릴리스 **editor-276d53ac6e56**(hwpx, hwpx2, 옛 editor-f9dd411d4321 정리) → 72b7362 까지 두 원격 푸시
+  - next_steps(10-11 이후): ① 1자 앞 글 + 넓은 표를 한/글처럼 같은 줄에(칸 줄 다시 짜기 `composer.rs` 가 `[빈 줄(표), "x"]` 로 나누는 까닭부터. 재현은 udlB 사본 칸 문단 9 앞에 1자, 한/글 대조는 `test/linebreak/hwp2pdf.py` 를 `hidden_desktop.py` 로) ② 에디터 창 다시 열어 화살표 드나들기, p 입력이 실제 창에서도 되는지 사용자 확인
   - 사용자 「푸시」 → hwpx, hwpx2 에 beabfee 까지 푸시(10-08 의 75b115c, 9e2cba6 과 다른 세션의 b4b3013, 436eda1, bd04758 포함). `rhwp_layout.mjs` 는 저장소 파일이라 릴리스 대상 아님
 - **10-10**: 사용자 「에디터 열 때마다 너무 오래 걸린다」 → 시작 시간 실측 후 UserPromptSubmit 훅 `~/.claude/scripts/hwpx-editor-open.py`(settings.json 등록, scripts와 settings.json은 `~/.claude` 저장소에서 gitignore라 커밋되지 않음. 글로벌 CLAUDE.md 한 줄은 6fd3b14)
   - 실측: 서버 기동→응답 0.2초(빈 node 0.08초), 앱 창(pywebview, WebView2, 화면 38MB) 약 2.1초, 그리기 0.8초 → 처음 열기 3.5초, 떠 있는 창 재사용 0.7초. editor-log 336건 중앙값: 일반 문서(`stored`) 3.4초, 스킬 산출물(`rhwp`) 7.4초(서버 표 높이 재기 첫 회 0.5초 + 그리기 2초). `pruneStale` 0.2초. **느림의 대부분은 모델 턴이었다**
