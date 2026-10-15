@@ -55,6 +55,11 @@
   - 도구: `~/.cache/rhwp-devel/cmp.mjs`(2쪽 글자 줄과 셀 상자), `allpages.mjs <pkg> <a> <b>`(전 쪽 글자 좌표 대조), `variants.py`, `winshot.py`(에디터 창을 앞으로 올리지 않고 PrintWindow 로 캡처 — 사용자 화면을 뺏지 않는다)
 
 ## 컨텍스트 앵커
+- **10-15**: 사용자 「cd8fe559 에디터는 큰 덩어리의 글자취급 표 등으로 에디터와 한/컴에서 순서가 달라진다」(CORE 실적 새틀 `_261015_02`, 한/글 4쪽, 에디터 6쪽) → 스킬 151352f(엔진 패치 `oversized-tac-table`, **푸시, 릴리스 안 함**)
+  - 원인: p0 한 문단에 TAC 표 셋(T1~T3, `flowWithText="0"`, 모두 쪽 본문 876.8px보다 큼), p1 에 T4. rhwp 는 HWPX 에서 `treatAsChar && flowWithText`(#3930)만 TAC 로 보고, 예외로 첫 줄(`tac_table_line_index == Some(0)`) 표만 TAC 로 인정 → T2, T3, T4 는 블록 표로 쪽이 나뉘고, `typeset_table_paragraph` 정렬 키 `table_flow_tiebreak` 가 블록 표를 앞세워 T2 → T3 → T1 순서
+  - 처방: `is_effective_tac_table` 에 「쪽 본문보다 큰 글자처럼 취급 표」 추가(엔진에 구역 본문 높이 `body_height_px` 칸). #3930 근거 편람의 fwt0 TAC 표 5개는 모두 쪽 안에 든다. 6쪽 → 4쪽, 순서와 글자 세로 범위 한/글 PDF 와 맞음
+  - 회귀: `reg_corpus_1014.txt` 354개 SVG 해시 동일(두 번 결정적), 편람 hwpx 383쪽, hwp 384쪽 동일, `cargo test --lib` 3889 통과. ⚠ `tests/issue_3930_hwpx_hwp_save_layout.rs` 는 Cargo.toml(autotests=false)에 연결되어 있지 않아 돌지 않는다
+  - next_steps: ① 사용자 창(cd8fe559)은 옛 번들 — 닫고 다시 열어 4쪽 확인 ② 요청 시 `release.mjs` → 푸시
 - **10-14 둘째**: 사용자 「훅이 빈 문서만 열게 되니 의미가 없다. 훅을 빼든지 대화 맥락의 문서를 열든지」 → 훅 `hwpx-editor-open.py` 수정: 파일 이름이 없으면 열지 않고 모델에 넘김(모델이 맥락의 문서를 연다), 빈 문서는 「새/빈 문서」라고 할 때만. 분류 시험 9건 통과. 이어서 사용자 「그냥 훅 빼라」 → settings.json 등록을 빼고 스크립트와 표식 폴더(`~/.claude/cache/hwpx-editor/hook-opened-*`)를 지웠다. 이제 「에디터 열어」는 모델이 맥락의 문서를 연다(글로벌 CLAUDE.md 한 줄 갱신). 10-10 블록의 훅 관련 next_steps ②는 폐기
 - **10-14**: 사용자 「전보유예 희망서가 왜 이렇게 보이나, 내가 넣은 건가」(표 둘이 본문과 겹침) → 스킬 b61c7fb(엔진 패치 `tac-overlay-flow`)
   - 원인: 교육청 서식 표 둘이 처음부터 treatAsChar="1" + BEHIND_TEXT(사용자가 넣은 것 아님). `/hwpx` 채우기가 줄 배치를 걷어(원본 46 → 0) rhwp 가 직접 조판하는데, `table_layout.rs` 가 글 뒤로/글 앞으로 표는 글자처럼 취급이어도 흐름을 전진시키지 않는다. 저장 줄 배치가 있으면 `layout.rs` overlay_tac 보정이 그 줄 높이로 전진시켜 가려져 있었다. 한/글 PDF 는 정상
