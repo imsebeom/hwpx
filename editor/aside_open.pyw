@@ -1,6 +1,6 @@
-"""hwpx 파일을 HWPX 에디터로 띄워 Aside 브라우저 탭에 연다(창 없이 pythonw 로 실행).
+"""Aside 가 연 hwpx 는 HWPX 에디터로 띄워 Aside 탭에 열고, 그 밖(탐색기 더블클릭 등)은 한/글로 넘긴다(창 없이 pythonw 로 실행).
 
-    pythonw aside_open.pyw <문서.hwpx>    연다 (탐색기, Aside 다운로드 「열기」가 부른다)
+    pythonw aside_open.pyw <문서.hwpx>    연다 (.hwpx 기본 연결 프로그램으로 불린다)
     python  aside_open.pyw --install      .hwpx 연결 후보 「HWPX 에디터 (Aside)」 등록(HKCU)
     python  aside_open.pyw --uninstall    등록 해제
 
@@ -81,6 +81,46 @@ def open_file(file):
         subprocess.Popen(["msg", "*", f"HWPX 에디터로 열지 못했다:\n{out.strip()[-400:]}"], creationflags=NO_WINDOW)
 
 
+def parent_exe():
+    """이 프로세스를 띄운 프로세스의 실행 파일 이름(소문자). Aside 다운로드 「열기」면 aside.exe 다."""
+    import ctypes
+    from ctypes import wintypes
+
+    class PE(ctypes.Structure):
+        _fields_ = [
+            ("dwSize", wintypes.DWORD), ("cntUsage", wintypes.DWORD), ("th32ProcessID", wintypes.DWORD),
+            ("th32DefaultHeapID", ctypes.c_size_t), ("th32ModuleID", wintypes.DWORD), ("cntThreads", wintypes.DWORD),
+            ("th32ParentProcessID", wintypes.DWORD), ("pcPriClassBase", ctypes.c_long), ("dwFlags", wintypes.DWORD),
+            ("szExeFile", ctypes.c_wchar * 260),
+        ]
+
+    k32 = ctypes.windll.kernel32
+    k32.CreateToolhelp32Snapshot.restype = wintypes.HANDLE
+    snap = k32.CreateToolhelp32Snapshot(0x2, 0)
+    procs, e = {}, PE()
+    e.dwSize = ctypes.sizeof(PE)
+    ok = k32.Process32FirstW(snap, ctypes.byref(e))
+    while ok:
+        procs[e.th32ProcessID] = (e.th32ParentProcessID, e.szExeFile.lower())
+        ok = k32.Process32NextW(snap, ctypes.byref(e))
+    k32.CloseHandle(snap)
+    ppid = procs.get(os.getpid(), (0, ""))[0]
+    return procs.get(ppid, (0, ""))[1]
+
+
+def open_hancom(file):
+    """한/글 연결(Hwp.Document.hwpx.130, 없으면 120)의 열기 명령으로 넘긴다."""
+    for progid in ["Hwp.Document.hwpx.130", "Hwp.Document.hwpx.120"]:
+        try:
+            with winreg.OpenKey(winreg.HKEY_CLASSES_ROOT, rf"{progid}\shell\open\command") as k:
+                cmd = winreg.QueryValue(k, None)
+        except FileNotFoundError:
+            continue
+        subprocess.Popen(cmd.replace("%1", file))
+        return
+    open_file(file)  # 한/글이 없으면 에디터로
+
+
 def install():
     pyw = str(Path(sys.executable).with_name("pythonw.exe"))
     cmd = f'"{pyw}" "{Path(__file__).resolve()}" "%1"'
@@ -118,7 +158,12 @@ if __name__ == "__main__":
         uninstall()
     elif arg:
         try:
-            open_file(arg)
+            parent = parent_exe()
+            if parent == "aside.exe" or os.environ.get("HWPX_FORCE_EDITOR"):
+                open_file(arg)
+            else:
+                log(f"한/글로 넘김 (부모 {parent or '?'}) {arg}")
+                open_hancom(arg)
         except Exception as e:
             log(f"오류 {arg} {e!r}")
             raise
