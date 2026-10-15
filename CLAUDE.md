@@ -55,7 +55,7 @@
   - 도구: `~/.cache/rhwp-devel/cmp.mjs`(2쪽 글자 줄과 셀 상자), `allpages.mjs <pkg> <a> <b>`(전 쪽 글자 좌표 대조), `variants.py`, `winshot.py`(에디터 창을 앞으로 올리지 않고 PrintWindow 로 캡처 — 사용자 화면을 뺏지 않는다)
 
 ## 컨텍스트 앵커
-- **10-15**: 사용자 「cd8fe559 에디터는 큰 덩어리의 글자취급 표 등으로 에디터와 한/컴에서 순서가 달라진다」(CORE 실적 새틀 `_261015_02`, 한/글 4쪽, 에디터 6쪽) → 스킬 151352f(엔진 패치 `oversized-tac-table`, **푸시, 릴리스 안 함**)
+- **10-15**: 사용자 「cd8fe559 에디터는 큰 덩어리의 글자취급 표 등으로 에디터와 한/컴에서 순서가 달라진다」(CORE 실적 새틀 `_261015_02`, 한/글 4쪽, 에디터 6쪽) → 스킬 151352f(엔진 패치 `oversized-tac-table`, **푸시와 릴리스는 안 함**)
   - 원인: p0 한 문단에 TAC 표 셋(T1~T3, `flowWithText="0"`, 모두 쪽 본문 876.8px보다 큼), p1 에 T4. rhwp 는 HWPX 에서 `treatAsChar && flowWithText`(#3930)만 TAC 로 보고, 예외로 첫 줄(`tac_table_line_index == Some(0)`) 표만 TAC 로 인정 → T2, T3, T4 는 블록 표로 쪽이 나뉘고, `typeset_table_paragraph` 정렬 키 `table_flow_tiebreak` 가 블록 표를 앞세워 T2 → T3 → T1 순서
   - 처방: `is_effective_tac_table` 에 「쪽 본문보다 큰 글자처럼 취급 표」 추가(엔진에 구역 본문 높이 `body_height_px` 칸). #3930 근거 편람의 fwt0 TAC 표 5개는 모두 쪽 안에 든다. 6쪽 → 4쪽, 순서와 글자 세로 범위 한/글 PDF 와 맞음
   - 회귀: `reg_corpus_1014.txt` 354개 SVG 해시 동일(두 번 결정적), 편람 hwpx 383쪽, hwp 384쪽 동일, `cargo test --lib` 3889 통과. ⚠ `tests/issue_3930_hwpx_hwp_save_layout.rs` 는 Cargo.toml(autotests=false)에 연결되어 있지 않아 돌지 않는다
