@@ -50,6 +50,7 @@ ${CLAUDE_SKILL_DIR}/
 │   ├── setup.mjs              # 최초 1회 준비 — 미리 빌드한 에디터(prebuilt.json, 릴리스)를 받는다. 빌드는 --build 일 때만
 │   ├── release.mjs            # (관리자) 빌드한 에디터를 릴리스로 올리고 prebuilt.json 갱신
 │   ├── app.py                 # 에디터 앱 창 (pywebview=WebView2, 한/글 단축키 전부)
+│   ├── aside_open.pyw         # .hwpx 연결 프로그램: 에디터를 Aside 탭으로 연다 (--install / --uninstall)
 │   ├── server.mjs · host/     # 브리지 서버와 호스트 페이지
 │   ├── plugin/                # studio 플러그인, 한/글 단축키 층, 편집 도구 25종(lib/)
 │   └── tests/                 # 왕복 보존력, 쪽 번호, 실제 키 입력 시험
