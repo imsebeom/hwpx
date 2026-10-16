@@ -55,6 +55,13 @@
   - 도구: `~/.cache/rhwp-devel/cmp.mjs`(2쪽 글자 줄과 셀 상자), `allpages.mjs <pkg> <a> <b>`(전 쪽 글자 좌표 대조), `variants.py`, `winshot.py`(에디터 창을 앞으로 올리지 않고 PrintWindow 로 캡처 — 사용자 화면을 뺏지 않는다)
 
 ## 컨텍스트 앵커
+- **10-17**: 사용자 「에디터 ktx 에 글자 겹침은 문서 설정인가 에디터 오류인가」(KTX 문항 `_261017_01`, 6쪽 「◎ 문항 4 _수행특성과 예시 답안」이 위 채점표 아래 괘선을 덮음) → 에디터 오류. 스킬 625e258(엔진 패치 `empty-float-offset-flow`, `-typeset`, **릴리스, 푸시 안 함**)
+  - 원인: 빈 문단의 위아래 배치 블록 표(vertRelTo=PARA, 오프셋 893, 바깥 여백 141)는 rhwp 가 오프셋만큼 내려 그리는데, 빈 앵커 흐름 규칙(layout.rs `lane_flow_bottom`, typeset `empty_host_physical_extras_hu`)은 표 높이만 전진한다. 여분(오프셋 + 위 여백 + 아래 여백)은 #5870 이 저장 줄 배치가 물리 공식과 맞을 때만 더해, 줄 배치 없는 스킬 산출물에서 다음 문단이 15.7px 위로 올라왔다. 한/글 재저장본은 rhwp 에서도 맞았다
+  - 근거: 한/글 재저장본 표 8개(KTX, 교과 평가계획, 문예복지부)에서 다음 문단 vpos 차이 = 오프셋 + 위 여백 + 표 높이 + 아래 여백, HWPUNIT 까지 일치
+  - 처방: 저장 줄 배치가 없고 표가 하나인 빈 문단만 여분을 더한다(layout, typeset 대칭). KTX 제목 기준선 807.9 → 823.6px, 다음 표 위 852.5px(한/글 재저장본 rhwp 렌더와 같음)
+  - 회귀: `reg_corpus_1014.txt` 354개 1,990쪽 SVG 해시 — 바뀐 것 11개, 쪽수 모두 같음(두 번 결정적). 한/글 PDF 줄 대조 도구는 세션 scratchpad `ktx/cmp.py`, `detail.py`(남지 않음). `cargo test --lib` 3889 통과
+  - ❌ 남은 기존 오차 둘(이번 변경과 무관): ① rhwp 가 블록 표를 바깥 위 여백 없이 그려 표가 그만큼(1.9~3.8px) 높다 ② 교과 평가계획(5학년) 2쪽 두 표 사이 제목 구간이 한/글보다 8px 크다 — 옛 엔진에서는 빠진 여분 12.5px 와 우연히 상쇄돼 맞아 보였고 지금은 다음 표가 4.6px 낮다
+  - next_steps: ① 에디터 창(ktx)을 닫고 다시 열어 확인 ② 요청 시 `release.mjs` → prebuilt.json 커밋 → 푸시 ③ 위 남은 오차 ①②
 - **10-15**: 사용자 「cd8fe559 에디터는 큰 덩어리의 글자취급 표 등으로 에디터와 한/컴에서 순서가 달라진다」(CORE 실적 새틀 `_261015_02`, 한/글 4쪽, 에디터 6쪽) → 스킬 151352f(엔진 패치 `oversized-tac-table`)
   - 원인: p0 한 문단에 TAC 표 셋(T1~T3, `flowWithText="0"`, 모두 쪽 본문 876.8px보다 큼), p1 에 T4. rhwp 는 HWPX 에서 `treatAsChar && flowWithText`(#3930)만 TAC 로 보고, 예외로 첫 줄(`tac_table_line_index == Some(0)`) 표만 TAC 로 인정 → T2, T3, T4 는 블록 표로 쪽이 나뉘고, `typeset_table_paragraph` 정렬 키 `table_flow_tiebreak` 가 블록 표를 앞세워 T2 → T3 → T1 순서
   - 처방: `is_effective_tac_table` 에 「쪽 본문보다 큰 글자처럼 취급 표」 추가(엔진에 구역 본문 높이 `body_height_px` 칸). #3930 근거 편람의 fwt0 TAC 표 5개는 모두 쪽 안에 든다. 6쪽 → 4쪽, 순서와 글자 세로 범위 한/글 PDF 와 맞음
