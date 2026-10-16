@@ -61,7 +61,8 @@
   - 처방: 저장 줄 배치가 없고 표가 하나인 빈 문단만 여분을 더한다(layout, typeset 대칭). KTX 제목 기준선 807.9 → 823.6px, 다음 표 위 852.5px(한/글 재저장본 rhwp 렌더와 같음)
   - 회귀: `reg_corpus_1014.txt` 354개 1,990쪽 SVG 해시 — 바뀐 것 11개, 쪽수 모두 같음(두 번 결정적). 한/글 PDF 줄 대조 도구는 세션 scratchpad `ktx/cmp.py`, `detail.py`(남지 않음). `cargo test --lib` 3889 통과
   - ❌ 남은 기존 오차 둘(이번 변경과 무관): ① rhwp 가 블록 표를 바깥 위 여백 없이 그려 표가 그만큼(1.9~3.8px) 높다 ② 교과 평가계획(5학년) 2쪽 두 표 사이 제목 구간이 한/글보다 8px 크다 — 옛 엔진에서는 빠진 여분 12.5px 와 우연히 상쇄돼 맞아 보였고 지금은 다음 표가 4.6px 낮다
-  - next_steps: ① 에디터 창(ktx)을 닫고 다시 열어 확인 ② 요청 시 `release.mjs` → prebuilt.json 커밋 → 푸시 ③ 위 남은 오차 ①②
+  - 새 창(인스턴스 ktx2)으로 열어 사용자가 「해결되었군」 확인 → 릴리스 **editor-455cce1eab08**(옛 editor-276d53ac6e56 정리) → 1a87197 까지 hwpx, hwpx2 푸시(다른 세션의 785b7ee, a77260c 포함)
+  - next_steps: 위 남은 오차 ①②(요청 시)
 - **10-15**: 사용자 「cd8fe559 에디터는 큰 덩어리의 글자취급 표 등으로 에디터와 한/컴에서 순서가 달라진다」(CORE 실적 새틀 `_261015_02`, 한/글 4쪽, 에디터 6쪽) → 스킬 151352f(엔진 패치 `oversized-tac-table`)
   - 원인: p0 한 문단에 TAC 표 셋(T1~T3, `flowWithText="0"`, 모두 쪽 본문 876.8px보다 큼), p1 에 T4. rhwp 는 HWPX 에서 `treatAsChar && flowWithText`(#3930)만 TAC 로 보고, 예외로 첫 줄(`tac_table_line_index == Some(0)`) 표만 TAC 로 인정 → T2, T3, T4 는 블록 표로 쪽이 나뉘고, `typeset_table_paragraph` 정렬 키 `table_flow_tiebreak` 가 블록 표를 앞세워 T2 → T3 → T1 순서
   - 처방: `is_effective_tac_table` 에 「쪽 본문보다 큰 글자처럼 취급 표」 추가(엔진에 구역 본문 높이 `body_height_px` 칸). #3930 근거 편람의 fwt0 TAC 표 5개는 모두 쪽 안에 든다. 6쪽 → 4쪽, 순서와 글자 세로 범위 한/글 PDF 와 맞음
