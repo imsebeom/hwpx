@@ -444,6 +444,9 @@ const RUST_PATCHES = [
     ['tac-overlay-flow', 'src/renderer/layout.rs'],
     // 쪽 본문보다 큰 글자처럼 취급 표(flowWithText=0)를 블록 표로 보아 쪽을 나누고, 한 문단에 여럿이면 순서까지 뒤집던 것
     ['oversized-tac-table', 'src/renderer/typeset.rs'],
+    // 줄 배치 없는 빈 문단의 위아래 배치 표가 세로 오프셋만큼 내려 그려지는데 흐름은 표 높이만 전진해 다음 문단이 표 아래를 덮던 것
+    ['empty-float-offset-flow', 'src/renderer/layout.rs'],
+    ['empty-float-offset-flow-typeset', 'src/renderer/typeset.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));
