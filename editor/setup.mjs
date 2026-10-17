@@ -742,6 +742,23 @@ for (const [id, rel, tail] of [['nested-table-cache', 'engine/table-bbox-cache.t
     fs.writeFileSync(f, src.replace(/\n*$/, '\n') + fs.readFileSync(path.join(HERE, 'patches', 'nested-table-table.ts'), 'utf8').replace(/\r\n/g, '\n'));
   }
 }
+// 칸 여러 열(행)을 고르고 끝 테두리를 끌면 고른 열(행)이 크기 비율대로 함께 바뀐다(patches/cell-drag-proportional.ts).
+// 위 nested-table-table 의 claudeCellProps, claudeNestedPath 를 쓰므로 그 뒤에 넣는다
+{
+  const f = path.join(STUDIO, 'src', 'engine', 'input-handler-table.ts');
+  let src = fs.readFileSync(f, 'utf8');
+  if (!src.includes('[claude-hwpx cell-drag-proportional]')) {
+    const eol = (s) => (src.includes('\r\n') ? s.replace(/\r?\n/g, '\r\n') : s);
+    const blocks = fs.readFileSync(path.join(HERE, 'patches', 'cell-drag-proportional.ts'), 'utf8').replace(/\r\n/g, '\n')
+      .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n');
+    for (const b of blocks) {
+      const [find, replace] = b.split('\n// ==== replace ====\n');
+      if (src.split(eol(find)).length !== 2) throw new Error('input-handler-table.ts 에서 패치 자리(cell-drag-proportional)를 하나로 못 찾았다');
+      src = src.replace(eol(find), () => eol(replace.replace(/\n$/, '')));
+    }
+    fs.writeFileSync(f, src);
+  }
+}
 
 // 4. 빌드
 if (!fs.existsSync(path.join(STUDIO, 'node_modules'))) sh('npm ci --no-audit --no-fund', STUDIO);
