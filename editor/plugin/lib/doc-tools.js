@@ -333,8 +333,24 @@ function checkPara(doc, s, p) {
 
 const shifted = (n, from) => `p${from} 뒤의 문단 번호가 ${n > 0 ? '+' : ''}${n} 만큼 바뀌었습니다. 이어서 편집하려면 새 번호를 쓰세요.`;
 
-function charProps(a) {
+function charProps(a, doc) {
   const props = {};
+  // 글꼴은 언어(한글, 영문, 한자, 일어, 기타, 기호, 사용자) 7 칸마다 글꼴 목록 번호가 따로 있다
+  if (a.font) {
+    const ids = [0, 1, 2, 3, 4, 5, 6].map((lang) => doc.findOrCreateFontIdForLang(lang, String(a.font)));
+    if (ids.some((x) => x < 0)) throw new Error(`글꼴 「${a.font}」를 등록하지 못했습니다.`);
+    props.fontIds = ids;
+  }
+  if (a.width_percent != null) {
+    const v = Math.round(Number(a.width_percent));
+    if (!(v >= 50 && v <= 200)) throw new Error('width_percent(장평)는 50~200 입니다(기본 100).');
+    props.ratios = Array(7).fill(v);
+  }
+  if (a.spacing_percent != null) {
+    const v = Math.round(Number(a.spacing_percent));
+    if (!(v >= -50 && v <= 50)) throw new Error('spacing_percent(자간)는 -50~50 입니다(기본 0).');
+    props.spacings = Array(7).fill(v);
+  }
   for (const k of ['bold', 'italic', 'underline', 'strikethrough']) if (typeof a[k] === 'boolean') props[k] = a[k];
   if (a.size_pt != null) {
     const pt = Number(a.size_pt);
@@ -345,7 +361,7 @@ function charProps(a) {
     if (!/^#[0-9a-f]{6}$/i.test(a.color)) throw new Error('color 는 #RRGGBB 형식입니다.');
     props.textColor = a.color.toLowerCase();
   }
-  if (!Object.keys(props).length) throw new Error('바꿀 서식이 없습니다(bold, italic, underline, strikethrough, size_pt, color).');
+  if (!Object.keys(props).length) throw new Error('바꿀 서식이 없습니다(bold, italic, underline, strikethrough, size_pt, color, font, width_percent, spacing_percent).');
   return props;
 }
 
@@ -370,6 +386,21 @@ function paraProps(a) {
 }
 
 const PAGE_BREAK = { split: 2, cell: 1, none: 0 };
+const MM = (mm) => Math.round((mm * 7200) / 25.4); // mm → HWPUNIT
+// 테두리 종류와 굵기 번호(엔진 setCellProperties → 저장 XML 실측: 3 → DASH, 굵기 6 → 0.4 mm)
+const BORDER_TYPE = { none: 0, solid: 1, dot: 2, dash: 3, dash_dot: 4, long_dash: 6, double: 8 };
+const BORDER_MM = [0.1, 0.12, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5, 0.6, 0.7, 1.0, 1.5, 2.0, 3.0, 4.0, 5.0];
+const borderWidthIdx = (mm) => BORDER_MM.reduce((best, v, i) => (Math.abs(v - mm) < Math.abs(BORDER_MM[best] - mm) ? i : best), 1);
+const HEX = /^#[0-9a-fA-F]{6}$/;
+
+/** 표 안에서 행·열 범위와 겹치는 칸(병합 칸은 한 번만). */
+function cellsInRange(doc, t, r0, c0, r1, c1) {
+  const { dim, cells } = tableCells(doc, t);
+  if (!(r0 >= 0 && c0 >= 0 && r1 >= r0 && c1 >= c0 && r1 < dim.rowCount && c1 < dim.colCount)) {
+    throw new Error(`${t.id} 는 r0~r${dim.rowCount - 1}, c0~c${dim.colCount - 1} 입니다.`);
+  }
+  return cells.filter((c) => c.row <= r1 && c.row + c.rowSpan - 1 >= r0 && c.col <= c1 && c.col + c.colSpan - 1 >= c0);
+}
 const norm = (s) => String(s).replace(/\s+/g, '');
 
 // ── 도구 정의 ────────────────────────────────────────
@@ -409,6 +440,11 @@ export const TOOLS = [
     parameters: { type: 'object', properties: { find: { type: 'string' }, replace: { type: 'string' }, expected_count: { type: 'integer' }, keep_width: { type: 'boolean' } }, required: ['find', 'replace'] },
   },
   {
+    name: 'regex_replace',
+    description: '정규식(JavaScript 문법)으로 문서 전체(본문과 표 칸)를 찾아 바꾼다. replace 에서 $1 같은 묶음을 쓸 수 있다. color 를 주면 그 글자 색(#RRGGBB)으로 시작하는 곳만 바꾼다(예: 빨간 안내 글만). expected_count 가 다르면 바꾸지 않고 위치를 알려 준다.',
+    parameters: { type: 'object', properties: { pattern: { type: 'string' }, replace: { type: 'string' }, ignore_case: { type: 'boolean' }, color: { type: 'string' }, expected_count: { type: 'integer' } }, required: ['pattern', 'replace'] },
+  },
+  {
     name: 'set_cell',
     description: '표 셀의 내용을 통째로 바꾼다. 줄바꿈은 셀 안 새 문단이 된다. 병합 셀은 그 영역 안의 아무 행과 열로 가리키면 된다.',
     parameters: { type: 'object', properties: { table: { type: 'string', description: 'T1 형식' }, row: { type: 'integer' }, col: { type: 'integer' }, text: { type: 'string' }, keep_style: { type: 'boolean', description: '안내 문구(빨간 글씨 등) 자리에 쓸 때 원래 서식을 유지. 기본은 검은 본문 서식으로 돌림' } }, required: ['table', 'row', 'col', 'text'] },
@@ -420,13 +456,15 @@ export const TOOLS = [
   },
   {
     name: 'format_text',
-    description: '글자 서식을 바꾼다. at 의 문단이나 셀에서 text 에 해당하는 글자만(생략하면 전체) 굵게, 기울임, 밑줄, 취소선, 크기(pt), 색을 바꾼다. 지정하지 않은 속성은 그대로다.',
+    description: '글자 서식을 바꾼다. at 의 문단이나 셀에서 text 에 해당하는 글자만(생략하면 전체) 굵게, 기울임, 밑줄, 취소선, 크기(pt), 색, 글꼴, 장평(%), 자간(%)을 바꾼다. 한 줄에 맞추려면 자간을 -5~-10 정도로 줄인다. 지정하지 않은 속성은 그대로다.',
     parameters: {
       type: 'object',
       properties: {
         ...S, at: AT, text: { type: 'string', description: '이 글자열만 바꿈. 생략하면 대상 전체' },
         bold: { type: 'boolean' }, italic: { type: 'boolean' }, underline: { type: 'boolean' }, strikethrough: { type: 'boolean' },
         size_pt: { type: 'number', description: '글자 크기 pt(예: 12)' }, color: { type: 'string', description: '#RRGGBB' },
+        font: { type: 'string', description: '글꼴 이름(예: 맑은 고딕, 함초롬바탕)' },
+        width_percent: { type: 'number', description: '장평 %(50~200, 기본 100)' }, spacing_percent: { type: 'number', description: '자간 %(-50~50, 기본 0)' },
       },
       required: ['at'],
     },
@@ -458,6 +496,11 @@ export const TOOLS = [
     parameters: { type: 'object', properties: { table: { type: 'string' }, row: { type: 'integer' }, below: { type: 'boolean' } }, required: ['table', 'row'] },
   },
   {
+    name: 'duplicate_row',
+    description: '표의 row 행을 서식째 복제해 바로 아래에 count 개(기본 1) 넣는다. 칸 배경, 테두리, 여백, 높이, 문단과 글자 모양을 그대로 옮긴다. with_text=false 면 서식만 옮긴 빈 행이다(명단, 일정표 행 늘리기). 여러 행에 걸친 칸이 있는 행은 복제할 수 없다.',
+    parameters: { type: 'object', properties: { table: { type: 'string' }, row: { type: 'integer' }, count: { type: 'integer' }, with_text: { type: 'boolean' } }, required: ['table', 'row'] },
+  },
+  {
     name: 'delete_table_row',
     description: '표의 row 행을 지운다.',
     parameters: { type: 'object', properties: { table: { type: 'string' }, row: { type: 'integer' } }, required: ['table', 'row'] },
@@ -483,14 +526,43 @@ export const TOOLS = [
     parameters: { type: 'object', properties: { table: { type: 'string' }, row: { type: 'integer' }, col: { type: 'integer' } }, required: ['table', 'row', 'col'] },
   },
   {
+    name: 'cell_style',
+    description: '표의 칸 범위(from_row,from_col ~ to_row,to_col, 생략하면 한 칸)에 배경색, 테두리, 안쪽 여백을 정한다. bg_color 는 #RRGGBB 또는 none. border.sides 는 all(모든 칸 테두리), outer(범위 바깥), inner(범위 안쪽), top, bottom, left, right(범위의 그쪽 가장자리) 중 하나 또는 배열. border.type 은 solid, dash, dot, dash_dot, long_dash, double, none. padding_mm 은 숫자 하나(네 방향) 또는 {left,right,top,bottom}.',
+    parameters: {
+      type: 'object',
+      properties: {
+        table: { type: 'string' }, from_row: { type: 'integer' }, from_col: { type: 'integer' }, to_row: { type: 'integer' }, to_col: { type: 'integer' },
+        bg_color: { type: 'string' },
+        border: { type: 'object', properties: { sides: {}, type: { type: 'string' }, width_mm: { type: 'number' }, color: { type: 'string' } } },
+        padding_mm: {},
+      },
+      required: ['table', 'from_row', 'from_col'],
+    },
+  },
+  {
+    name: 'column_width',
+    description: '표의 col 열(to_col 을 주면 col~to_col 각각)의 너비를 width_mm(mm)로 정한다. keep_table_width(기본 true)면 바로 오른쪽 열(마지막 열이면 왼쪽 열)을 그만큼 줄이거나 늘려 표 전체 폭을 지킨다.',
+    parameters: { type: 'object', properties: { table: { type: 'string' }, col: { type: 'integer' }, to_col: { type: 'integer' }, width_mm: { type: 'number' }, keep_table_width: { type: 'boolean' } }, required: ['table', 'col', 'width_mm'] },
+  },
+  {
+    name: 'table_caption',
+    description: '표에 캡션 「표 N 제목」을 단다(N 은 자동 번호). position 은 bottom(기본, 한/글 기본값), top, left, right. 이미 캡션이 있으면 제목만 바꾼다.',
+    parameters: { type: 'object', properties: { table: { type: 'string' }, text: { type: 'string' }, position: { type: 'string', enum: ['bottom', 'top', 'left', 'right'] } }, required: ['table', 'text'] },
+  },
+  {
+    name: 'page_setup',
+    description: '구역의 용지 방향(orientation: portrait 세로, landscape 가로)과 여백(margins_mm: {top,bottom,left,right,header,footer} 중 바꿀 것만, mm)을 정한다.',
+    parameters: { type: 'object', properties: { ...S, orientation: { type: 'string', enum: ['portrait', 'landscape'] }, margins_mm: { type: 'object' } } },
+  },
+  {
     name: 'row_height',
     description: '표의 row 행(to_row 를 주면 row~to_row)의 높이를 height_mm(mm)로 정한다. 칸 높이는 최솟값이라 글이 더 많으면 그보다 크게 그려지며, 결과에 실제 높이를 알려 준다.',
     parameters: { type: 'object', properties: { table: { type: 'string' }, row: { type: 'integer' }, to_row: { type: 'integer' }, height_mm: { type: 'number' } }, required: ['table', 'row', 'height_mm'] },
   },
   {
     name: 'table_props',
-    description: '표가 쪽 경계에 걸릴 때의 처리(page_break)와 제목 줄 반복(repeat_header)을 정한다. cell=행 경계에서만 나눔(칸 안 글은 쪼개지 않음, 긴 표의 기본값으로 repeat_header 와 함께), split=칸 안 글까지 쪼개 나눔, none=나누지 않고 통째로 다음 쪽으로. none 은 한 쪽에 들어가는 작은 표에만 쓴다. 한 쪽보다 긴 표에 none 을 쓰면 넘친 행이 한글에서 그려지지 않아 도구가 거부한다.',
-    parameters: { type: 'object', properties: { table: { type: 'string' }, page_break: { type: 'string', enum: ['split', 'cell', 'none'] }, repeat_header: { type: 'boolean' } }, required: ['table'] },
+    description: '표가 쪽 경계에 걸릴 때의 처리(page_break)와 제목 줄 반복(repeat_header)을 정한다. auto=표 높이를 재서 아래 셋 중 고름(잘 모르면 이것), cell=행 경계에서만 나눔(칸 안 글은 쪼개지 않음, 긴 표의 기본값으로 repeat_header 와 함께), split=칸 안 글까지 쪼개 나눔, none=나누지 않고 통째로 다음 쪽으로. none 은 한 쪽에 들어가는 작은 표에만 쓴다. 한 쪽보다 긴 표에 none 을 쓰면 넘친 행이 한글에서 그려지지 않아 도구가 거부한다.',
+    parameters: { type: 'object', properties: { table: { type: 'string' }, page_break: { type: 'string', enum: ['auto', 'split', 'cell', 'none'] }, repeat_header: { type: 'boolean' } }, required: ['table'] },
   },
   {
     name: 'table_formula',
@@ -521,13 +593,23 @@ export const TOOLS = [
   },
   {
     name: 'set_header_footer',
-    description: '머리말(header)이나 꼬리말(footer)의 글을 넣거나 바꾼다. 모든 쪽에 들어간다. 쪽 번호는 넣을 수 없다(rhwp 0.8.6 에서 쪽 번호 필드가 저장 때 사라지거나 문서를 깨뜨린다. 한컴 한글에서 넣으라고 안내하라).',
+    description: '머리말(header)이나 꼬리말(footer)의 글을 넣거나 바꾼다. 모든 쪽에 들어간다. 쪽 번호는 text 에 {쪽}, 전체 쪽수는 {전체쪽} 으로 쓴다(예: 「- {쪽} -」, 「{쪽} / {전체쪽}」).',
     parameters: { type: 'object', properties: { which: { type: 'string', enum: ['header', 'footer'] }, text: { type: 'string' }, align: { type: 'string', enum: ['left', 'center', 'right'] } }, required: ['which', 'text'] },
   },
   {
     name: 'add_footnote',
     description: '문단 para 의 after 글자 바로 뒤(생략하면 문단 끝)에 각주 번호를 달고 쪽 아래에 각주 글을 넣는다. 출처나 근거를 밝힐 때 쓴다.',
     parameters: { type: 'object', properties: { ...S, para: { type: 'integer' }, after: { type: 'string' }, text: { type: 'string' } }, required: ['para', 'text'] },
+  },
+  {
+    name: 'add_endnote',
+    description: '문단 para 의 after 글자 바로 뒤(생략하면 문단 끝)에 미주 번호를 달고 문서 끝에 미주 글을 넣는다. 시험지 정답, 참고 문헌에 쓴다.',
+    parameters: { type: 'object', properties: { ...S, para: { type: 'integer' }, after: { type: 'string' }, text: { type: 'string' } }, required: ['para', 'text'] },
+  },
+  {
+    name: 'insert_equation',
+    description: '본문 문단 para 의 after 글자 바로 뒤(생략하면 문단 끝)에 한컴 수식을 넣는다. script 는 한컴 수식 문법(예: 1 over 2, x^2 + y^2 = r^2, sqrt {a+b}, LEFT ( matrix{a & b # c & d} RIGHT )). size_pt 기본 10. 표 칸 안에는 넣을 수 없다.',
+    parameters: { type: 'object', properties: { ...S, para: { type: 'integer' }, after: { type: 'string' }, script: { type: 'string' }, size_pt: { type: 'number' } }, required: ['para', 'script'] },
   },
   {
     name: 'set_field',
@@ -669,6 +751,56 @@ function exec(doc, name, a) {
       return { result: { ok: true, count: r.count }, mark: { kind: 'replace', where: `전체 ${r.count}곳`, before: a.find, after: replace } };
     }
 
+    case 'regex_replace': {
+      let re;
+      try {
+        re = new RegExp(a.pattern, 'g' + (a.ignore_case ? 'i' : ''));
+      } catch (e) {
+        throw new Error(`pattern 이 정규식이 아닙니다: ${e.message}`);
+      }
+      if (a.color != null && !HEX.test(a.color)) throw new Error('color 는 #RRGGBB 입니다.');
+      // 대상: 구역마다 본문 문단, 본문 표의 칸 문단(표 안 표는 셀 API 로 닿지 않아 뺀다)
+      const targets = [];
+      for (let sec = 0; sec < doc.getSectionCount(); sec++) {
+        for (let p = 0; p < doc.getParagraphCount(sec); p++) targets.push({ kind: 'para', s: sec, p, text: paraText(doc, sec, p), at: `${sec ? `s${sec}` : ''}p${p}` });
+      }
+      for (const t of listTables(doc)) {
+        for (const c of tableCells(doc, t).cells) {
+          const n = doc.getCellParagraphCount(t.section, t.para, t.ctrl, c.idx);
+          for (let i = 0; i < n; i++) targets.push({ kind: 'cell', t, c: c.idx, i, text: cellParaText(doc, t, c.idx, i), at: `${t.id}r${c.row}c${c.col}` });
+        }
+      }
+      const hits = [];
+      for (const x of targets) {
+        for (const mt of x.text.matchAll(re)) {
+          if (!mt[0].length) continue;
+          if (a.color) {
+            const cp = x.kind === 'para'
+              ? J(doc.getCharPropertiesAt(x.s, x.p, mt.index))
+              : J(doc.getCellCharPropertiesAt(x.t.section, x.t.para, x.t.ctrl, x.c, x.i, mt.index));
+            if (String(cp.textColor).toLowerCase() !== a.color.toLowerCase()) continue;
+          }
+          const one = new RegExp(re.source, re.flags.replace('g', ''));
+          hits.push({ x, start: mt.index, len: mt[0].length, before: mt[0], after: clean(mt[0].replace(one, a.replace)) });
+        }
+      }
+      if (!hits.length) return { result: { ok: false, error: `/${a.pattern}/ 에 맞는 곳이 없습니다${a.color ? `(색 ${a.color})` : ''}.` } };
+      if (a.expected_count != null && hits.length !== a.expected_count) {
+        return { result: { ok: false, error: `${hits.length}곳이 맞아 기대한 ${a.expected_count}곳과 다릅니다. 바꾸지 않았습니다. 위치: ${[...new Set(hits.map((h) => h.x.at))].join(', ')}` } };
+      }
+      // 같은 문단 안에서는 뒤에서부터 바꿔 앞쪽 위치가 밀리지 않게 한다
+      for (const h of [...hits].sort((u, v) => v.start - u.start)) {
+        const { x } = h;
+        if (x.kind === 'para') doc.replaceText(x.s, x.p, h.start, h.len, h.after);
+        else {
+          doc.deleteTextInCell(x.t.section, x.t.para, x.t.ctrl, x.c, x.i, h.start, h.len);
+          if (h.after) doc.insertTextInCell(x.t.section, x.t.para, x.t.ctrl, x.c, x.i, h.start, h.after);
+        }
+      }
+      const sample = hits.slice(0, 5).map((h) => `${h.x.at} 「${h.before}」→「${h.after}」`);
+      return { result: { ok: true, count: hits.length, sample }, mark: { kind: 'replace', where: `전체 ${hits.length}곳`, before: `/${a.pattern}/`, after: a.replace } };
+    }
+
     case 'set_cell': {
       const t = findTable(doc, a.table);
       const c = findCell(doc, t, a.row, a.col);
@@ -708,7 +840,7 @@ function exec(doc, name, a) {
     }
 
     case 'format_text': {
-      const props = JSON.stringify(charProps(a));
+      const props = JSON.stringify(charProps(a, doc));
       let n = 0;
       for (const x of expandTargets(doc, a.at, s)) {
         for (const r of rangesIn(doc, x, a.text)) {
@@ -718,7 +850,7 @@ function exec(doc, name, a) {
         }
       }
       if (!n) throw new Error(a.text ? `「${a.text}」를 ${a.at} 에서 찾지 못했습니다.` : `${a.at} 에 글자가 없습니다.`);
-      const what = ['bold', 'italic', 'underline', 'strikethrough', 'size_pt', 'color'].filter((k) => a[k] != null).map((k) => `${k}=${a[k]}`).join(', ');
+      const what = ['bold', 'italic', 'underline', 'strikethrough', 'size_pt', 'color', 'font', 'width_percent', 'spacing_percent'].filter((k) => a[k] != null).map((k) => `${k}=${a[k]}`).join(', ');
       return { result: { ok: true, ranges: n }, mark: { kind: 'format', where: String(a.at), after: `${a.text ? `「${a.text}」 ` : ''}${what}` } };
     }
 
@@ -767,6 +899,59 @@ function exec(doc, name, a) {
       return { result: { ok: true, rowCount: r.rowCount }, mark: { kind: 'table', where: t.id, after: `행 추가 (r${a.row} ${a.below ?? true ? '아래' : '위'})` } };
     }
 
+    case 'duplicate_row': {
+      // 엔진의 행 넣기는 높이만 따라오고 배경, 글자 모양은 따라오지 않는다(2026-10-17 실측) → 칸 속성과 모양 번호를 옮긴다
+      const t = findTable(doc, a.table);
+      const count = a.count ?? 1;
+      if (!(count >= 1 && count <= 50)) throw new Error('count 는 1~50 입니다.');
+      const withText = a.with_text !== false;
+      const COPY = ['fillType', 'fillColor', 'patternColor', 'patternType', 'borderLeft', 'borderRight', 'borderTop', 'borderBottom',
+        'paddingLeft', 'paddingRight', 'paddingTop', 'paddingBottom', 'applyInnerMargin', 'verticalAlign', 'height'];
+      const srcCells = () => tableCells(doc, t).cells.filter((c) => c.row === a.row);
+      const first = srcCells();
+      const dim = J(doc.getTableDimensions(t.section, t.para, t.ctrl));
+      if (!(a.row >= 0 && a.row < dim.rowCount)) throw new Error(`${t.id} 는 r0~r${dim.rowCount - 1} 행입니다.`);
+      if (tableCells(doc, t).cells.some((c) => c.rowSpan > 1 && c.row <= a.row && c.row + c.rowSpan - 1 >= a.row)) {
+        throw new Error(`r${a.row} 에 여러 행에 걸친 칸이 있어 복제할 수 없습니다.`);
+      }
+      // 원본 칸의 속성, 문단별 글, 문단 모양 번호, 글자 모양 구간을 먼저 모은다
+      const snap = first.map((c) => {
+        const props = J(doc.getCellProperties(t.section, t.para, t.ctrl, c.idx));
+        const paras = [];
+        const n = doc.getCellParagraphCount(t.section, t.para, t.ctrl, c.idx);
+        for (let i = 0; i < n; i++) {
+          const text = cellParaText(doc, t, c.idx, i);
+          const paraShape = J(doc.getCellParaPropertiesAt(t.section, t.para, t.ctrl, c.idx, i)).paraShapeId;
+          const runs = [];
+          for (let k = 0; k < text.length; k++) {
+            const id = J(doc.getCellCharPropertiesAt(t.section, t.para, t.ctrl, c.idx, i, k)).charShapeId;
+            if (runs.length && runs[runs.length - 1].id === id) runs[runs.length - 1].end = k + 1;
+            else runs.push({ start: k, end: k + 1, id });
+          }
+          paras.push({ text, paraShape, runs, emptyShape: text.length ? null : J(doc.getCellCharPropertiesAt(t.section, t.para, t.ctrl, c.idx, i, 0)).charShapeId });
+        }
+        return { col: c.col, colSpan: c.colSpan, props: Object.fromEntries(COPY.filter((k) => k in props).map((k) => [k, props[k]])), paras };
+      });
+      for (let n = 0; n < count; n++) {
+        doc.insertTableRow(t.section, t.para, t.ctrl, a.row + n, true);
+        const dst = tableCells(doc, t).cells.filter((c) => c.row === a.row + n + 1);
+        for (const sc of snap) {
+          const d = dst.find((c) => c.col === sc.col);
+          if (!d) continue;
+          doc.setCellProperties(t.section, t.para, t.ctrl, d.idx, JSON.stringify(sc.props));
+          const paras = withText ? sc.paras : sc.paras.slice(0, 1).map((p) => ({ ...p, text: '', runs: [], emptyShape: p.runs[0]?.id ?? p.emptyShape }));
+          setCellText(doc, t, d.idx, paras.map((p) => p.text).join('\n'));
+          paras.forEach((p, i) => {
+            if (p.paraShape != null) doc.setCellParaShapeId(t.section, t.para, t.ctrl, d.idx, i, p.paraShape);
+            const path = JSON.stringify([{ controlIndex: t.ctrl, cellIndex: d.idx, cellParaIndex: i }]);
+            for (const r of p.runs) doc.setCharShapeIdInCellByPath(t.section, t.para, path, r.start, r.end, r.id);
+            if (!p.text && p.emptyShape != null) doc.setCharShapeIdInCellByPath(t.section, t.para, path, 0, 0, p.emptyShape);
+          });
+        }
+      }
+      return { result: { ok: true, inserted: count, rowCount: J(doc.getTableDimensions(t.section, t.para, t.ctrl)).rowCount }, mark: { kind: 'table', where: t.id, after: `r${a.row} 복제 ${count}행${withText ? '' : '(서식만)'}` } };
+    }
+
     case 'delete_table_row': {
       const t = findTable(doc, a.table);
       const r = J(doc.deleteTableRow(t.section, t.para, t.ctrl, a.row));
@@ -798,6 +983,157 @@ function exec(doc, name, a) {
       findCell(doc, t, a.row, a.col);
       const r = J(doc.splitTableCell(t.section, t.para, t.ctrl, a.row, a.col));
       return { result: { ok: true, cellCount: r.cellCount }, mark: { kind: 'table', where: t.id, after: `r${a.row}c${a.col} 나누기` } };
+    }
+
+    case 'cell_style': {
+      const t = findTable(doc, a.table);
+      const r0 = a.from_row, c0 = a.from_col, r1 = a.to_row ?? r0, c1 = a.to_col ?? c0;
+      const cells = cellsInRange(doc, t, r0, c0, r1, c1);
+      const base = {};
+      if (a.bg_color != null) {
+        if (a.bg_color === 'none') base.fillType = 'none';
+        else if (HEX.test(a.bg_color)) Object.assign(base, { fillType: 'solid', fillColor: a.bg_color.toLowerCase() });
+        else throw new Error('bg_color 는 #RRGGBB 또는 none 입니다.');
+      }
+      if (a.padding_mm != null) {
+        const p = typeof a.padding_mm === 'number' ? { left: a.padding_mm, right: a.padding_mm, top: a.padding_mm, bottom: a.padding_mm } : a.padding_mm;
+        for (const [k, v] of Object.entries(p)) {
+          const key = { left: 'paddingLeft', right: 'paddingRight', top: 'paddingTop', bottom: 'paddingBottom' }[k];
+          if (!key || !(v >= 0)) throw new Error('padding_mm 은 0 이상의 숫자 또는 {left,right,top,bottom} 입니다.');
+          base[key] = MM(v);
+        }
+        base.applyInnerMargin = true;
+      }
+      let line = null, sides = null;
+      if (a.border) {
+        const type = BORDER_TYPE[a.border.type ?? 'solid'];
+        if (type == null) throw new Error(`border.type 은 ${Object.keys(BORDER_TYPE).join(', ')} 중 하나입니다.`);
+        const color = a.border.color ?? '#000000';
+        if (!HEX.test(color)) throw new Error('border.color 는 #RRGGBB 입니다.');
+        line = { type, width: borderWidthIdx(a.border.width_mm ?? 0.12), color: color.toLowerCase() };
+        sides = new Set([].concat(a.border.sides ?? 'all'));
+        const ok = ['all', 'outer', 'inner', 'top', 'bottom', 'left', 'right'];
+        for (const s of sides) if (!ok.includes(s)) throw new Error(`border.sides 는 ${ok.join(', ')} 중에서 고릅니다.`);
+      }
+      if (!Object.keys(base).length && !line) throw new Error('바꿀 것이 없습니다(bg_color, border, padding_mm).');
+      for (const c of cells) {
+        const props = { ...base };
+        if (line) {
+          const edge = { top: c.row <= r0, bottom: c.row + c.rowSpan - 1 >= r1, left: c.col <= c0, right: c.col + c.colSpan - 1 >= c1 };
+          for (const side of ['top', 'bottom', 'left', 'right']) {
+            const want = sides.has('all') || (sides.has('outer') && edge[side]) || (sides.has('inner') && !edge[side]) || (sides.has(side) && edge[side]);
+            if (want) props[`border${side[0].toUpperCase()}${side.slice(1)}`] = line;
+          }
+        }
+        if (Object.keys(props).length) doc.setCellProperties(t.section, t.para, t.ctrl, c.idx, JSON.stringify(props));
+      }
+      const where = `r${r0}c${c0}${r1 !== r0 || c1 !== c0 ? `~r${r1}c${c1}` : ''}`;
+      const what = [a.bg_color != null && `배경 ${a.bg_color}`, line && `테두리 ${[...sides].join('/')} ${a.border.type ?? 'solid'} ${BORDER_MM[line.width]}mm`, a.padding_mm != null && '안쪽 여백'].filter(Boolean).join(', ');
+      return { result: { ok: true, cells: cells.length }, mark: { kind: 'table', where: `${t.id} ${where}`, after: what } };
+    }
+
+    case 'column_width': {
+      const t = findTable(doc, a.table);
+      if (!(a.width_mm > 0)) throw new Error('width_mm 는 0보다 큰 mm 값이어야 합니다.');
+      const { dim, cells } = tableCells(doc, t);
+      const from = a.col, to = a.to_col ?? a.col;
+      if (!(from >= 0 && to >= from && to < dim.colCount)) throw new Error(`${t.id} 는 c0~c${dim.colCount - 1} 열입니다.`);
+      // 열 너비는 그 열만 차지하는 칸(colSpan 1)의 너비로 읽는다(getCellInfo 에는 너비가 없다)
+      const widthOf = (list, col) => {
+        const c = list.find((x) => x.col === col && x.colSpan === 1);
+        return c ? J(doc.getCellProperties(t.section, t.para, t.ctrl, c.idx)).width : undefined;
+      };
+      const colWidth = (col) => widthOf(cells, col);
+      const delta = new Map(); // 열 → 너비 변화(HWPUNIT)
+      const keep = a.keep_table_width !== false;
+      for (let col = from; col <= to; col++) {
+        const w = colWidth(col);
+        if (w == null) throw new Error(`c${col} 열은 병합된 칸뿐이라 너비를 읽을 수 없습니다.`);
+        const d = MM(a.width_mm) - w;
+        delta.set(col, (delta.get(col) || 0) + d);
+        if (keep) {
+          const nb = to + 1 < dim.colCount ? to + 1 : from - 1;
+          if (nb < 0) throw new Error('열이 하나뿐이라 표 폭을 지킬 수 없습니다. keep_table_width: false 로 부르세요.');
+          delta.set(nb, (delta.get(nb) || 0) - d);
+        }
+      }
+      for (const [col, d] of delta) {
+        const w = colWidth(col);
+        if (w != null && w + d < MM(3)) throw new Error(`c${col} 열이 3mm 보다 좁아집니다. 바꾸려는 너비를 줄이세요.`);
+      }
+      // 칸마다 그 칸이 걸친 열들의 변화를 더해 한 번에 바꾼다(병합 칸도 함께 맞는다)
+      const batch = [];
+      for (const c of cells) {
+        let d = 0;
+        for (let col = c.col; col < c.col + c.colSpan; col++) d += delta.get(col) || 0;
+        if (d) batch.push({ cellIdx: c.idx, widthDelta: d });
+      }
+      if (batch.length) doc.resizeTableCells(t.section, t.para, t.ctrl, JSON.stringify(batch));
+      const after = tableCells(doc, t).cells;
+      const widths = [];
+      for (let col = 0; col < dim.colCount; col++) {
+        const w = widthOf(after, col);
+        widths.push(w == null ? null : Math.round((w * 254) / 7200) / 10);
+      }
+      return { result: { ok: true, columns_mm: widths }, mark: { kind: 'table', where: t.id, after: `c${from}${to !== from ? `~c${to}` : ''} 너비 ${a.width_mm}mm` } };
+    }
+
+    case 'table_caption': {
+      // 한/글 2024 가 만드는 캡션: <hp:t>표 </hp:t>{자동 번호}<hp:t> 제목</hp:t>, 기본 위치 아래(2026-10-17 실측).
+      // 캡션 문단은 칸 번호 자리에 65534(TABLE_CAPTION_CELL_SENTINEL)를 주면 칸 API 로 다룬다.
+      const t = findTable(doc, a.table);
+      const CAP = 65534;
+      const SIDE = { left: 0, right: 1, top: 2, bottom: 3 };
+      const pos = a.position ?? 'bottom';
+      if (!(pos in SIDE)) throw new Error('position 은 bottom, top, left, right 입니다.');
+      const title = clean(a.text).trim();
+      if (!title) throw new Error('text 가 비었습니다.');
+      const had = J(doc.getTableProperties(t.section, t.para, t.ctrl)).hasCaption;
+      let before = '';
+      if (!had) doc.setTableProperties(t.section, t.para, t.ctrl, JSON.stringify({ hasCaption: true, captionDirection: SIDE[pos] }));
+      else {
+        if (a.position) doc.setTableProperties(t.section, t.para, t.ctrl, JSON.stringify({ captionDirection: SIDE[pos] }));
+        // 글자 위치는 「표」0, 빈칸 1, 번호 자리 2, 빈칸 3, 제목 4~(한/글 저장본도 같다). 구분 빈칸부터 지우고 다시 넣는다
+        const len = doc.getCellParagraphLength(t.section, t.para, t.ctrl, CAP, 0);
+        before = len ? doc.getTextInCell(t.section, t.para, t.ctrl, CAP, 0, 0, len) : '';
+        if (len > 3) doc.deleteTextInCell(t.section, t.para, t.ctrl, CAP, 0, 3, len - 3);
+      }
+      const len = doc.getCellParagraphLength(t.section, t.para, t.ctrl, CAP, 0);
+      // 끝 자리가 번호 바로 뒤면 번호 뒤에 넣도록 표지를 켠다(없으면 번호 앞에 들어간다)
+      doc.setInsertAfterInline(true);
+      try {
+        // 새 캡션은 구분 빈칸까지 4자리, 제목을 지운 캡션은 3자리
+        doc.insertTextInCell(t.section, t.para, t.ctrl, CAP, 0, len, (len >= 4 ? '' : ' ') + title);
+      } finally {
+        doc.setInsertAfterInline(false);
+      }
+      const n = doc.getCellParagraphLength(t.section, t.para, t.ctrl, CAP, 0);
+      const now = doc.getTextInCell(t.section, t.para, t.ctrl, CAP, 0, 0, n);
+      return { result: { ok: true, caption: now, position: pos }, mark: { kind: 'table', where: `${t.id} 캡션`, before, after: now } };
+    }
+
+    case 'page_setup': {
+      const pd = J(doc.getPageDef(s));
+      const before = { ...pd };
+      if (a.orientation) {
+        if (!['portrait', 'landscape'].includes(a.orientation)) throw new Error('orientation 은 portrait 또는 landscape 입니다.');
+        pd.landscape = a.orientation === 'landscape';
+      }
+      if (a.margins_mm) {
+        const KEY = { top: 'marginTop', bottom: 'marginBottom', left: 'marginLeft', right: 'marginRight', header: 'marginHeader', footer: 'marginFooter' };
+        for (const [k, v] of Object.entries(a.margins_mm)) {
+          if (!KEY[k] || !(v >= 0)) throw new Error('margins_mm 은 {top,bottom,left,right,header,footer} 중 바꿀 것만, 0 이상 mm 입니다.');
+          pd[KEY[k]] = MM(v);
+        }
+      }
+      if (JSON.stringify(pd) === JSON.stringify(before)) throw new Error('바꿀 것이 없습니다(orientation, margins_mm).');
+      doc.setPageDef(s, JSON.stringify(pd));
+      const now = J(doc.getPageDef(s));
+      const mm = (v) => Math.round((v * 254) / 7200) / 10;
+      return {
+        result: { ok: true, landscape: now.landscape, margins_mm: { top: mm(now.marginTop), bottom: mm(now.marginBottom), left: mm(now.marginLeft), right: mm(now.marginRight) }, pages: doc.pageCount() },
+        mark: { kind: 'replace', where: `구역 ${s} 쪽 모양`, before: `${before.landscape ? '가로' : '세로'}`, after: `${now.landscape ? '가로' : '세로'}, 여백 위${mm(now.marginTop)} 아래${mm(now.marginBottom)} 왼${mm(now.marginLeft)} 오른${mm(now.marginRight)}mm` },
+      };
     }
 
     case 'row_height': {
@@ -833,7 +1169,13 @@ function exec(doc, name, a) {
       const t = findTable(doc, a.table);
       const props = {};
       if (a.page_break) {
-        if (!(a.page_break in PAGE_BREAK)) throw new Error('page_break 는 split, cell, none 중 하나입니다.');
+        if (a.page_break === 'auto') {
+          // table_page_fit.py 와 같은 판정: 한 쪽 본문의 45% 를 넘으면 행 경계에서 나누고 제목 줄을 반복, 아니면 통째로 넘긴다
+          const { height, body } = tableVsBody(doc, t);
+          a.page_break = height >= body * 0.45 ? 'cell' : 'none';
+          if (a.page_break === 'cell' && a.repeat_header == null && J(doc.getTableDimensions(t.section, t.para, t.ctrl)).rowCount > 1) a.repeat_header = true;
+        }
+        if (!(a.page_break in PAGE_BREAK)) throw new Error('page_break 는 auto, split, cell, none 중 하나입니다.');
         if (a.page_break === 'none') {
           const { height, body } = tableVsBody(doc, t);
           if (height > body) {
@@ -920,7 +1262,9 @@ function exec(doc, name, a) {
     case 'set_header_footer': {
       const isHeader = a.which === 'header';
       if (!isHeader && a.which !== 'footer') throw new Error('which 는 header 또는 footer 입니다.');
-      if (/쪽\s*번호|페이지\s*번호|\{쪽\}|page/i.test(a.text)) throw new Error('쪽 번호는 넣을 수 없습니다(rhwp 0.8.6 에서 저장 때 사라지거나 문서를 깨뜨림). 글만 넣고, 쪽 번호는 한컴 한글에서 넣도록 사용자에게 안내하세요.');
+      // 쪽 번호: {쪽} → 현재 쪽 필드, {전체쪽} → 총 쪽수 필드. 패치한 엔진(hwpx-hf-autonum)은 <hp:autoNum numType="PAGE"> 로
+      // 저장하고 한/글 2024 가 쪽마다 바르게 그린다(2026-10-17 실측: 「- {쪽} -」 → 「- 1 -」「- 2 -」「- 3 -」).
+      if (/쪽\s*번호|페이지\s*번호/.test(a.text)) throw new Error('쪽 번호 자리는 「쪽 번호」라고 쓰지 말고 {쪽} 으로 쓰세요(전체 쪽수는 {전체쪽}).');
       const text = clean(a.text);
       let hf = J(doc.getHeaderFooter(s, isHeader, 0));
       const before = hf.exists ? hf.text : '';
@@ -928,10 +1272,41 @@ function exec(doc, name, a) {
       for (let i = J(doc.getHeaderFooter(s, isHeader, 0)).paraCount - 1; i >= 1; i--) doc.mergeParagraphInHeaderFooter(s, isHeader, 0, i);
       const len = J(doc.getHeaderFooterParaInfo(s, isHeader, 0, 0)).charCount;
       if (len) doc.deleteTextInHeaderFooter(s, isHeader, 0, 0, 0, len);
-      if (text) doc.insertTextInHeaderFooter(s, isHeader, 0, 0, 0, text);
+      for (const part of text.split(/(\{쪽\}|\{전체쪽\})/).filter(Boolean)) {
+        const at = J(doc.getHeaderFooterParaInfo(s, isHeader, 0, 0)).charCount;
+        if (part === '{쪽}' || part === '{전체쪽}') doc.insertFieldInHf(s, isHeader, 0, 0, at, part === '{쪽}' ? 1 : 2);
+        else doc.insertTextInHeaderFooter(s, isHeader, 0, 0, at, part);
+      }
       if (a.align) doc.applyParaFormatInHf(s, isHeader, 0, 0, JSON.stringify({ alignment: ALIGN[a.align] }));
       hf = J(doc.getHeaderFooter(s, isHeader, 0));
       return { result: { ok: true, text: hf.text }, mark: { kind: 'replace', where: isHeader ? '머리말' : '꼬리말', before, after: text } };
+    }
+
+    case 'add_endnote':
+    case 'insert_equation': {
+      checkPara(doc, s, a.para);
+      const text = paraText(doc, s, a.para);
+      let offset = text.length;
+      if (a.after) {
+        const k = text.indexOf(a.after);
+        if (k < 0) throw new Error(`p${a.para} 에서 「${a.after}」를 찾지 못했습니다.`);
+        offset = k + a.after.length;
+      }
+      if (name === 'insert_equation') {
+        const script = String(a.script ?? '').trim();
+        if (!script) throw new Error('script 가 비었습니다.');
+        const pt = a.size_pt ?? 10;
+        if (!(pt >= 4 && pt <= 100)) throw new Error('size_pt 는 4~100 입니다.');
+        const r = J(doc.insertEquation(s, a.para, offset, script, Math.round(pt * 100), 0));
+        if (!r.ok) throw new Error(`수식을 넣지 못했습니다: ${JSON.stringify(r)}`);
+        return { result: { ok: true }, mark: { kind: 'insert', where: `p${a.para} 수식`, after: script } };
+      }
+      // 미주 글은 각주와 같은 함수로 넣는다. 글 길이 자리(번호 뒤)에 넣어야 한/글에서 「1) 글」로 나온다(2026-10-17 실측)
+      const r = J(doc.insertEndnote(s, a.para, offset));
+      if (!r.ok) throw new Error(`미주를 넣지 못했습니다: ${JSON.stringify(r)}`);
+      const info = J(doc.getFootnoteInfo(s, a.para, r.controlIdx));
+      doc.insertTextInFootnote(s, a.para, r.controlIdx, 0, info.totalTextLen ?? 0, clean(a.text));
+      return { result: { ok: true, number: r.endnoteNumber }, mark: { kind: 'insert', where: `p${a.para} 미주 ${r.endnoteNumber}`, after: clean(a.text) } };
     }
 
     case 'add_footnote': {
