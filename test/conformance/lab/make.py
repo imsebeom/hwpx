@@ -86,12 +86,25 @@ def make(v, out_dir):
             rf'(<hp:margin [^>]*\b{key}=")\d+"', rf'\g<1>{val}"', section, count=1
         )
     paras = v.get("paras") or ["본문 한 문단."]
+
+    # 글 안 특수 요소 표기: ⟦FW⟧ 고정폭 빈칸, ⟦NB⟧ 묶음 빈칸, ⟦HY⟧ 하이픈, ⟦TAB⟧ 탭
+    def body(t):
+        s = escape(t)
+        for k, tag in (
+            ("FW", "<hp:fwSpace/>"),
+            ("NB", "<hp:nbSpace/>"),
+            ("HY", "<hp:hyphen/>"),
+            ("TAB", '<hp:tab width="4000" leader="0" type="1"/>'),
+        ):
+            s = s.replace(f"⟦{k}⟧", tag)
+        return s
+
     section = section.replace(
-        "<hp:t>본문 한 문단.</hp:t>", f"<hp:t>{escape(paras[0])}</hp:t>"
+        "<hp:t>본문 한 문단.</hp:t>", f"<hp:t>{body(paras[0])}</hp:t>"
     )
     extra = "".join(
         f'<hp:p id="0" paraPrIDRef="0" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0">'
-        f'<hp:run charPrIDRef="0"><hp:t>{escape(t)}</hp:t></hp:run></hp:p>'
+        f'<hp:run charPrIDRef="0"><hp:t>{body(t)}</hp:t></hp:run></hp:p>'
         for t in paras[1:]
     )
     section = section.replace("</hs:sec>", extra + "</hs:sec>")
