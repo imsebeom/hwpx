@@ -54,18 +54,74 @@ def body_height(section_xml: str) -> int | None:
     )
 
 
-def _table_height(tbl: str) -> int:
-    """표 높이. sz가 있으면 그 값, 없으면 행 높이 합."""
+# 칸 글 양으로 높이를 어림할 때 쓰는 값. 크게 잡을수록 안전한 TABLE 쪽으로 기운다.
+LINE_SPACING = 1.6  # 줄 간격 160%
+NARROW_GLYPH = 0.55  # 한글, 한자가 아닌 글자의 폭(글자 크기 대비)
+
+
+def char_heights(header_xml: str) -> dict[str, int]:
+    """charPr id → 글자 크기(HWPUNIT)."""
+    return {
+        m.group(1): int(m.group(2))
+        for m in re.finditer(
+            r'<hh:charPr\b[^>]*\bid="(\d+)"[^>]*\bheight="(\d+)"', header_xml
+        )
+    }
+
+
+def _cell_content_height(tc: str, heights: dict[str, int]) -> int:
+    """칸 글을 칸 폭에 흘려 넣은 높이 어림값과, 한글이 남긴 줄 배치 캐시로 잰 높이 중 큰 값."""
+    w = re.search(r'<hp:cellSz\b[^>]*\bwidth="(\d+)"', tc)
+    mg = re.search(r"<hp:cellMargin\b[^>]*/>", tc)
+    m = {k: int(v) for k, v in re.findall(r'(\w+)="(\d+)"', mg.group())} if mg else {}
+    inner_w = max(
+        (int(w.group(1)) if w else 0) - m.get("left", 510) - m.get("right", 510), 1000
+    )
+    est = 0
+    for p in re.findall(r"<hp:p\b.*?</hp:p>", tc, re.S):
+        size, units = 1000, 0.0
+        for cp, body in re.findall(
+            r'<hp:run\b[^>]*\bcharPrIDRef="(\d+)"[^>]*>(.*?)</hp:run>', p, re.S
+        ):
+            h = heights.get(cp, 1000)
+            size = max(size, h)
+            text = "".join(re.findall(r"<hp:t>([^<]*)</hp:t>", body))
+            units += sum(h if ord(c) >= 0x2E80 else h * NARROW_GLYPH for c in text)
+        lines = max(1, -(-int(units) // inner_w))
+        est += int(lines * size * LINE_SPACING)
+    # 한글이 저장한 문서는 칸 문단마다 줄 위치(vertpos)와 줄 높이(vertsize)가 남아 있다
+    segs = [
+        int(a) + int(b)
+        for a, b in re.findall(
+            r'<hp:lineseg\b[^>]*\bvertpos="(\d+)"[^>]*\bvertsize="(\d+)"', tc
+        )
+    ]
+    measured = max(segs) if segs else 0
+    return max(est, measured) + m.get("top", 141) + m.get("bottom", 141)
+
+
+def _table_height(tbl: str, heights: dict[str, int] | None = None) -> int:
+    """표 높이. 적힌 값(hp:sz)과 행마다 cellSz, 칸 글 양으로 어림한 높이의 합 중 큰 값.
+
+    적힌 hp:sz height만 믿으면 안 된다. 한글은 이 값을 읽지 않고 다시 계산하며(2026-10-17 실측),
+    쪽을 넘는 표를 저장할 때는 첫 쪽 조각의 높이만 적는다(41행 표가 15,320). 생성기(md2hwpx)는
+    내용과 무관하게 2,400 × 행 수를 적는다. 어느 쪽이든 실제보다 작게 보면 NONE을 권해 넘친 행이 사라진다.
+    """
+    heights = heights or {}
     sz = re.search(r'<hp:sz\b[^>]*\bheight="(\d+)"', tbl)
-    if sz:
-        return int(sz.group(1))
-    rows = re.findall(r"<hp:tr>.*?</hp:tr>", tbl, re.S)
     total = 0
-    for r in rows:
-        hs = re.findall(r'<hp:cellSz\b[^>]*\bheight="(\d+)"', r)
-        if hs:
-            total += max(int(x) for x in hs)
-    return total
+    for r in re.findall(r"<hp:tr>.*?</hp:tr>", tbl, re.S):
+        row = 0
+        for tc in re.findall(r"<hp:tc\b.*?</hp:tc>", r, re.S):
+            span = re.search(r'\browSpan="(\d+)"', tc)
+            if span and int(span.group(1)) > 1:
+                continue  # 여러 행에 걸친 칸은 한 행 높이로 보지 않는다(규칙 33)
+            cs = re.search(r'<hp:cellSz\b[^>]*\bheight="(\d+)"', tc)
+            row = max(
+                row, int(cs.group(1)) if cs else 0, _cell_content_height(tc, heights)
+            )
+        total += row
+    return max(int(sz.group(1)) if sz else 0, total)
 
 
 def analyze(path: str | Path) -> list[dict]:
@@ -77,13 +133,19 @@ def analyze(path: str | Path) -> list[dict]:
             for n in zf.namelist()
             if n.startswith("Contents/section") and n.endswith(".xml")
         )
+        names = set(zf.namelist())
+        heights = (
+            char_heights(zf.read("Contents/header.xml").decode("utf-8", "replace"))
+            if "Contents/header.xml" in names
+            else {}
+        )
         for name in sections:
             xml = zf.read(name).decode("utf-8", "replace")
             avail = body_height(xml)
             for idx, m in enumerate(re.finditer(r"<hp:tbl\b.*?</hp:tbl>", xml, re.S)):
                 tbl = m.group(0)
                 open_tag = re.match(r"<hp:tbl\b[^>]*>", tbl).group()
-                h = _table_height(tbl)
+                h = _table_height(tbl, heights)
                 rows = len(re.findall(r"<hp:tr>", tbl))
                 cur_break = re.search(r'\bpageBreak="(\w+)"', open_tag)
                 cur_repeat = re.search(r'\brepeatHeader="(\d+)"', open_tag)
@@ -131,7 +193,9 @@ def analyze(path: str | Path) -> list[dict]:
                         "avail": avail,
                         "ratio": ratio,
                         "current_pageBreak": cur_break.group(1) if cur_break else None,
-                        "current_repeatHeader": cur_repeat.group(1) if cur_repeat else None,
+                        "current_repeatHeader": cur_repeat.group(1)
+                        if cur_repeat
+                        else None,
                         "current_treatAsChar": as_char,
                         "recommend_treatAsChar": "0" if danger else as_char,
                         "recommend_pageBreak": rec_break,
@@ -157,9 +221,10 @@ def apply(src: str | Path, dst: str | Path | None = None) -> dict:
     target = (tmpdir / "out.hwpx") if tmpdir else dst
 
     changed = 0
-    with zipfile.ZipFile(src) as zin, zipfile.ZipFile(
-        target, "w", zipfile.ZIP_DEFLATED
-    ) as zout:
+    with (
+        zipfile.ZipFile(src) as zin,
+        zipfile.ZipFile(target, "w", zipfile.ZIP_DEFLATED) as zout,
+    ):
         for info in zin.infolist():
             data = zin.read(info.filename)
             plans_here = by_section.get(info.filename)
@@ -218,13 +283,11 @@ def _rewrite(xml: str, plans: list[dict]) -> tuple[str, int]:
             else:
                 new_tag = new_tag[:-1] + f' repeatHeader="{want_repeat}">'
 
-        body = tbl[open_m.end():]
+        body = tbl[open_m.end() :]
         if plan.get("danger") and plan["current_treatAsChar"] == "1":
-            body = body.replace(
-                '<hp:pos treatAsChar="1"', '<hp:pos treatAsChar="0"', 1
-            )
+            body = body.replace('<hp:pos treatAsChar="1"', '<hp:pos treatAsChar="0"', 1)
 
-        if new_tag != open_tag or body != tbl[open_m.end():]:
+        if new_tag != open_tag or body != tbl[open_m.end() :]:
             changed += 1
             pieces.append(xml[last : m.start()])
             pieces.append(new_tag + body)

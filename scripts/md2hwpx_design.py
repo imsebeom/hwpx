@@ -24,6 +24,9 @@ import sys
 import zipfile
 from pathlib import Path
 
+from table_page_fit import _table_height as table_height
+from table_page_fit import body_height, char_heights
+
 SCRIPT_DIR = Path(__file__).resolve().parent
 
 # 강조색, 옅은 색. 옅은 색은 강조색을 흰색에 90% 가까이 섞은 값이다
@@ -54,7 +57,12 @@ NAME_BLANK = "_" * 14  # 이름 쓸 자리. 오른쪽 정렬이라도 이만큼�
 def _is_name_line(ln):
     """학년, 반, 번, 이름을 적는 짧은 줄(표, 제목, 목록이 아닌 것)."""
     t = ln.strip()
-    return bool(t) and not t.startswith(("|", "#", "-", "*", ">")) and len(t) <= 60 and re.search(r"이름\s*[:：_]|(학년|반|번|모둠)\W.*이름", t)
+    return (
+        bool(t)
+        and not t.startswith(("|", "#", "-", "*", ">"))
+        and len(t) <= 60
+        and re.search(r"이름\s*[:：_]|(학년|반|번|모둠)\W.*이름", t)
+    )
 
 
 def _pad_name_blank(ln):
@@ -161,7 +169,9 @@ def style_header(h, accent, light, font):
     keep = re.sub(r'id="0"', f'id="{n_pp}"', p0_flat, count=1).replace(
         'keepWithNext="0"', 'keepWithNext="1"'
     )
-    right = re.sub(r'id="0"', f'id="{n_pp + 1}"', p0_flat, count=1).replace('horizontal="JUSTIFY"', 'horizontal="RIGHT"')
+    right = re.sub(r'id="0"', f'id="{n_pp + 1}"', p0_flat, count=1).replace(
+        'horizontal="JUSTIFY"', 'horizontal="RIGHT"'
+    )
     h = _append(h, "paraProperties", keep + right, 2)
     cp["keep_pp"] = n_pp
     cp["right_pp"] = n_pp + 1
@@ -174,14 +184,19 @@ def _set_attr(tag, name, value):
     return tag[:-1] + f' {name}="{value}">'
 
 
-def style_section(s, ids, cp):
+def style_section(s, ids, cp, heights=None):
     # 표 배치: 짧은 표는 글자처럼 취급 + 나누지 않음(treatAsChar=0 + NONE 이면 표가 뒤 절보다 늦게 떠서 순서가 뒤바뀐다).
     # 긴 표는 규칙 33에 따라 treatAsChar=0 을 지키고 셀 단위가 아닌 표 단위로 나누며 머리 행을 반복한다.
+    # 짧은 표는 행 수만으로 정하지 않는다. 행이 적어도 칸 글이 길어 한 쪽을 넘으면 글자처럼 취급 + NONE 이
+    # 넘친 행을 지운다(2026-10-17 한글 실측: 5행 표가 2행만 렌더). 추정 높이가 본문 높이 안에 들 때만 짧다고 본다.
+    avail = body_height(s)
+
     def place(m):
         t = m.group(0)
         head = re.match(r"<hp:tbl\b[^>]*>", t).group(0)
         rows = int(re.search(r'rowCnt="(\d+)"', head).group(1))
-        if rows <= SHORT_TABLE_ROWS:
+        fits = avail is None or table_height(t, heights) <= avail * 0.9
+        if rows <= SHORT_TABLE_ROWS and fits:
             new_head = _set_attr(head, "pageBreak", "NONE")
             t = new_head + t[len(head) :]
             t = re.sub(
@@ -305,7 +320,7 @@ def build(md_path, out, accent, light, font="Pretendard", layout=True):
         h = z.read("Contents/header.xml").decode("utf-8")
         s = z.read("Contents/section0.xml").decode("utf-8")
     h, ids, cp = style_header(h, accent, light, font)
-    s = style_section(s, ids, cp)
+    s = style_section(s, ids, cp, char_heights(h))
     tmp = str(out) + ".tmp"
     with (
         zipfile.ZipFile(out) as zi,
@@ -345,7 +360,9 @@ def main():
     ap.add_argument("--accent", help="강조색 #RRGGBB (주면 --theme 대신)")
     ap.add_argument("--light", help="옅은 색 #RRGGBB (--accent 와 함께)")
     ap.add_argument(
-        "--font", default="Pretendard", help="본문 글꼴(기본 Pretendard, 스킬 fonts/ 에 동봉). 빈 문자열이면 템플릿 글꼴 유지"
+        "--font",
+        default="Pretendard",
+        help="본문 글꼴(기본 Pretendard, 스킬 fonts/ 에 동봉). 빈 문자열이면 템플릿 글꼴 유지",
     )
     ap.add_argument(
         "--no-layout",
