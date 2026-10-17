@@ -68,7 +68,15 @@
     - 결과: 교과 평가계획 1~3쪽 괘선 한/글 PDF 와 1px 안(옛 3.9~8px). KTX 표 위 286.9px(한/글 286.5)
     - 회귀: 직전 릴리스 대비 354개 중 16개 변경, 쪽수 동일, 두 번 결정적. 16개 한/글 괘선 대조(scratchpad `ktx/cmp2.py`) — 1px 넘는 괘선 수가 늘어난 문서 없음, 10개 줄어듦. `cargo test --lib` 3889 통과
   - ❌ 새로 본 기존 오차(이번 변경과 무관): 교과 평가계획 5쪽 표 첫 행이 한/글보다 8.6px 크다(4, 6~8쪽도 비슷한 칸 높이 오차), linetest2 1쪽 끝 나뉜 표 조각 끝이 24px 짧다
-  - next_steps: ① 요청 시 릴리스, 푸시 ② 위 칸 높이 오차
+  - 사용자 「추가 수정」 → 스킬 bb57e29(엔진 패치 4개, **릴리스, 푸시 안 함**). 교과 평가계획 칸 높이 오차의 원인은 넷이었다
+    - `cell-squeeze-one-line`: 「한 줄로 입력」(subList lineWrap=SQUEEZE) 칸을 문서를 열 때 칸 폭으로 나눠 「평가/영역」 두 줄(5쪽 머리 행 26.6 → 18.2px). 그리기 쪽 가로 축소(transform scale)는 rhwp 가 이미 한다. 넓은 상자로 다시 나눈 한 줄을 **저장 줄로 표시**해야 그릴 때 다시 안 나뉜다(합성 표시면 `recompose_cell_lines_in_frame` 이 다시 나눔)
+    - `hangul-word-char-widths`: 칸보다 긴 한글 어절의 글자 단위 나눔이 글자별 폭이 비어 「max(글자 크기, 12px)」로 어림 → 8pt 장평 90% 자간 -15% 「노력요함」이 「노/력/요/함」(6쪽). 늘 `measure_char_width` 로 잰다
+    - `tac-synthetic-full-spacing`: 계산된 줄 하나뿐인 문단의 글자처럼 취급 표 뒤에 줄 간격 절반만 더하던 규칙(`current_owned_row_covers_object`, 근거 시험 없음, 대형 병합 커밋 유래)을 끔. 한/글 재저장본 줄 24158 + 600 = 다음 vpos
+    - `partial-float-outer-top`: 쪽에 걸친 표 첫 조각과 이어진 조각 맨 위에 바깥 위 여백(7쪽 2.9px, 8쪽 3.3px)
+    - 결과: 교과 평가계획 1~7쪽 괘선 한/글과 1.2px 안. 회귀: 직전 대비 354개 중 47개 변경, 쪽수 동일, 두 번 결정적, 한/글 대조 46개 중 개선 27, 같음 17, +1 둘(e2e2, 2-3 원고 — 원래 대부분 어긋난 문서라 지표 잡음). `cargo test --lib` 3889 통과
+    - 🔑 함정: SVG 글자는 `<text x= y=>` 말고 `<text transform="translate(x,y) scale(..)">`(SQUEEZE, 장평) 형태도 있다 — 정규식이 놓쳐 「글자가 안 그려진다」로 오진할 뻔했다. `document.rs` 는 LF, `layout.rs` 등은 CRLF
+  - ❌ 남은 것(일반 rhwp 동작, 줄 배치가 있는 문서에도 걸림): ① 쪽 끝에서 잘린 행을 한/글은 본문 끝까지 늘려 그리고 글을 그 안에서 정렬한다(linetest2 1쪽 22px, 한/글 재저장본도 rhwp 26px 어긋남). 쪽 나누기 규칙(#3820 Stage 76 `end_row_height_override` 등)과 얽혀 있다 ② 이어진 조각 첫 행(잘린 행의 나머지)에 칸 위 여백이 빠진다(교과 평가계획 8쪽 3.7px) ③ 단보다 넓은 표의 가로 위치: 한/글은 p21, p28 을 단 가운데(양쪽으로 넘침, 56px), p15~17 은 단 왼쪽(79px)에 두는데 rhwp 는 76/79px. 구분 조건 미확인
+  - next_steps: ① 요청 시 릴리스, 푸시 ② 위 남은 것 ①②③
 - **10-15**: 사용자 「cd8fe559 에디터는 큰 덩어리의 글자취급 표 등으로 에디터와 한/컴에서 순서가 달라진다」(CORE 실적 새틀 `_261015_02`, 한/글 4쪽, 에디터 6쪽) → 스킬 151352f(엔진 패치 `oversized-tac-table`)
   - 원인: p0 한 문단에 TAC 표 셋(T1~T3, `flowWithText="0"`, 모두 쪽 본문 876.8px보다 큼), p1 에 T4. rhwp 는 HWPX 에서 `treatAsChar && flowWithText`(#3930)만 TAC 로 보고, 예외로 첫 줄(`tac_table_line_index == Some(0)`) 표만 TAC 로 인정 → T2, T3, T4 는 블록 표로 쪽이 나뉘고, `typeset_table_paragraph` 정렬 키 `table_flow_tiebreak` 가 블록 표를 앞세워 T2 → T3 → T1 순서
   - 처방: `is_effective_tac_table` 에 「쪽 본문보다 큰 글자처럼 취급 표」 추가(엔진에 구역 본문 높이 `body_height_px` 칸). #3930 근거 편람의 fwt0 TAC 표 5개는 모두 쪽 안에 든다. 6쪽 → 4쪽, 순서와 글자 세로 범위 한/글 PDF 와 맞음
