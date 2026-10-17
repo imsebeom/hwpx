@@ -13,6 +13,10 @@
                             }
                             let stretch = self.render_normalization.nested_table_width_scale(nested);
                             let mt = self.measure_table_impl(nested, 0, 0, styles, depth + 1, stretch);
-                            let grown = mt.total_height - hwpunit_to_px(para_max_lh, self.dpi);
+                            // 합성 줄은 「적힌 높이 + 바깥 여백」이므로 표도 바깥 여백까지 센다(한/글 줄 = 표 + 바깥 여백.
+                            // 2026-10-17 KTX 자료 1: 여백 141+141 을 빼고 재서 바깥 칸이 3.8px 모자랐다)
+                            let om = hwpunit_to_px(nested.outer_margin_top as i32, self.dpi)
+                                + hwpunit_to_px(nested.outer_margin_bottom as i32, self.dpi);
+                            let grown = mt.total_height + om - hwpunit_to_px(para_max_lh, self.dpi);
                             return (grown > 0.5).then_some(grown);
                         }

@@ -6,13 +6,16 @@
         // 큰 값으로 행 높이를 정한다(한글이 저장한 행 높이와 같다). rhwp 의 칸 내용 측정은 줄 간격, 문단 간격을 한글보다 크게
         // 잡아(d05 p4: 한글 51.2/112.2, rhwp 58.4/121.1) 평소에는 비례 축소가 가려 주다가, 칸에 문단을 더하면 축소 조건을 벗어나
         // 표가 16px 커졌다(2026-09-28). 합친 칸, 세로쓰기, 줄 배치 없는 문단이 있으면 종전 측정을 쓴다.
+        // 줄 배치 없는 문단에는 엔진이 합성 줄(표식 0x80000000)을 달아 비어 있지 않으므로 표식으로 가린다. 합성 줄은 칸 안 표의
+        // 적힌 높이만 담아, 안쪽 표가 내용으로 자란 몫(tac-no-ls-nested)을 사다리가 지웠다(2026-10-17 KTX 문항 자료 1: 바깥 칸이
+        // 글 높이 278px 로 남아 안쪽 3행 표가 0행만 보였다. 한/글 재저장본은 칸을 늘린다)
         if table.common.treat_as_char
             && table.cells.iter().all(|c| {
                 c.row_span == 1
                     && c.text_direction == 0
                     && (c.row as usize) < row_count
                     && !c.paragraphs.is_empty()
-                    && c.paragraphs.iter().all(|p| !p.line_segs.is_empty())
+                    && c.paragraphs.iter().all(|p| !crate::renderer::para_has_no_stored_line_segs(p))
             })
         {
             let mut ladder = vec![0.0f64; row_count];

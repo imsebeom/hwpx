@@ -463,7 +463,9 @@ const RUST_PATCHES = [
     ['wide-table-column-center', 'src/renderer/layout/table_layout.rs'],
     ['wide-table-column-center-float', 'src/renderer/float_placement.rs'],
     // 병합 칸이 다음 쪽으로 이어지는 조각의 마지막 행을 본문 끝까지 늘리지 않던 것
-    ['rspan-fragment-fill', 'src/renderer/layout/table_partial.rs'],  ].flatMap(([id, file]) => {
+    ['rspan-fragment-fill', 'src/renderer/layout/table_partial.rs'],
+    // 세로 가운데 정렬 칸이 줄 배치 없는 문단의 칸 안 글자처럼 취급 표가 자란 몫을 빼고 재 내용을 내려 그리던 것
+    ['cell-tac-nested-valign', 'src/renderer/layout/table_layout.rs'],  ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));
     const marker = (blocks[0][1].match(/\[claude-hwpx [\w-]+\]/) ?? [])[0];
