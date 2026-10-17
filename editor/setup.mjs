@@ -495,6 +495,18 @@ const RUST_PATCHES = [
     // 대체 글꼴로 바뀌는 한컴 글꼴도 한/글에서 잰 폭 표(editor/hft-metrics.json)가 있으면 원래 이름으로 잰다
     ['hft-source-name-font-metrics-data', 'src/renderer/font_metrics_data.rs'],
     ['hft-source-name-style-resolver', 'src/renderer/style_resolver.rs'],
+    // 줄 기록 하나뿐인 칸 문단에 합성 줄을 덧붙여 칸을 한 줄 늘리던 것
+    ['no-synth-cell-line-document', 'src/document_core/commands/document.rs'],
+    // 표 하나만 든 빈 문단의 높이는 선언한 표 높이(+세로 오프셋, 바깥 여백)로 잡는다
+    ['empty-host-block-typeset', 'src/renderer/typeset.rs'],
+    // 진하게도 보통 글자 폭으로 잰다(한/글 PDF 실측)
+    ['bold-regular-width-text-measurement', 'src/renderer/layout/text_measurement.rs'],
+    // 비율 줄 간격은 줄 높이를 4 단위로 내린 뒤 곱해 반올림한다(line-spacing-quantum 결과 위에 겹친다)
+    ['spacing-quantum-line-breaking', 'src/renderer/composer/line_breaking.rs'],
+    // 쪽 끝 마지막 줄은 남은 높이가 줄 높이를 넘기만 하면 넣는다(4px 안전 여유 제거)
+    ['page-end-fit-typeset', 'src/renderer/typeset.rs'],
+    // 제목 외톨이 보정은 한/글이 저장한 줄 위치가 있을 때만 쓴다(합성 줄 vpos 로 오판하지 않게)
+    ['heading-orphan-stored-typeset', 'src/renderer/typeset.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));
