@@ -46,7 +46,7 @@ function hcrFallback() {
   }
   return hcrMemo;
 }
-const CACHE_VERSION = 2;   // 2: 굵기(usWeightClass)를 싣는다
+const CACHE_VERSION = 3;   // 2: 굵기(usWeightClass)를 싣는다, 3: 보여 줄 이름(display, names)을 싣는다
 // 폭을 싣는 구간(엔진 내장 표와 같은 범위). 한글 음절과 한자는 따로 싣는다
 const BLOCKS = [
   [0x0020, 0x007e], // ASCII
@@ -126,7 +126,12 @@ function readNames(fd, table) {
   const b = readAt(fd, table.offset, Math.min(table.length, 1 << 20));
   const family = new Set();
   const full = new Set();
-  if (b.length < 6) return { family: [], full: [] };
+  // 글꼴 목록에 보여 줄 이름: Windows 이름표의 가족 이름(1번)을 대소문자 그대로, 한국어가 있으면 한국어(한/글 목록과 같다)
+  let ko = '';
+  let en = '';
+  let any = '';
+  const names = new Set();
+  if (b.length < 6) return { family: [], full: [], display: '', names: [] };
   const strings = b.readUInt16BE(4);
   for (let i = 0, r = 6; i < b.readUInt16BE(2) && r + 12 <= b.length; i++, r += 12) {
     const nameId = b.readUInt16BE(r + 6);
@@ -138,10 +143,18 @@ function readNames(fd, table) {
     if (platform === 3 || platform === 0) s = utf16be(raw);
     else if (platform === 1 && b.readUInt16BE(r + 2) === 0) s = raw.toString('latin1');
     else if (platform === 1 && b.readUInt16BE(r + 2) === 3) { try { s = new TextDecoder('euc-kr').decode(raw); } catch { /* 풀지 못하는 이름은 건너뛴다 */ } }
-    s = s.replace(/\0/g, '').trim().toLowerCase();
+    s = s.replace(/\0/g, '').trim();
+    if (s && platform === 3 && nameId !== 4) {
+      names.add(s);
+      const lang = b.readUInt16BE(r + 4);
+      if (nameId === 1 && lang === 0x0412 && !ko) ko = s;
+      if (nameId === 1 && lang === 0x0409 && !en) en = s;
+      if (nameId === 1 && !any) any = s;
+    }
+    s = s.toLowerCase();
     if (s) (nameId === 4 ? full : family).add(s);
   }
-  return { family: [...family], full: [...full] };
+  return { family: [...family], full: [...full], display: ko || en || any, names: [...names] };
 }
 
 /** 파일의 글꼴마다 { index, family, full, bold, italic } */
@@ -348,9 +361,14 @@ export function docFontFaces(hwpxBuf) {
  * 패치가 없는 엔진(npm 원본)이면 아무것도 하지 않는다.
  */
 export function docFontMetrics(hwpxBuf, mod) {
+  return fontMetricsForNames(docFontFaces(hwpxBuf), mod);
+}
+
+/** 글꼴 이름들의 폭 표(문서 열기와 같은 규칙). 에디터에서 새 글꼴을 고를 때도 쓴다(/api/font-metrics) */
+export function fontMetricsForNames(names, mod) {
   const result = { metrics: [], read: [], missing: [] };
   if (typeof mod?.hasBuiltinFontMetric !== 'function') return result;
-  for (const name of docFontFaces(hwpxBuf)) {
+  for (const name of names) {
     // 한/글 2024 는 설치된 글꼴 파일의 폭으로 조판한다 — 엔진에 내장 표가 있어도 파일을 찾으면 그것을 쓴다(엔진 패치
     // font-file-first 가 등록한 표를 먼저 본다). 내장 표의 기호 폭이 파일과 달랐다(test/conformance/lab e2, e5).
     // 함초롬 계열만은 한/글 값이 Windows 글꼴 파일과 달라(`…` 0.964em 대 0.702em) 파일을 읽지 않는다. 한/글에서 잰 표
@@ -375,6 +393,26 @@ export function docFontMetrics(hwpxBuf, mod) {
     result.metrics.push(...faces.map(({ file, ...metric }) => metric));
   }
   return result;
+}
+
+/**
+ * 이 PC 에 설치된 글꼴 가족(글꼴 목록용). [{ name: 보여 줄 이름(한국어 이름이 있으면 그것), aliases: 다른 이름들 }].
+ * 기울임만 있는 얼굴과 이름이 「@」 로 시작하는 세로쓰기 얼굴은 뺀다
+ */
+export function systemFontFamilies() {
+  const byName = new Map();
+  for (const face of fontIndex()) {
+    const name = face.display;
+    if (!name || name.startsWith('@')) continue;
+    const entry = byName.get(name) ?? { name, aliases: new Set(), upright: false };
+    for (const alias of face.names ?? []) if (alias !== name) entry.aliases.add(alias);
+    if (!face.italic) entry.upright = true;
+    byName.set(name, entry);
+  }
+  return [...byName.values()]
+    .filter((entry) => entry.upright)
+    .map(({ name, aliases }) => ({ name, aliases: [...aliases] }))
+    .sort((a, b) => a.name.localeCompare(b.name, 'ko'));
 }
 
 /** 폭 표를 엔진 모듈에 등록한다(이미 등록한 것은 엔진이 건너뛴다). 반환: 새로 등록한 얼굴 수 */

@@ -597,7 +597,7 @@ if (hasRust && RUST_PATCHES.some((p) => !builtIds.includes(p.id))) {
 }
 
 // 3. claude 플러그인 복사와 allowlist 등록
-for (const f of ['claude-plugin.ts', 'hancom-keys.ts', 'edit-log.ts', 'k-commands.ts', 'log-panel.ts', 'memo-panel.ts', 'color-palette.ts', 'para-preview.ts', 'dialog-enter.ts', 'cell-block-erase.ts', 'cell-clipboard.ts', 'picture-crop.ts', 'move-drop.ts']) fs.copyFileSync(path.join(HERE, 'plugin', f), path.join(STUDIO, 'src', 'plugin', f));
+for (const f of ['claude-plugin.ts', 'hancom-keys.ts', 'edit-log.ts', 'k-commands.ts', 'log-panel.ts', 'memo-panel.ts', 'color-palette.ts', 'para-preview.ts', 'dialog-enter.ts', 'cell-block-erase.ts', 'cell-clipboard.ts', 'picture-crop.ts', 'move-drop.ts', 'system-fonts.ts']) fs.copyFileSync(path.join(HERE, 'plugin', f), path.join(STUDIO, 'src', 'plugin', f));
 // 편집 도구 라이브러리(lib/SOURCE.md)도 같은 자리로. 플러그인이 './doc-tools.js' 로 부른다.
 for (const f of ['doc-tools.js', 'doc-rules.js', 'collab-ops.js']) {
   fs.copyFileSync(path.join(HERE, 'plugin', 'lib', f), path.join(STUDIO, 'src', 'plugin', f));
@@ -746,7 +746,9 @@ for (const [file, patch] of [['input-handler-table.ts', 'move-drop-table.ts'], [
 for (const [id, rel] of [['wrap-text-labels', 'ui/picture-props-dialog.ts'], ['wrap-text-flow', 'ui/picture-props-dialog.ts'], ['wrap-move-sign', 'engine/input-handler-picture.ts'],
   ['page-view-cmd', 'command/commands/view.ts'], ['page-view-buttons', 'main.ts'], ['table-arrow-edge', 'engine/cursor.ts'],
   // 본문에서 끌다 표를 만나면 칸 안으로 들어가지 않고 표를 글자 하나처럼 통째로 넣고 뺀다(사용자 보고 2026-10-18)
-  ['drag-skip-table', 'engine/input-handler.ts']]) {
+  ['drag-skip-table', 'engine/input-handler.ts'],
+  // 에디터 서버가 읽은 설치 글꼴을 로컬 글꼴로(host-fonts), 처음 고르는 글꼴은 폭 표를 받아 등록한 뒤 적용(font-metrics-on-pick)
+  ['host-fonts', 'core/local-fonts.ts'], ['font-metrics-on-pick', 'ui/toolbar.ts']]) {
   const f = path.join(STUDIO, 'src', ...rel.split('/'));
   let src = fs.readFileSync(f, 'utf8');
   if (src.includes(`[claude-hwpx ${id}]`)) continue;

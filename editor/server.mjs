@@ -20,7 +20,7 @@ import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { readZip, stripDummyLinesegs, fixHfFields } from './hwpx-zip.mjs';
 import { rhwpLayout, engineModule, engineId } from './rhwp_layout.mjs';
-import { docFontMetrics } from './font-metrics.mjs';
+import { docFontMetrics, fontMetricsForNames, systemFontFamilies } from './font-metrics.mjs';
 import { makeProxy, restoreImages, PROXY_MIN_BYTES } from './image-proxy.mjs';
 import { formatLog, formatOp, coalesceOps } from './log-format.mjs';
 
@@ -329,6 +329,23 @@ const server = http.createServer(async (req, res) => {
       const { ops } = await readBody(req);
       if (Array.isArray(ops) && ops.length) fs.appendFileSync(OPS, ops.map((o) => JSON.stringify(o)).join('\n') + '\n');
       return sendJson(res, 200, { ok: true });
+    }
+    if (p === '/api/system-fonts') {   // 글꼴 목록에 넣을 이 PC 의 설치 글꼴(브라우저 글꼴 접근 권한 없이)
+      try {
+        return sendJson(res, 200, { ok: true, fonts: systemFontFamilies() });
+      } catch (e) {
+        return sendJson(res, 200, { ok: false, error: String(e?.message || e), fonts: [] });
+      }
+    }
+    if (p === '/api/font-metrics') {   // 편집 중 새로 고른 글꼴의 폭 표(문서 열기와 같은 규칙). 줄 나눔이 그 글꼴 폭을 쓰게 한다
+      const names = url.searchParams.getAll('name').filter(Boolean);
+      try {
+        const fonts = fontMetricsForNames(names, await engineModule());
+        if (fonts.read.length) logEvent('fonts', { read: fonts.read, missing: fonts.missing, why: '글꼴 고름' });
+        return sendJson(res, 200, { ok: true, ...fonts });
+      } catch (e) {
+        return sendJson(res, 200, { ok: false, error: String(e?.message || e), metrics: [] });
+      }
     }
     if (p === '/api/health') {
       return sendJson(res, 200, { ok: true, pid: process.pid, browser: Date.now() - lastPollAt < 30_000, session: readSession(), stateDir: STATE_DIR });
