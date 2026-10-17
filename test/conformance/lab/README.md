@@ -64,6 +64,7 @@
 | e29 | 번호 문단(heading NUMBER)의 본문 시작 = 번호 글의 실제 폭(글꼴마다 다름, 「1.」 함초롬바탕 17.4pt, 맑은 고딕 15.4pt, 20pt) + 본문과의 거리(PERCENT 면 글자 크기 x %, HWPUNIT 이면 그 값) + 너비 보정값. 자동 내어쓰기면 이어지는 줄도 그 자리, 아니면 첫 줄만 좁다. useInstWidth=0 은 글꼴과 상관없이 약 1em(규칙 미확정, 엔진은 안 다룸) | `number-head-*` |
 | d089 | 표만 담은 빈 문단(위아래 배치)은 문단 아래 간격을 흐름에 더하지 않는다(정답본 15건 중 15건, `harvest_tblnext.py`) | `empty-host-no-after-*` |
 | d089 | 한/글 vertpos 는 문단 위아래 간격을 품는다. 엔진이 줄 배치 없는 문단의 vpos 를 줄 높이와 줄 간격만으로 이어 만들어, 둘째 쪽부터 스냅이 문단마다 간격만큼 끌어올렸다 | `synth-vpos-spacing-*` |
+| d124 | 「표 나눔」(pageBreak=TABLE) 표는 행 경계에서만 나뉜다(정답본 쪽 넘는 TABLE 표 12건 중 10건, 나머지 2건은 칸 안 표가 든 행이라 높이 추정이 어긋남. `harvest_tblsplit.py`). 「셀 단위로 나눔」(CELL)은 행 안에서도 가른다(81건). 엔진은 TABLE 을 CellBreak 로 읽어 쪽 끝 행을 칸 안에서 갈랐다. 쪽 첫 행이 아니면 통째로 넘긴다 | `table-whole-rows-*` |
 
 ## 남은 것 (2026-10-18)
 
@@ -72,12 +73,11 @@
 - Word 호환 문서(`compatibleDocument targetProgram="MS_WORD"`, `adjustLineheightToFont`)는 줄 높이가 글꼴 세로 지표 × 1.3 이다
   (Pretendard 1.1934 → 1.551, 맑은 고딕 1.3301 → 1.73). 정답본 2개(d076, d133)뿐이라 미뤘다. 문단 모양 `fontLineHeight="1"` 도 함초롬바탕에서 1.3
 - `!` 뒤에 한/글이 PDF 에 찍는 빈칸은 글자 위치 비교(advances, pdfadv)에서 빈칸으로 잡힌다
-- 쪽수 지표 93.3%, 문단 쪽 96.4%(네이티브 6725/6976, wasm 96.4%), 불일치 줄 338. 남은 쪽수 불일치 22개 문서.
+- 쪽수 지표 93.6%, 문단 쪽 96.4%(네이티브 6726/6976, wasm 96.4%), 불일치 줄 338. 남은 쪽수 불일치 21개 문서.
 - 번호 폭(e29)은 넣었다. 번호 값은 줄 나눔 단계에 계수기가 없어 시작 번호로 잰다(두 자리 번호 문단만 다를 수 있다).
   글머리표 문단 첫 줄 불일치 14건(자동 내어쓰기 끈 글머리표 포함)은 아직
-- d124: `pageBreak="TABLE"` 표의 행(12,264)을 rhwp 는 칸 안에서 갈라 쪽 끝을 채우고, 한/글은 행 경계에서만 나눈다(REA hwpx_lab
-  findings 48~49행과 같은 관찰). 파서가 HWPX TABLE 을 CellBreak 로 읽는데, 대응만 바꾸면 쪽수 지표가 91.4% 로 떨어져 넣지 않았다.
-  CellBreak 경로의 행 안 분할 허용 조건을 따로 봐야 한다
+- d124(TABLE 표 행을 칸 안에서 가름)는 `table-whole-rows` 로 해결. 반대로 CELL 표(엔진 RowBreak)는 rhwp 가 행 경계에서만 나누는데
+  한/글은 행 안에서도 가른다(81건). 파서 대응을 통째로 뒤집으면 쪽수가 91.4% 로 떨어졌으니, RowBreak 경로에 행 안 분할을 따로 넣어야 한다
 - e28: 맑은 고딕 진하게는 자간(0, −5, −9%)이 있어도 보통 폭과 같다(bold-regular 규칙 확인)
 - 글자 겹치기(compose) 폭(e27)을 엔진에 넣지 못했다. 줄 나눔이 개체 폭을 받는 `flow_inline_controls` 에 스타일이 없어, 겹친 글자의
   글꼴 폭을 재려면 호출부 세 곳을 함께 바꿔야 한다. 불일치 18줄(d073, d113, d127, d144, d145 의 동그라미 글머리 칸)
@@ -97,5 +97,6 @@
 - `mmstat.py <불일치.jsonl>`: 불일치를 방향(먼저, 늦게 꺾음)과 글꼴로 묶는다
 - `harvest_spacing.py`, `harvest_lineheight.py`: 정답본 줄 기록에서 줄 간격, 줄 높이 배율을 모은다
 - `headstat.py <불일치.jsonl> [--list NUMBER]`: 불일치를 문단 머리 종류(번호, 글머리표)와 어긋난 줄(첫 줄, 이후)로 묶는다
+- `harvest_tblsplit.py [--list]`: 쪽을 넘는 표가 한/글에서 행 경계로 나뉘었는지(첫 조각 높이 = 행 높이 누적합) pageBreak 별로 센다
 - `harvest_tblnext.py`: 표만 담은 문단에서 한/글이 문단 아래 간격을 더하는지 정답본으로 센다
 - `claude-linestarts` 환경 변수: `CLAUDE_SEGV`(엔진이 가진 본문 문단 줄 배치 vpos), `CLAUDE_VY`(문단 y), `CLAUDE_XP=<문단|all>`(글자 x), `CLAUDE_ITEMS`(쪽 항목), `CLAUDE_SVG=<폴더>`(쪽 SVG), `CLAUDE_METRICS_DIR`(문서별 폭 표, `dump_metrics.mjs` 로 만든다)
