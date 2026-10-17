@@ -521,6 +521,8 @@ const RUST_PATCHES = [
     ['space-no-overflow-line-breaking', 'src/renderer/composer/line_breaking.rs'],
     // 글자 단위 문단은 라틴, 숫자 바로 뒤 한글 앞에서도 꺾는다(「생성형 AI」 / 「를」, 정답본 97곳)
     ['latin-hangul-break-line-breaking', 'src/renderer/composer/line_breaking.rs'],
+    // 블록처럼 다루는 글자처럼 취급 표의 쪽 맞춤은 선언 높이 + 바깥 여백 위아래(한/글 줄 높이)로 본다
+    ['tac-outer-margin-fit-typeset', 'src/renderer/typeset.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));
