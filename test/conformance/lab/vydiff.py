@@ -28,7 +28,12 @@ def main():
         capture_output=True,
         text=True,
         encoding="utf-8",
-        env={**os.environ, "CLAUDE_VY": "1"},
+        # 채점(nativescore)과 같은 조판이 되도록 문서별 글꼴 폭 표를 함께 넘긴다
+        env={
+            **os.environ,
+            "CLAUDE_VY": "1",
+            "CLAUDE_METRICS_DIR": str(HERE.parent / "out" / "metrics"),
+        },
     ).stdout
     vy = []
     for line in out.splitlines():
