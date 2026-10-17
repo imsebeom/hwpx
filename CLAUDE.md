@@ -62,7 +62,11 @@
   - 넣지 않은 것: HWPX `pageBreak` TABLE/CELL 대응 뒤집기(REA 실측과 맞지만 쪽수 91.4%로 떨어짐, README 남은 것)
   - 이어서 `table-whole-rows-typeset`: TABLE 표는 쪽 첫 행이 아니면 행을 통째로 넘김(정답본 10/12, REA 실측). wasm 쪽수 93.3→93.6%, 나머지 지표 그대로,
     3889 통과, svghash 쪽수 변화 0(그림 바뀐 2개는 한/글 재저장본에서도 행 경계 나눔 6/6)
-  - next_steps: ① 칸 내용이 행을 넘을 때 한/글이 행을 늘리지 않는 규칙(d243: 2행 걸친 칸, `harvest_cellmargin.py` 의 「행이 작음」 수백 건, README 남은 것) ② 글머리표 첫 줄 14건 ③ 쪽 끝 표 배치 22문서 ④ 이 CLAUDE.md 가 48k 자라 10-17 이전 앵커를 CLAUDE-ARCHIVE.md 로 내릴 것
+  - 이어서 줄 나눔 셋: `break-ctrl-start`(줄 경계 조판 부호를 새 줄에), `bullet-zero-size`(e31), `bullet-dot-word`(e32, e33). 불일치 338→327,
+    wasm 칸 여러 줄 97.8→97.9%, 나머지 그대로, 3889 통과, 에디터 시험 5개 통과, svghash 쪽수 변화 0(바뀐 1개는 한/글 재저장본과 본문 425/425 같음)
+  - d243 정정: 「한/글은 행을 안 늘린다」는 틀림(cellSz 는 실제 행 높이가 아니다). PDF 괘선으로 보면 둘 다 늘린다. 남은 차이는 쪽 끝 0.3pt 판정과
+    병합 칸을 쪽 아래로 넘쳐 그리는 그리기 결함(README)
+  - next_steps: ① d243 그리기 결함(행 4개 병합 칸이 쪽 끝에서 안 잘림) ② d302 글머리표 문단 빈칸 줄이기(README 남은 것) ③ 쪽 끝 표 배치 22문서 ④ 이 CLAUDE.md 가 48k 자라 10-17 이전 앵커를 CLAUDE-ARCHIVE.md 로 내릴 것
 - **10-18 첫째(조판 2단계, 밤샘 /goal)**: 사용자 「최대한 목표지점에 근접하도록 작업해라」(목표: rhwp 가 한/글 2024 와 똑같이 조판). 블랙박스 실측만, 지표가 떨어지는 변경은 넣지 않음, 푸시 안 함
   - 채점(327문서, 네이티브 `lab/nativescore.py --pages`, wasm `score.mjs` 와 같음): 본문 줄 98.9→99.5%, 본문 여러 줄 92.0→96.2%, 칸 줄 98.7→99.6%, 칸 여러 줄 92.9→97.8%, 쪽수 87.8→93.3%, 문단 쪽 92.1→94.6%, 불일치 줄 779→355
   - 넣은 것(스킬 editor/patches, setup.mjs 등록, 근거는 `lab/README.md` 규칙 표): `no-synth-cell-line`, `empty-host-block`, `bold-regular-width`, `spacing-quantum`, `page-end-fit`, `heading-orphan-stored`(합성 줄 vpos 로 제목 외톨이 보정 오판), `exclam-half`(`!` 는 0.5em), `para-line-wrap-*`(문단 모양 「한 줄로 입력」 읽기, 쓰기, 조판 — 불일치 103건), `space-no-overflow`(빈칸은 시작 위치가 줄 폭 이하일 때만 앞줄), `latin-hangul-break`(글자 단위 문단은 「AI|를」 「10|문항」 사이도 꺾음), `tac-outer-margin-fit`, `tac-caption-line-*`(글자처럼 취급 표 줄 높이에 캡션, 캡션 문단 조판, 한 줄 표 문단 쪽 끝 판정). font-metrics.mjs: 함초롬바탕, 함초롬돋움 40pt 실측 표(e15), 굵기 파일 여럿인 글꼴은 usWeightClass 400/700 얼굴(Pretendard 가 Black 으로 잡히던 것), 파일에 없는 글자는 함초롬바탕 폭(e20), 한양 4종(e22)과 HFT 9종(e23) 실측 표를 내장 표보다 먼저. 엔진 `runtime-no-overlay`(등록 표의 문장 부호 덮어쓰기 끔), `runtime-no-space-overlay`(한양 글꼴 빈칸 예외 끔, 실측 표에 빈칸 폭 e25), `para-float-text-host`(글 줄 뒤 어울림 표 흐름), `fixed-spaces`(고정폭 빈칸 0.25em, 묶음 빈칸 0.5em, e26)

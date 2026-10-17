@@ -10,6 +10,7 @@
 import collections
 import html
 import json
+import os
 import re
 import sys
 import zipfile
@@ -196,6 +197,14 @@ def main(path, n=40):
                 over[ch] += 1
         else:
             stat[f"{kind}: 계산 폭 ≤ 줄 폭"] += 1
+        if os.environ.get("LINECHECK_ALL"):  # 모든 줄의 계산 폭과 줄 폭
+            print(
+                d,
+                r["where"],
+                r.get("cell"),
+                r["para"],
+                f"계산 {tot} 줄 {horz} 남음 {horz - tot}",
+            )
         if shown < n and tot > horz:
             print(
                 d,

@@ -97,6 +97,32 @@ def make(v, out_dir):
             '<hh:heading type="NONE" idRef="0" level="0"/>',
             '<hh:heading type="NUMBER" idRef="1" level="0"/>',
         )
+    # bullet: {"char": "▶", "auto": 1, "offset": 50, "offsetType": "PERCENT", "adjust": 0, "useInst": 0} — 글머리표 정의 하나를 넣고
+    # 문단 모양 0 을 그 글머리표 문단으로 만든다(글머리표 글자 모양은 문단 것)
+    bl = v.get("bullet")
+    if bl:
+        bullet = (
+            f'<hh:bullets itemCnt="1"><hh:bullet id="1" char="{escape(bl["char"], {chr(34): "&quot;"})}" useImage="0">'
+            f'<hh:paraHead level="0" align="LEFT" useInstWidth="{bl.get("useInst", 0)}" autoIndent="{bl.get("auto", 1)}" '
+            f'widthAdjust="{bl.get("adjust", 0)}" textOffsetType="{bl.get("offsetType", "PERCENT")}" '
+            f'textOffset="{bl.get("offset", 50)}" numFormat="DIGIT" '
+            f'charPrIDRef="{1 if "charHeight" in bl else 4294967295}" checkable="0"/>'
+            "</hh:bullet></hh:bullets>"
+        )
+        assert "<hh:bullets" not in header
+        if (
+            "charHeight" in bl
+        ):  # 글머리표 글자 모양 = charPr 1(크기만 바꾼다, 글꼴은 charPr 0 과 같은 id 1)
+            cp1 = re.search(r'<hh:charPr id="1"[\s\S]*?</hh:charPr>', header).group(0)
+            header = header.replace(
+                cp1,
+                re.sub(r'height="\d+"', f'height="{bl["charHeight"]}"', cp1, count=1),
+            )
+        header = header.replace("</hh:numberings>", "</hh:numberings>" + bullet, 1)
+        newp = newp.replace(
+            '<hh:heading type="NONE" idRef="0" level="0"/>',
+            '<hh:heading type="BULLET" idRef="1" level="0"/>',
+        )
     header = header.replace(pp, newp)
 
     # pageMargin: {"bottom": 3000, ...} — 쪽 여백(HWPUNIT) 바꾸기
