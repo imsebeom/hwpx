@@ -55,6 +55,12 @@
   - 도구: `~/.cache/rhwp-devel/cmp.mjs`(2쪽 글자 줄과 셀 상자), `allpages.mjs <pkg> <a> <b>`(전 쪽 글자 좌표 대조), `variants.py`, `winshot.py`(에디터 창을 앞으로 올리지 않고 PrintWindow 로 캡처 — 사용자 화면을 뺏지 않는다)
 
 ## 컨텍스트 앵커
+- **10-18 둘째(조판 2단계 이어서)**: 사용자 「푸시」 → 스킬 fa8ee1d 까지 hwpx, hwpx2 푸시(저작권 검토 통과, 릴리스 editor-8c1a27c232f9). 이어서 /goal 계속
+  - 번호 문단 폭(e29, `lab/make.py` 에 `numbering` 선택지): 본문 시작 = 번호 글 실제 폭 + 본문과의 거리 + 너비 보정. 자동 내어쓰기 끔이면 첫 줄만 좁다 → `number-head-line-breaking`
+  - 그 패치가 d089 를 9 → 8쪽으로 만든 원인 둘을 찾아 함께 고침: 표만 담은 빈 문단의 아래 간격(한/글은 안 더함, `harvest_tblnext.py` 15/15 → `empty-host-no-after-typeset`, 선언 높이 대신 잰 높이 - 아래 간격. 선언 높이를 쓰면 md2hwpx 의 낡은 2400 x 행 수 때문에 0043_AI_Ethics_Guide 가 10 → 9쪽), 줄 배치 없는 문단의 vpos 사슬에 문단 위아래 간격이 빠져 둘째 쪽부터 스냅이 끌어올림(`synth-vpos-spacing-document`)
+  - 채점(wasm b19): 본문 여러 줄 96.2→96.5%, 칸 여러 줄 97.7→97.8%, 쪽수 93.3% 그대로, 문단 쪽 94.6→96.4%, 불일치 줄 355→338. `cargo test --lib` 3889 통과, 에디터 시험 5개 통과, svghash 354개 중 쪽수 바뀐 문서 0(그림 바뀐 9개 중 3개를 한/글 재저장본과 대조: 줄 나눔 382/382 같음, 줄 배치 지운 사본 쪽수 한/글과 같음)
+  - 넣지 않은 것: HWPX `pageBreak` TABLE/CELL 대응 뒤집기(REA 실측과 맞지만 쪽수 91.4%로 떨어짐, README 남은 것)
+  - next_steps: ① d124(TABLE 표 행을 rhwp 가 칸 안에서 가름) ② 글머리표 첫 줄 14건 ③ 쪽 끝 표 배치 22문서 ④ 이 CLAUDE.md 가 48k 자라 10-17 이전 앵커를 CLAUDE-ARCHIVE.md 로 내릴 것
 - **10-18 첫째(조판 2단계, 밤샘 /goal)**: 사용자 「최대한 목표지점에 근접하도록 작업해라」(목표: rhwp 가 한/글 2024 와 똑같이 조판). 블랙박스 실측만, 지표가 떨어지는 변경은 넣지 않음, 푸시 안 함
   - 채점(327문서, 네이티브 `lab/nativescore.py --pages`, wasm `score.mjs` 와 같음): 본문 줄 98.9→99.5%, 본문 여러 줄 92.0→96.2%, 칸 줄 98.7→99.6%, 칸 여러 줄 92.9→97.8%, 쪽수 87.8→93.3%, 문단 쪽 92.1→94.6%, 불일치 줄 779→355
   - 넣은 것(스킬 editor/patches, setup.mjs 등록, 근거는 `lab/README.md` 규칙 표): `no-synth-cell-line`, `empty-host-block`, `bold-regular-width`, `spacing-quantum`, `page-end-fit`, `heading-orphan-stored`(합성 줄 vpos 로 제목 외톨이 보정 오판), `exclam-half`(`!` 는 0.5em), `para-line-wrap-*`(문단 모양 「한 줄로 입력」 읽기, 쓰기, 조판 — 불일치 103건), `space-no-overflow`(빈칸은 시작 위치가 줄 폭 이하일 때만 앞줄), `latin-hangul-break`(글자 단위 문단은 「AI|를」 「10|문항」 사이도 꺾음), `tac-outer-margin-fit`, `tac-caption-line-*`(글자처럼 취급 표 줄 높이에 캡션, 캡션 문단 조판, 한 줄 표 문단 쪽 끝 판정). font-metrics.mjs: 함초롬바탕, 함초롬돋움 40pt 실측 표(e15), 굵기 파일 여럿인 글꼴은 usWeightClass 400/700 얼굴(Pretendard 가 Black 으로 잡히던 것), 파일에 없는 글자는 함초롬바탕 폭(e20), 한양 4종(e22)과 HFT 9종(e23) 실측 표를 내장 표보다 먼저. 엔진 `runtime-no-overlay`(등록 표의 문장 부호 덮어쓰기 끔), `runtime-no-space-overlay`(한양 글꼴 빈칸 예외 끔, 실측 표에 빈칸 폭 e25), `para-float-text-host`(글 줄 뒤 어울림 표 흐름), `fixed-spaces`(고정폭 빈칸 0.25em, 묶음 빈칸 0.5em, e26)

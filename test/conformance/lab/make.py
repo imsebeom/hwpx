@@ -78,6 +78,25 @@ def make(v, out_dir):
         newp = re.sub(
             r'<hc:right value="-?\d+"', f'<hc:right value="{v["right"]}"', newp
         )
+    # numbering: {"text": "^1.", "start": 1, "auto": 1, "offset": 50, "offsetType": "PERCENT", "adjust": 0,
+    # "useInst": 1, "align": "LEFT"} — 번호 정의 1 의 1수준 머리를 바꾸고 문단 모양 0 을 그 번호 문단으로 만든다
+    nb = v.get("numbering")
+    if nb:
+        head = re.search(
+            r'<hh:paraHead start="\d+" level="1"[^>]*>[^<]*</hh:paraHead>', header
+        ).group(0)
+        new_head = (
+            f'<hh:paraHead start="{nb.get("start", 1)}" level="1" align="{nb.get("align", "LEFT")}" '
+            f'useInstWidth="{nb.get("useInst", 1)}" autoIndent="{nb.get("auto", 1)}" '
+            f'widthAdjust="{nb.get("adjust", 0)}" textOffsetType="{nb.get("offsetType", "PERCENT")}" '
+            f'textOffset="{nb.get("offset", 50)}" numFormat="DIGIT" charPrIDRef="4294967295" '
+            f'checkable="0">{escape(nb.get("text", "^1."))}</hh:paraHead>'
+        )
+        header = header.replace(head, new_head)
+        newp = newp.replace(
+            '<hh:heading type="NONE" idRef="0" level="0"/>',
+            '<hh:heading type="NUMBER" idRef="1" level="0"/>',
+        )
     header = header.replace(pp, newp)
 
     # pageMargin: {"bottom": 3000, ...} — 쪽 여백(HWPUNIT) 바꾸기

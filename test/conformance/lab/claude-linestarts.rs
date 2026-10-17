@@ -26,6 +26,19 @@ fn main() {
                 }
             }
         }
+        // CLAUDE_SEGV=1 이면 첫 구역 본문 문단마다 엔진이 가진 줄 배치의 vpos 를 stderr 로: 「SEGV 문단 [vpos/높이/간격...]」
+        if std::env::var("CLAUDE_SEGV").is_ok() {
+            if let Some(sec) = core.document().sections.first() {
+                for (i, para) in sec.paragraphs.iter().enumerate() {
+                    let v: Vec<String> = para
+                        .line_segs
+                        .iter()
+                        .map(|s| format!("{}/{}/{}", s.vertical_pos, s.line_height, s.line_spacing))
+                        .collect();
+                    eprintln!("SEGV {} {}", i, v.join(" "));
+                }
+            }
+        }
         // CLAUDE_ITEMS=1 이면 쪽마다 놓인 항목(문단, 표 조각의 행 범위)을 stderr 로
         if std::env::var("CLAUDE_ITEMS").is_ok() {
             eprintln!("{}", core.dump_page_items(None));

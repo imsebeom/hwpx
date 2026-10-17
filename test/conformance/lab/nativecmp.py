@@ -99,6 +99,8 @@ def main():
     rh = {}
     for line in out.splitlines():
         path, p, st = line.split("\t")
+        if not p.isdigit():  # PAGES 같은 문서 단위 줄
+            continue
         rh.setdefault(os.path.basename(path)[:-5], {})[int(p)] = json.loads(st)
     same = total = 0
     for name in han:
