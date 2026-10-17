@@ -41,6 +41,8 @@ def make(v, out_dir):
     new = cp
     if "height" in v:
         new = re.sub(r'height="\d+"', f'height="{v["height"]}"', new, count=1)
+    if v.get("bold") and "<hh:bold/>" not in new:
+        new = new.replace("<hh:underline ", "<hh:bold/><hh:underline ", 1)
     if "useFontSpace" in v:
         new = re.sub(r'useFontSpace="\d"', f'useFontSpace="{v["useFontSpace"]}"', new)
     if "ratio" in v:
@@ -70,6 +72,11 @@ def make(v, out_dir):
         )
     header = header.replace(pp, newp)
 
+    # pageMargin: {"bottom": 3000, ...} — 쪽 여백(HWPUNIT) 바꾸기
+    for key, val in (v.get("pageMargin") or {}).items():
+        section = re.sub(
+            rf'(<hp:margin [^>]*\b{key}=")\d+"', rf'\g<1>{val}"', section, count=1
+        )
     paras = v.get("paras") or ["본문 한 문단."]
     section = section.replace(
         "<hp:t>본문 한 문단.</hp:t>", f"<hp:t>{escape(paras[0])}</hp:t>"

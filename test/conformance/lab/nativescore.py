@@ -36,6 +36,7 @@ TOK = re.compile(r"<(/?)hp:([A-Za-z]+)\b([^>]*?)(/?)>")
 def parse(xmls):
     """정답본 섹션 XML 들에서 본문 문단과 칸 문단의 줄 시작(score.mjs parseOracle 과 같은 순서)."""
     body, cells = [], []
+    vpos = {}
     for xml in xmls:
         stack = []
         for m in TOK.finditer(xml):
@@ -74,10 +75,21 @@ def parse(xmls):
                 if rec is not None:
                     tp = re.search(r'\btextpos="(\d+)"', attrs)
                     rec.append(int(tp.group(1)) if tp else 0)
+                    vp = re.search(r'\bvertpos="(-?\d+)"', attrs)
+                    vpos.setdefault(id(rec), []).append(int(vp.group(1)) if vp else 0)
                 continue
             if not selfc:
                 stack.append((name, None))
-    return body, cells
+    # 본문 문단의 한/글 쪽: 첫 줄 vertpos 가 앞 문단 마지막 줄보다 작아지면 새 쪽(score.mjs hanPages 와 같다)
+    page, prev, pages = 0, -1, []
+    for rec in body:
+        v = vpos.get(id(rec), [])
+        if v:
+            if prev >= 0 and v[0] < prev:
+                page += 1
+            prev = v[-1]
+        pages.append(page)
+    return body, cells, pages
 
 
 def one(path, tmp):
@@ -87,7 +99,7 @@ def one(path, tmp):
         key=lambda n: int(re.findall(r"\d+", n)[-1]),
     )
     xmls = [z.read(n).decode("utf-8") for n in names]
-    body, cells = parse(xmls)
+    body, cells, han_body_pages = parse(xmls)
     dst = os.path.join(tmp, os.path.basename(path))
     with zipfile.ZipFile(dst, "w") as w:
         for info in z.infolist():
@@ -106,20 +118,30 @@ def one(path, tmp):
         capture_output=True,
         text=True,
         encoding="utf-8",
-        env={**os.environ, "CLAUDE_CELLS": "1"},
+        env={**os.environ, "CLAUDE_CELLS": "1", "CLAUDE_METRICS_DIR": str(HERE.parent / "out" / "metrics")},
     )
     rb, rc = {}, {}
     pages = None
+    para_pages = []  # 본문 문단 차례대로 엔진이 놓은 쪽
     for line in r.stdout.splitlines():
         _, key, st = line.split("\t")
         if key == "PAGES":
             pages = int(st)
+        elif key == "PP":
+            para_pages.append(int(st.split(":")[2]))
         elif ":" in key:
             k, p = key.split(":")
             rc.setdefault(int(k), {})[int(p)] = json.loads(st)
         else:
             rb[int(key)] = json.loads(st)
-    return os.path.basename(path)[:-5], body, cells, rb, rc, pages
+    return (
+        os.path.basename(path)[:-5],
+        body,
+        cells,
+        rb,
+        rc,
+        (pages, para_pages, han_body_pages),
+    )
 
 
 def main():
@@ -135,7 +157,7 @@ def main():
     if ids:
         files = [f for f in files if os.path.basename(f)[:-5] in ids]
     tmp = tempfile.mkdtemp(prefix="nativescore_")
-    tot = {k: 0 for k in ("bc", "bs", "bm", "bms", "cc", "cs", "cm", "cms", "pc", "ps")}
+    tot = {k: 0 for k in ("bc", "bs", "bm", "bms", "cc", "cs", "cm", "cms", "pc", "ps", "qc", "qs")}
     page_bad = []
     han_pages = {}
     for line in open(HERE.parent / "out" / "oracle.jsonl", encoding="utf-8"):
@@ -144,13 +166,24 @@ def main():
             han_pages[rec["id"]] = rec["pages"]
     bad = []
     with cf.ThreadPoolExecutor(8) as ex:
-        for name, body, cells, rb, rc, pages in ex.map(lambda f: one(f, tmp), files):
+        for name, body, cells, rb, rc, (pages, para_pages, han_bp) in ex.map(
+            lambda f: one(f, tmp), files
+        ):
             hp = han_pages.get(name)
             if hp is not None and pages is not None:
                 tot["pc"] += 1
                 tot["ps"] += pages == hp
                 if pages != hp:
                     page_bad.append(f"{name}:{hp}/{pages}")
+            # 문단 쪽: 한/글 쪽을 vertpos 로 센 수가 한/글 쪽수와 같고 문단 수가 같은 문서만(score.mjs 와 같다)
+            if (
+                hp is not None
+                and han_bp
+                and han_bp[-1] + 1 == hp
+                and len(para_pages) == len(han_bp)
+            ):
+                tot["qc"] += len(han_bp)
+                tot["qs"] += sum(a == b for a, b in zip(para_pages, han_bp))
             if len(rb) == len(body):
                 for p, h in enumerate(body):
                     if not h:
@@ -202,7 +235,7 @@ def main():
     print(
         f"문서 {len(files)} | 본문 {pct(tot['bs'], tot['bc'])}% ({tot['bc']}) 여러 줄 {pct(tot['bms'], tot['bm'])}% ({tot['bm']})"
         f" | 칸 {pct(tot['cs'], tot['cc'])}% ({tot['cc']}) 여러 줄 {pct(tot['cms'], tot['cm'])}% ({tot['cm']})"
-        f" | 쪽수 {pct(tot['ps'], tot['pc'])}% ({tot['pc']}) | 불일치 {len(bad)}"
+        f" | 쪽수 {pct(tot['ps'], tot['pc'])}% ({tot['pc']}) | 문단 쪽 {pct(tot['qs'], tot['qc'])}% ({tot['qc']}) | 불일치 {len(bad)}"
     )
     if "--pages" in args:
         print("쪽수 다름(한글/rhwp)", " ".join(sorted(page_bad)))

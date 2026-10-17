@@ -10,7 +10,7 @@ import json
 import sys
 
 sys.stdout.reconfigure(encoding="utf-8")
-PDF_SCALE = 0.9955
+PDF_SCALE = float(__import__("os").environ.get("PDF_SCALE", "0.9955"))  # 10pt 의 좌표 눈금 오차 보정. 큰 글자는 PDF_SCALE=1
 
 
 def main():

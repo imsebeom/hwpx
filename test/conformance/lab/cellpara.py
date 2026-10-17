@@ -72,6 +72,32 @@ def show(xml, header, start, end, stack):
             for x in re.findall(r"<hp:lineseg [^>]*>", segs[-1] if segs else "")
         ],
     )
+    faces = {
+        lang: dict(
+            re.findall(
+                r'<hh:font id="(\d+)" face="([^"]+)"',
+                re.search(
+                    rf'<hh:fontface lang="{lang}".*?</hh:fontface>', header, re.S
+                ).group(0),
+            )
+        )
+        for lang in ("HANGUL", "LATIN", "SYMBOL")
+    }
+    for cp in dict.fromkeys(re.findall(r'charPrIDRef="(\d+)"', own)):
+        c = re.search(rf'<hh:charPr id="{cp}".*?</hh:charPr>', header, re.S).group(0)
+        fr = dict(
+            re.findall(
+                r'(hangul|latin|symbol)="(\d+)"',
+                re.search(r"<hh:fontRef [^>]*>", c).group(0),
+            )
+        )
+        ratio = re.search(r'<hh:ratio hangul="(\d+)"', c).group(1)
+        spacing = re.search(r'<hh:spacing hangul="(-?\d+)"', c).group(1)
+        print(
+            f"글자 모양 {cp}: 크기 {re.search(r'height=\"(\d+)\"', c).group(1)} 한글 {faces['HANGUL'].get(fr['hangul'])} 라틴 {faces['LATIN'].get(fr['latin'])}"
+            f" 기호 {faces['SYMBOL'].get(fr['symbol'])} 장평 {ratio} 자간 {spacing} {re.search(r'useFontSpace=\"(\d)\"', c).group(0)}"
+            f"{' 굵게' if '<hh:bold/>' in c else ''}"
+        )
     pp = re.search(r'paraPrIDRef="(\d+)"', p).group(1)
     mg = re.search(
         rf'<hh:paraPr id="{pp}".*?<hh:margin>(.*?)</hh:margin>', header, re.S
