@@ -27,6 +27,8 @@ CASES = [
     ("tall_cells_md2hwpx.hwpx", "TABLE"),
     ("long_table_hancom_saved.hwpx", "TABLE"),
     ("short_table_md2hwpx.hwpx", "NONE"),
+    # 41행 표 첫 칸에 5행 표를 넣음. 짧은 일치로 자르면 안쪽 표에서 끊겨 5행으로 보고 NONE → 한글에서 40행 중 25행
+    ("nested_in_long_table.hwpx", "TABLE"),
 ]
 
 

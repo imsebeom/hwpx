@@ -69,10 +69,39 @@ def char_heights(header_xml: str) -> dict[str, int]:
     }
 
 
+def top_level(xml: str, tag: str) -> list[tuple[int, int]]:
+    """xml 안 바깥쪽 <hp:{tag}> 요소의 (시작, 끝) 위치. 같은 이름 요소가 안에 들어 있어도 짝을 맞춘다.
+
+    `<hp:tbl\\b.*?</hp:tbl>` 같은 짧은 일치는 표 안 표의 닫는 태그에서 바깥 표를 끊는다. 그러면 41행 바깥 표를
+    안쪽 표의 5행으로 보고 NONE 을 권해, 한글에서 40행 중 25행만 그려졌다(2026-10-17 실측).
+    """
+    out, depth, start = [], 0, 0
+    for m in re.finditer(rf"<hp:{tag}\b[^>]*?(/?)>|</hp:{tag}>", xml):
+        if m.group(0).startswith("</"):
+            depth -= 1
+            if depth == 0:
+                out.append((start, m.end()))
+        elif m.group(1) == "/":
+            if depth == 0:
+                out.append((m.start(), m.end()))
+        else:
+            if depth == 0:
+                start = m.start()
+            depth += 1
+    return out
+
+
+def _own_cell_part(tc: str) -> str:
+    """칸 자신의 cellAddr, cellSpan, cellSz, cellMargin 이 있는 꼬리. 칸 내용(subList) 안의 표 속성을 피한다."""
+    i = tc.rfind("</hp:subList>")
+    return tc[i:] if i >= 0 else tc
+
+
 def _cell_content_height(tc: str, heights: dict[str, int]) -> int:
     """칸 글을 칸 폭에 흘려 넣은 높이 어림값과, 한글이 남긴 줄 배치 캐시로 잰 높이 중 큰 값."""
-    w = re.search(r'<hp:cellSz\b[^>]*\bwidth="(\d+)"', tc)
-    mg = re.search(r"<hp:cellMargin\b[^>]*/>", tc)
+    own = _own_cell_part(tc)
+    w = re.search(r'<hp:cellSz\b[^>]*\bwidth="(\d+)"', own)
+    mg = re.search(r"<hp:cellMargin\b[^>]*/>", own)
     m = {k: int(v) for k, v in re.findall(r'(\w+)="(\d+)"', mg.group())} if mg else {}
     inner_w = max(
         (int(w.group(1)) if w else 0) - m.get("left", 510) - m.get("right", 510), 1000
@@ -110,13 +139,16 @@ def _table_height(tbl: str, heights: dict[str, int] | None = None) -> int:
     heights = heights or {}
     sz = re.search(r'<hp:sz\b[^>]*\bheight="(\d+)"', tbl)
     total = 0
-    for r in re.findall(r"<hp:tr>.*?</hp:tr>", tbl, re.S):
+    for ra, rb in top_level(tbl, "tr"):
+        r = tbl[ra:rb]
         row = 0
-        for tc in re.findall(r"<hp:tc\b.*?</hp:tc>", r, re.S):
-            span = re.search(r'\browSpan="(\d+)"', tc)
+        for ca, cb in top_level(r, "tc"):
+            tc = r[ca:cb]
+            own = _own_cell_part(tc)
+            span = re.search(r'\browSpan="(\d+)"', own)
             if span and int(span.group(1)) > 1:
                 continue  # 여러 행에 걸친 칸은 한 행 높이로 보지 않는다(규칙 33)
-            cs = re.search(r'<hp:cellSz\b[^>]*\bheight="(\d+)"', tc)
+            cs = re.search(r'<hp:cellSz\b[^>]*\bheight="(\d+)"', own)
             row = max(
                 row, int(cs.group(1)) if cs else 0, _cell_content_height(tc, heights)
             )
@@ -142,11 +174,11 @@ def analyze(path: str | Path) -> list[dict]:
         for name in sections:
             xml = zf.read(name).decode("utf-8", "replace")
             avail = body_height(xml)
-            for idx, m in enumerate(re.finditer(r"<hp:tbl\b.*?</hp:tbl>", xml, re.S)):
-                tbl = m.group(0)
+            for idx, (ta, tb) in enumerate(top_level(xml, "tbl")):
+                tbl = xml[ta:tb]
                 open_tag = re.match(r"<hp:tbl\b[^>]*>", tbl).group()
                 h = _table_height(tbl, heights)
-                rows = len(re.findall(r"<hp:tr>", tbl))
+                rows = len(top_level(tbl, "tr"))
                 cur_break = re.search(r'\bpageBreak="(\w+)"', open_tag)
                 cur_repeat = re.search(r'\brepeatHeader="(\d+)"', open_tag)
                 pos = re.search(r"<hp:pos\b[^>]*/>", tbl)
@@ -253,11 +285,11 @@ def _rewrite(xml: str, plans: list[dict]) -> tuple[str, int]:
     changed = 0
     pieces: list[str] = []
     last = 0
-    for i, m in enumerate(re.finditer(r"<hp:tbl\b.*?</hp:tbl>", xml, re.S)):
+    for i, (ta, tb) in enumerate(top_level(xml, "tbl")):
         plan = next((p for p in plans if p["index"] == i), None)
         if plan is None:
             continue
-        tbl = m.group(0)
+        tbl = xml[ta:tb]
         open_m = re.match(r"<hp:tbl\b[^>]*>", tbl)
         open_tag = open_m.group()
         new_tag = open_tag
@@ -289,9 +321,9 @@ def _rewrite(xml: str, plans: list[dict]) -> tuple[str, int]:
 
         if new_tag != open_tag or body != tbl[open_m.end() :]:
             changed += 1
-            pieces.append(xml[last : m.start()])
+            pieces.append(xml[last:ta])
             pieces.append(new_tag + body)
-            last = m.end()
+            last = tb
 
     pieces.append(xml[last:])
     return "".join(pieces), changed
