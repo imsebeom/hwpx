@@ -97,6 +97,17 @@ def make(v, out_dir):
             ("TAB", '<hp:tab width="4000" leader="0" type="1"/>'),
         ):
             s = s.replace(f"⟦{k}⟧", tag)
+        # ⟦CO:유⟧ 글자 겹치기(동그라미 안 글자). run 안에서 <hp:t> 와 나란한 요소라 글 조각을 닫고 연다
+        s = re.sub(
+            r"⟦CO:(.)⟧",
+            lambda m: (
+                '</hp:t><hp:compose circleType="SHAPE_CIRCLE" charSz="-3" composeType="SPREAD" '
+                f'charPrCnt="10" composeText="{m.group(1)}">'
+                + '<hp:charPr prIDRef="4294967295"/>' * 10
+                + "</hp:compose><hp:t>"
+            ),
+            s,
+        )
         return s
 
     section = section.replace(
