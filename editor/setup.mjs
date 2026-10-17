@@ -523,6 +523,10 @@ const RUST_PATCHES = [
     ['latin-hangul-break-line-breaking', 'src/renderer/composer/line_breaking.rs'],
     // 블록처럼 다루는 글자처럼 취급 표의 쪽 맞춤은 선언 높이 + 바깥 여백 위아래(한/글 줄 높이)로 본다
     ['tac-outer-margin-fit-typeset', 'src/renderer/typeset.rs'],
+    // 글자처럼 취급 표 줄 높이에 위, 아래 캡션(높이 + 간격)을 넣고, 줄 배치 없는 캡션은 열 때 조판, 한 줄 표 문단은 쪽 끝에서 줄 높이만
+    ['tac-caption-line-line-breaking', 'src/renderer/composer/line_breaking.rs'],
+    ['tac-caption-line-document', 'src/document_core/commands/document.rs'],
+    ['tac-caption-line-typeset', 'src/renderer/typeset.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));
