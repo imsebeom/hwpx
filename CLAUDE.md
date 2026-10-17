@@ -84,7 +84,8 @@
     - 🔑 함정: Bash `sed` 로 백슬래시 경로를 바꾸다 apply.py 를 깨뜨림(글로벌 규칙 그대로) — Write 로 다시 씀. `cd` 뒤 상대 경로 `rm` 은 안전 검사가 명령 전체를 막는다 → 새 출력 폴더를 만든다
   - ❌ 남은 것: 교과 평가계획 7쪽 첫 조각 끝(글줄 사이에서 잘린 병합 묶음) 한/글 1030.1, rhwp 1032.4(2.3px) — 한/글의 잘린 앞부분 높이 규칙 미확인
   - 사용자 「왜 문단을 못 지운다고 할까」(다른 세션이 [자료 2] 그림 아래 빈 줄을 「칸 안 문단을 지우는 도구가 없다」며 Backspace 를 부탁) → 이름 붙은 도구 `delete_paragraphs` 가 본문 문단만 받고 설명서가 칸 메서드(`deleteRangeInCellByPath`, `mergeParagraphInCell`)를 안 적어 `doc` 경로를 못 찾은 것. 사용자 「재발 막기 해라」 → 스킬 02556da: 플러그인 도구 `delete_cell_paragraphs`(cell, from_para~to_para 또는 only_empty, 번호 없으면 칸 문단 목록, 그림/표 문단 거절, 문단 하나 남김 — 칸 그림 문단은 글 길이 0 이라 개체를 따로 본다) + editor-mode.md(도구 설명, 칸 메서드 표 행, 「손 편집 넘기기 전에 doc 경로 확인」). 화면 없는 브라우저 시험 6경우 통과. **릴리스 전이라 미리 빌드한 에디터를 받는 사람에게는 아직 없다**
-  - next_steps: ① 요청 시 릴리스, 푸시(2dabd9c, bb57e29, e5e9037, 02556da) ② 위 2.3px
+  - 사용자 「릴리스하고 푸시하라」 → 릴리스 **editor-ee6778d45cbe**(hwpx, hwpx2, 옛 editor-f4128e4ff7a5 정리) → 56acbcc 까지 hwpx, hwpx2 푸시
+  - next_steps: ① 교과 평가계획 7쪽 2.3px
 - **10-15**: 사용자 「cd8fe559 에디터는 큰 덩어리의 글자취급 표 등으로 에디터와 한/컴에서 순서가 달라진다」(CORE 실적 새틀 `_261015_02`, 한/글 4쪽, 에디터 6쪽) → 스킬 151352f(엔진 패치 `oversized-tac-table`)
   - 원인: p0 한 문단에 TAC 표 셋(T1~T3, `flowWithText="0"`, 모두 쪽 본문 876.8px보다 큼), p1 에 T4. rhwp 는 HWPX 에서 `treatAsChar && flowWithText`(#3930)만 TAC 로 보고, 예외로 첫 줄(`tac_table_line_index == Some(0)`) 표만 TAC 로 인정 → T2, T3, T4 는 블록 표로 쪽이 나뉘고, `typeset_table_paragraph` 정렬 키 `table_flow_tiebreak` 가 블록 표를 앞세워 T2 → T3 → T1 순서
   - 처방: `is_effective_tac_table` 에 「쪽 본문보다 큰 글자처럼 취급 표」 추가(엔진에 구역 본문 높이 `body_height_px` 칸). #3930 근거 편람의 fwt0 TAC 표 5개는 모두 쪽 안에 든다. 6쪽 → 4쪽, 순서와 글자 세로 범위 한/글 PDF 와 맞음
