@@ -235,7 +235,7 @@ def main():
     print(
         f"문서 {len(files)} | 본문 {pct(tot['bs'], tot['bc'])}% ({tot['bc']}) 여러 줄 {pct(tot['bms'], tot['bm'])}% ({tot['bm']})"
         f" | 칸 {pct(tot['cs'], tot['cc'])}% ({tot['cc']}) 여러 줄 {pct(tot['cms'], tot['cm'])}% ({tot['cm']})"
-        f" | 쪽수 {pct(tot['ps'], tot['pc'])}% ({tot['pc']}) | 문단 쪽 {pct(tot['qs'], tot['qc'])}% ({tot['qc']}) | 불일치 {len(bad)}"
+        f" | 쪽수 {pct(tot['ps'], tot['pc'])}% ({tot['pc']}) | 문단 쪽 {pct(tot['qs'], tot['qc'])}% ({tot['qs']}/{tot['qc']}) | 불일치 {len(bad)}"
     )
     if "--pages" in args:
         print("쪽수 다름(한글/rhwp)", " ".join(sorted(page_bad)))
