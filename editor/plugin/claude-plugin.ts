@@ -56,6 +56,11 @@ const EXTRA_TOOLS = [
     description: '문서에 이미 있는 표(그림 상자, 예시 프롬프트 상자 등)를 본보기로 복제해 after_para 문단 뒤에 넣고 칸 글만 바꾼다. 테두리, 칸 크기, 글자 모양이 본보기와 같다. rows 는 행마다 열 글 배열이고 null 인 칸은 본보기 글을 그대로 둔다. 칸 안 그림도 복제되니 바꾸려면 image 명령을 쓴다.',
     parameters: { type: 'object', properties: { model: { type: 'string', description: '본보기 표 T 번호' }, after_para: { type: 'integer' }, rows: { type: 'array', items: { type: 'array', items: { type: ['string', 'null'] } } } }, required: ['model', 'after_para'] },
   },
+  {
+    name: 'delete_cell_paragraphs',
+    description: '표 칸 안의 문단을 지운다(delete_paragraphs 는 본문 문단만 지운다). cell 은 T3r1c0 이나 표 속 표 T15r0c0/T1r0c0. from_para~to_para(칸 문단 번호, 포함)를 지우거나, only_empty=true 로 글도 개체도 없는 빈 문단을 모두 지운다. 그림이나 표가 든 문단은 지우지 않는다. 번호를 모르면 둘 다 빼고 부르면 칸 문단 목록을 알려 준다. 칸에는 문단이 하나 이상 남는다.',
+    parameters: { type: 'object', properties: { cell: { type: 'string' }, from_para: { type: 'integer' }, to_para: { type: 'integer' }, only_empty: { type: 'boolean' } }, required: ['cell'] },
+  },
 ];
 
 const EXTRA_RUN = {
@@ -81,7 +86,45 @@ const EXTRA_RUN = {
     }));
     return { ok: true, table: nt.id, para: `p${r.paraIdx}`, cells: changed, note: `p${a.after_para} 뒤의 문단 번호가 +1, 그 뒤 표 번호가 +1 만큼 바뀌었습니다.` };
   },
+  // 2026-10-17: 칸 안 문단을 지우는 이름 붙은 도구가 없어, 다른 세션이 그림 아래 빈 줄을 사용자에게 Backspace 로 지워 달라고 했다
+  delete_cell_paragraphs(doc, a) {
+    const x = resolveNested(doc, a.cell);
+    const paras = nestedParas(doc, x).map((p) => ({ ...p, ctrl: hasCellControl(doc, x, p.i) }));
+    const list = () => paras.map((p) => `${p.i}: ${p.ctrl ? '[개체] ' : ''}${p.text ? `「${p.text.slice(0, 30)}」` : '(빈 문단)'}`).join(', ');
+    let targets;
+    if (a.only_empty) {
+      targets = paras.filter((p) => !p.len && !p.ctrl).map((p) => p.i);
+      if (targets.length === paras.length) targets = targets.slice(1); // 칸에 문단 하나는 남긴다
+    } else {
+      if (a.from_para == null) throw new Error(`지울 문단을 from_para~to_para 나 only_empty 로 주세요. ${a.cell} 칸 문단: ${list()}`);
+      const f = a.from_para, t = a.to_para ?? a.from_para;
+      if (!(Number.isInteger(f) && Number.isInteger(t) && f >= 0 && f <= t && t < paras.length)) throw new Error(`칸 문단 범위가 틀렸습니다(0~${paras.length - 1}). ${a.cell} 칸 문단: ${list()}`);
+      if (t - f + 1 === paras.length) throw new Error('칸의 문단을 모두 지울 수는 없습니다. 칸을 비우려면 set_cell 로 빈 글을 넣으세요.');
+      const withCtrl = paras.slice(f, t + 1).find((p) => p.ctrl);
+      if (withCtrl) throw new Error(`칸 문단 ${withCtrl.i} 에 그림이나 표가 있습니다. 그림은 image --replace, 표는 delete_table 로 다루세요. ${a.cell} 칸 문단: ${list()}`);
+      targets = Array.from({ length: t - f + 1 }, (_, k) => f + k);
+    }
+    const removed = targets.map((i) => paras[i].text);
+    const root = PJ(pathAt(x.path, 0));
+    const len = (i) => doc.getCellParagraphLengthByPath(x.s, x.para, PJ(pathAt(x.path, i)));
+    // 뒤에서부터 하나씩: 앞 문단 끝과 합쳐 지우고, 0번이면 다음 문단 처음까지 지운다
+    for (const i of [...targets].sort((m, n) => n - m)) {
+      if (i > 0) doc.deleteRangeInCellByPath(x.s, x.para, root, i - 1, len(i - 1), i, len(i));
+      else doc.deleteRangeInCellByPath(x.s, x.para, root, 0, 0, 1, 0);
+    }
+    return { ok: true, at: a.cell, removed: removed.length, texts: removed, paragraphs: paras.length - removed.length };
+  },
 };
+
+/** 칸 문단 i 에 그림이나 표가 있는가. */
+function hasCellControl(doc, x, i) {
+  const p = PJ(pathAt(x.path, i));
+  for (let ci = 0; ci < 16; ci++) {
+    try { doc.getCellPicturePropertiesByPath(x.s, x.para, p, ci); return true; } catch { /* 그림 아님 */ }
+    try { doc.getTableDimensionsByPath(x.s, x.para, PJ([...pathAt(x.path, i), { controlIndex: ci, cellIndex: 0, cellParaIndex: 0 }])); return true; } catch { /* 표 아님 */ }
+  }
+  return false;
+}
 
 // ── 표 속 표 좌표 「T15r0c0/T1r0c0」(바깥 칸 안의 첫째 표 0행 0열, 단계는 / 로 더 이어진다) ──
 // doc-tools.js 의 좌표는 본문 표 한 단계뿐이라 표 속 표의 글은 format_text, set_cell 이 닿지 않고 search_text 는

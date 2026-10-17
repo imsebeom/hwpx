@@ -78,6 +78,7 @@ op 는 네 가지다. **먼저 `tool` 을 쓰고, 도구에 없는 일만 `doc` 
 - **플러그인이 더한 것**(2026-10-02, 가이드북 세션 수정 요청):
   - `clone_table`(model, after_para, rows) — 문서에 있는 표(그림 상자, 예시 프롬프트 상자)를 본보기로 복제하고 칸 글만 바꾼다. 테두리, 칸 크기, 글자 모양이 본보기와 같다. `rows` 의 `null` 칸은 본보기 글 그대로, 칸 안 그림도 복제된다(바꾸려면 `image … --replace`). `create_table` 로 만들면 글자 크기가 문서와 달라진다
   - **표 속 표 좌표** `T15r0c0/T1r0c0`(바깥 칸 안 첫째 표의 0행 0열, `/` 로 더 깊이) — `format_text` 의 at, `set_cell` 은 `table:"T15r0c0/T1"` + row, col. `search_text` 가 이 좌표와 문맥을 돌려준다(종전에는 문단 번호와 빈 문맥). 칸 서식은 유지된다
+  - `delete_cell_paragraphs`(cell, from_para?, to_para?, only_empty?) — **칸 안 문단 지우기**(2026-10-17). `delete_paragraphs` 는 본문 문단만 지운다. `cell` 은 `T3r1c0` 이나 표 속 표 좌표, 번호는 칸 문단 번호(0부터). 그림 아래 빈 줄처럼 빈 문단만 걷을 때는 `only_empty: true`. 번호 없이 부르면 칸 문단 목록을 오류로 돌려준다. 그림이나 표가 든 문단은 지우지 않고, 칸에는 문단 하나가 남는다. 다른 세션이 「칸 안 문단을 지우는 도구가 없다」며 사용자에게 Backspace 를 부탁한 일로 넣었다 — **도구 목록에 없어도 `doc` 경로(아래 표의 칸 메서드)로 되는지 먼저 보고, 사용자에게 손 편집을 넘기지 않는다**
   - `insert_paragraphs` 를 **글 없는 문단(빈 문단, 표 문단) 뒤에** 하면 새 문단 글자 모양을 앞뒤 15문단의 같은 문단 모양 본문이 가장 많이 쓰는 것으로 맞추고 `style` 로 알린다(빈 문단의 소제목 12pt 를 물려받았다). 글 있는 문단 뒤는 종전대로 그 문단을 따른다
 
 도구에 들어 있는 안전장치: 글머리 기호 보존(keep_bullet), 마크다운 기호 제거, 빨간 작은 안내 문구 자리에 채우면 검은 본문 서식으로 돌리기, 셀 안 표가 든 셀 통째 교체 거부.
@@ -119,6 +120,7 @@ op 는 네 가지다. **먼저 `tool` 을 쓰고, 도구에 없는 일만 `doc` 
 | 문단 서식 | `applyParaFormat(sec, para, {alignment, lineSpacing, indent, marginLeft, spacingBefore, spacingAfter, keepWithNext, pageBreakBefore, ...})` |
 | 스타일 | `getStyleList()` → `applyStyle(sec, para, styleId)` |
 | 표 | `createTableEx({sectionIdx, paraIdx, charOffset, rowCount, colCount, treatAsChar})`, `insertTextInCell(sec, parentPara, controlIdx, cellIdx, cellPara, offset, text)`, `insertTableRow`, `mergeTableCells` |
+| 칸 안 문단 | 나누기 `splitParagraphInCellByPath(sec, ppi, pathJson, offset)`, 합치기 `mergeParagraphInCell(sec, ppi, ctrl, cell, cellPara)`, 범위 지우기 `deleteRangeInCellByPath(sec, ppi, pathJson, 시작문단, 시작위치, 끝문단, 끝위치)` — pathJson 은 `[{"controlIndex":0,"cellIndex":3,"cellParaIndex":0}]`. 빈 문단 지우기는 `delete_cell_paragraphs` 도구가 낫다 |
 | 서식 있는 덩어리 | `pasteHtml(sec, para, offset, html)` — 첫 블록은 대상 문단에 이어 붙고, 목록은 글머리표 문단이 된다. 새 덩어리는 빈 문단을 만든 뒤 그 앞머리에 붙인다 |
 | 필드 | `{"m":"GetFieldList"}`, `{"m":"PutFieldText","a":[이름,값]}`, `setFieldValueByName(name, value)` |
 | 본문 전체 | `$E text` (표 셀 포함 UNICODE 텍스트) |
