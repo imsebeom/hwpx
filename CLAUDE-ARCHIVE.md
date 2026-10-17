@@ -4,6 +4,18 @@
 
 ## 컨텍스트 앵커 이력
 
+- **10-06 넷째**: 사용자 「여러 셀이든 한 셀이든 ctrl-c v x 이런게 되야지」, 「에디터 core_silj 가 또 페이지가 밀린다」 → 스킬 b51bb30, 58f6a5b(**푸시, 릴리스 안 함**)
+  - CORE 실적표(`2026 수업/교육연구/2026 교육력제고/실적_임세범/…_261006_02.hwpx`, 한/글 9쪽, 에디터 13쪽 → 9쪽). 엔진 패치 8개:
+    `table-zero-pad(-measure,-layout,-float)` — HWPX 표 inMargin 네 방향 0 을 rhwp 가 「미지정 → 칸 여백(141)」(#2195 stage50, 근거 86712 HWP)으로 세로에 써 행마다 282 커졌다. 한/글 사다리(`scratchpad core/rowmin.py`): hasMargin 0 + 표 여백 0 이면 칸 여백 141/500 모두 무시(900/1000), HWP 로 저장했다 다시 열어도 같음. HWPX 에서 읽은 표(`raw_ctrl_data` 빈 표)에만 적용, HWP5 원본은 종전대로.
+    `empty-host-object-max(-layout,-partial)` — 칸 안 빈 문단의 위아래 배치 그림: 다음 문단 = max(빈 줄, 그림)(한/글 재저장 1559→1600, 1617, 1824). 측정 additive 두 곳, 배치(`para_y_before_compose + flow`), 세로 정렬 내용 높이.
+    `html-paste-whitespace` — HTML 붙이기가 태그 사이 소스 줄바꿈을 글자(`\n`)로 넣던 것
+  - 🔑 진단법: 한/글 행 높이는 칸 cellSz 가 아니라(한/글은 cellSz 를 안 고친다) **표 sz height**(다시 적는다)와 **PDF 점선 괘선 y**(`fitz` 가로 조각 모으기)로 잰다. 한 칸만 바꾼 사본 여럿을 재저장해 표 높이 차로 행 높이를 역산(`scratchpad core/rowvar.py`). 글자 위치 대조 `cmptext.py`(PDF ↔ rhwp SVG)
+  - ❌ 남은 것: 표 1이 11px 큼(874.9 / 863.9, 쪽은 안 바뀜). 병합 칸 행 배분 — 한/글은 행 경계를 「그 경계에서 끝나는 칸들의 (시작 경계 + 칸 높이) 최댓값」(최장 경로)으로 정하는데 rhwp 2-b 단계는 걸친 행 수가 적은 제약부터 풀어 10, 11행 배분이 다르다. 많은 문서에 걸리는 변경이라 따로
+  - 칸 클립보드: 플러그인 `plugin/cell-clipboard.ts`(F5 칸 선택 중 Ctrl+C/X/V — 키에서 rhwp 의 칸 선택 해제만 막고 window 캡처 copy/cut/paste 에서 처리, 칸마다 HTML+글, 시스템 클립보드에 탭 글 + `<table data-claude-cells>`, 붙이기는 블록/커서 칸 왼쪽 위부터 덮어쓰기, 한 칸 → 여러 칸 채우기, 바깥 탭 글과 표 HTML). 시험 `scratchpad clip/clip_test.py <포트>`(CDP `commands: ['copy'|'cut'|'paste']` 로 실제 클립보드 명령, 21항목 세 번 연속 통과). ⚠ 첫 실행 직후 첫 붙이기가 한 번 실패한 적 있음(재현 안 됨)
+  - 🔑 패치 생성기 2판 `scratchpad u14/mkpatch2.py`(기준 = 그날 첫 백업 + 첫 묶음 패치). ⚠ 조각이 빈 줄로 끝나면 setup.mjs 의 끝 줄바꿈 떼기에 깎인다 — 문맥을 더 잡는다
+  - 사용자 시험 보고 셋 → 스킬 839b31a: ① 칸 붙이기 후 자간 눌림 — HTML 경로가 글자 모양을 「글꼴, 크기 같은 다른 번호」로 바꾸고 칸 경로판(`pasteHtmlInCellByPath`)은 줄을 다시 나누지 않았다 → 엔진 `clipboard-stash`(칸마다 내부 클립보드 보관, `claudeClipboardStash/Restore`)로 같은 문서 붙이기는 `pasteInternalInCellByPath`, `html-paste-path-reflow` ② 그림이 「[이미지]」 글 — 같은 원인(내부 클립보드는 그림째) ③ 칸 블록 Del → Ctrl+E 지우기 창. 시험 `scratchpad clip/clip_test2.py`(CORE 사본 7항목) + clip_test 21항목 통과. 패치 생성기 3판 `mkpatch3.py`(`BASE_SPECS=spec.json,spec2.json`)
+  - 🔑 시험 함정: `cli start --no-browser` 를 `timeout` 으로 감싸면 서버까지 꺼진다 — run_in_background 로 띄운다. 시험이 붙은 서버는 health 의 browser 가 true 로 남아 다음 실행이 거절된다 — stop 후 다시 띄운다
+  - next_steps: ① 사용자 확인(칸 복사, CORE 실적표) 뒤 요청 시 `release.mjs` → prebuilt.json 커밋 → 푸시 ② 병합 칸 행 배분(최장 경로) — 회귀 넓게 볼 것 ③ #2195 stage50 의 HWP5 근거(86712) 재확인 — 한/글 HWP 왕복도 0 이었다
 - **10-02 셋째**: 가이드북 세션 수정 요청 메모(`수정요청_20261002_가이드북세션.md`) 1번 「표가 한글과 다른 쪽에」 → 스킬 f982ae4(푸시 안 함), d0e90cf(그 세션의 editor-mode.md 함정 한 줄을 대신 커밋).
   원인은 낡은 저장 리셋(쪽 맨 위 vertpos=0): rhwp 는 편집 뒤에도 리셋을 남기고(`recalculate_section_vpos` delta=0 보존) 저장본에 다시 써, 한/글 원본에서 4쪽 맨 위였던 표 3-1이 내용이 줄어도 계속 다음 쪽으로 갔다.
   패치 `stale-reset-edit`(line_breaking.rs, 흐름이 밀리면 뒤 리셋을 풂), `stale-reset-fill`(typeset.rs, 직전 저장 끝이 본문의 50% 미만/110% 초과 + rhwp 로 반 미만이면 무시, 한 번 무시한 구역은 `st.claude_stale_reset_seen`)
