@@ -322,6 +322,68 @@ def check_secpr_openable(hwpx_path):
     return {"errors": errors, "warnings": warnings}
 
 
+# 조판 부호(탭, 개체 등) 하나가 줄 배치 위치에서 차지할 수 있는 최대 칸. 상한으로만 쓴다.
+_CTRL_SPAN = 8
+
+
+def check_stale_lineseg(hwpx_path):
+    """문단 글보다 뒤를 가리키는 줄 배치 캐시(<hp:lineseg textpos>)를 찾는다.
+
+    표 칸 안 문단의 글을 줄이고 캐시를 그대로 두면 한컴이 대화상자 없이 열기에 실패하고(Open=False),
+    그대로 저장하면 표가 통째로 빠진다(2026-10-17 한글 2024 실측, 변형 23개). 본문 문단은 한컴이 다시
+    계산해 열렸으므로 경고만 낸다. 처방은 해당 섹션의 linesegarray 제거다(규칙 17).
+
+    Returns: {"errors": [...], "warnings": [...]}
+    """
+    errors, warnings = [], []
+    try:
+        from lxml import etree
+    except ImportError:
+        return {"errors": [], "warnings": ["lxml 미설치 — 줄 배치 캐시 점검 건너뜀"]}
+
+    hp = "{http://www.hancom.co.kr/hwpml/2011/paragraph}"
+    cell_bad, body_bad = [], []
+    with zipfile.ZipFile(hwpx_path, "r") as zf:
+        secs = sorted(n for n in zf.namelist()
+                      if n.startswith("Contents/section") and n.endswith(".xml"))
+        for name in secs:
+            try:
+                root = etree.fromstring(zf.read(name))
+            except etree.XMLSyntaxError:
+                continue  # 파싱 오류는 다른 검사가 보고한다
+            for p in root.iter(f"{hp}p"):
+                lsa = p.find(f"{hp}linesegarray")
+                if lsa is None:
+                    continue
+                pos = [int(x.get("textpos", "0")) for x in lsa.findall(f"{hp}lineseg")]
+                if not pos:
+                    continue
+                text, ctrls = 0, 0
+                for run in p.findall(f"{hp}run"):
+                    for el in run:
+                        if el.tag == f"{hp}t":
+                            text += len((el.text or "").encode("utf-16-le")) // 2
+                            for sub in el:
+                                ctrls += 1
+                                text += len((sub.tail or "").encode("utf-16-le")) // 2
+                        else:
+                            ctrls += 1
+                if max(pos) <= text + ctrls * _CTRL_SPAN:
+                    continue
+                in_cell = any(a.tag == f"{hp}tc" for a in p.iterancestors())
+                (cell_bad if in_cell else body_bad).append(
+                    f"{name} 문단 id={p.get('id')}: textpos {max(pos)} > 글 {text}")
+    if cell_bad:
+        errors.append(
+            f"표 칸 문단 {len(cell_bad)}개의 줄 배치 캐시가 글보다 뒤를 가리킨다 — 한컴이 열지 못한다"
+            f"(Open=False). 해당 섹션의 <hp:linesegarray>를 지울 것. 예: {cell_bad[0]}")
+    if body_bad:
+        warnings.append(
+            f"본문 문단 {len(body_bad)}개의 줄 배치 캐시가 낡았다(한컴은 다시 계산해 연다). "
+            f"지우는 편이 안전하다. 예: {body_bad[0]}")
+    return {"errors": errors, "warnings": warnings}
+
+
 def check_table_grid(hwpx_path):
     """표 격자 정합성 점검 — KS X 6101:2024 10.9.3 기준.
 
@@ -533,6 +595,11 @@ def verify(source_path=None, result_path=None, json_output=None,
     grid_check = check_table_grid(result_path)
     report["issues"].extend(grid_check["errors"])
     report["warnings"].extend(grid_check["warnings"])
+
+    # 1.36. 낡은 줄 배치 캐시 — 표 칸 문단을 줄이고 캐시를 두면 한컴이 열지 못한다(2026-10-17)
+    lineseg_check = check_stale_lineseg(result_path)
+    report["issues"].extend(lineseg_check["errors"])
+    report["warnings"].extend(lineseg_check["warnings"])
 
     # 1.37. 문단 위/아래 간격 일관성 — '문단 모양' 값이 제각각인 문제 (경고)
     spacing_check = check_para_spacing(result_path)
