@@ -1,6 +1,6 @@
 """e20 측정(한/글 2024 PDF, 글꼴 12종 × 기호 160자, 40pt)에서 글자 폭(1000 단위 em)을 뽑는다.
 
-    python e20an.py <e20 재저장 폴더> <출력.json>
+    python e20an.py <재저장 폴더> <출력.json> [실험 이름=e20]   (e21 처럼 같은 꼴의 실험도 된다)
 
 문단 「가X가X가X가X가」 마다 첫 「가」와 끝 「가」 사이를 4로 나눈 값에서 「가」 폭을 뺀다. 「가」 폭은 그 글꼴에서 「가」 다음에
 X 가 찍힌 줄들의 중앙값이다. 줄이 빠지거나(한 줄이 두 줄로 묶임) 글자가 안 찍히는 경우가 있어 줄과 문단은 찍힌 글자로 맞댄다.
@@ -18,17 +18,22 @@ from e15an import rows  # noqa: E402
 SCALE = 0.99946
 
 
-def main(rt, dst):
+def main(rt, dst, name="e20"):
     meta = json.load(
         open(
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), "e20_meta.json"),
+            os.path.join(
+                os.path.dirname(os.path.abspath(__file__)), f"{name}_meta.json"
+            ),
             encoding="utf-8",
         )
     )
     chars = meta["chars"]
     out = {}
     for i, font in enumerate(meta["fonts"]):
-        rs = rows(os.path.join(rt, f"e20_{i:02d}.pdf"))
+        pdf = os.path.join(rt, f"{name}_{i:02d}.pdf")
+        if not os.path.exists(pdf):
+            pdf = os.path.join(rt, f"{name}_{i}.pdf")
+        rs = rows(pdf)
         ga = [
             row[k + 1][0] - row[k][0]
             for row in rs
@@ -55,4 +60,4 @@ def main(rt, dst):
 
 
 if __name__ == "__main__":
-    main(sys.argv[1], sys.argv[2])
+    main(*sys.argv[1:4])

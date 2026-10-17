@@ -31,10 +31,18 @@ def make(v, out_dir):
         block = re.search(
             rf'<hh:fontface lang="{lang}"[\s\S]*?</hh:fontface>', header
         ).group(0)
-        header = header.replace(
-            block,
-            re.sub(r'(<hh:font id="1" face=")[^"]*"', rf'\g<1>{escape(face)}"', block),
+        new_block = re.sub(
+            r'(<hh:font id="1" face=")[^"]*"', rf'\g<1>{escape(face)}"', block
         )
+        if v.get(
+            "fontType"
+        ):  # "HFT" 면 한컴 내장 글꼴로 찾는다(TTF 로 두면 한/글이 다른 글꼴로 바꿔 쓴다)
+            new_block = re.sub(
+                r'(<hh:font id="1" face="[^"]*" type=")\w+"',
+                rf'\g<1>{v["fontType"]}"',
+                new_block,
+            )
+        header = header.replace(block, new_block)
     if "face" in v:
         header = header.replace('face="Pretendard"', f'face="{escape(v["face"])}"')
     cp = re.search(r'<hh:charPr id="0"[\s\S]*?</hh:charPr>', header).group(0)
