@@ -551,6 +551,8 @@ const RUST_PATCHES = [
     ['bullet-dot-word-line-breaking', 'src/renderer/composer/line_breaking.rs'],
     // 쪽을 넘는 표에서 자르는 행에서 시작하는 병합 칸도 높이로 잘라 그린다(쪽 아래로 넘쳐 그리고 다음 쪽에 처음부터 다시 그리던 문제, d243)
     ['rowspan-cut-row-table-partial', 'src/renderer/layout/table_partial.rs'],
+    // HWP5 에서 온 HWPX 라도 본문 문단 전체에 줄 배치가 없으면(스킬이 캐시를 지운 저장본) 열 때 줄 배치를 다시 만든다(선택 음영이 첫 줄에만 칠해지던 문제)
+    ['hwp5-origin-stripped-document', 'src/document_core/commands/document.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));
@@ -742,7 +744,9 @@ for (const [file, patch] of [['input-handler-table.ts', 'move-drop-table.ts'], [
 // 상태 표시줄 한 쪽~네 쪽 보기(page-view-cmd.ts 명령, page-view-buttons.ts 단추, 스타일은 아래 page-view-buttons.css),
 // 표 첫 칸, 마지막 칸에서 좌우 화살표로 표 바로 앞뒤로 나가고 들어오기와 표 앞뒤 캐럿 그리기(table-arrow-edge.ts)
 for (const [id, rel] of [['wrap-text-labels', 'ui/picture-props-dialog.ts'], ['wrap-text-flow', 'ui/picture-props-dialog.ts'], ['wrap-move-sign', 'engine/input-handler-picture.ts'],
-  ['page-view-cmd', 'command/commands/view.ts'], ['page-view-buttons', 'main.ts'], ['table-arrow-edge', 'engine/cursor.ts']]) {
+  ['page-view-cmd', 'command/commands/view.ts'], ['page-view-buttons', 'main.ts'], ['table-arrow-edge', 'engine/cursor.ts'],
+  // 본문에서 끌다 표를 만나면 칸 안으로 들어가지 않고 표를 글자 하나처럼 통째로 넣고 뺀다(사용자 보고 2026-10-18)
+  ['drag-skip-table', 'engine/input-handler.ts']]) {
   const f = path.join(STUDIO, 'src', ...rel.split('/'));
   let src = fs.readFileSync(f, 'utf8');
   if (src.includes(`[claude-hwpx ${id}]`)) continue;
