@@ -35,7 +35,7 @@ function hftMetrics() {
   }
   return hftMemo;
 }
-const CACHE_VERSION = 1;
+const CACHE_VERSION = 2;   // 2: 굵기(usWeightClass)를 싣는다
 // 폭을 싣는 구간(엔진 내장 표와 같은 범위). 한글 음절과 한자는 따로 싣는다
 const BLOCKS = [
   [0x0020, 0x007e], // ASCII
@@ -147,7 +147,11 @@ function scanFile(file) {
       const mac = readAt(fd, t.head.offset + 44, 2);
       const bold = os2?.length === 2 ? (os2.readUInt16BE(0) & 0x20) !== 0 : mac.length === 2 && (mac.readUInt16BE(0) & 1) !== 0;
       const italic = os2?.length === 2 ? (os2.readUInt16BE(0) & 1) !== 0 : mac.length === 2 && (mac.readUInt16BE(0) & 2) !== 0;
-      faces.push({ index, ...readNames(fd, t.name), bold, italic });
+      // 굵기(OS/2 usWeightClass). 한 이름에 굵기 파일이 여럿인 글꼴(Pretendard 의 Black, Light 등)은 굵게 비트가 꺼져 있어
+      // 비트만으로는 보통 얼굴을 못 고른다
+      const wc = t['OS/2'] && t['OS/2'].length >= 6 ? readAt(fd, t['OS/2'].offset + 4, 2) : null;
+      const weight = wc?.length === 2 ? wc.readUInt16BE(0) : bold ? 700 : 400;
+      faces.push({ index, ...readNames(fd, t.name), bold, italic, weight });
     });
   } catch { /* 읽지 못하는 파일은 색인에 넣지 않는다 */ } finally {
     if (fd !== undefined) fs.closeSync(fd);
@@ -280,8 +284,10 @@ export function metricsFor(name) {
   const key = name.trim().toLowerCase();
   const index = fontIndex();
   const family = index.filter((f) => f.family.includes(key));
-  const regular = family.find((f) => !f.bold && !f.italic) ?? index.find((f) => f.full.includes(key)) ?? family.find((f) => !f.italic) ?? family[0];
-  const bold = regular && family.includes(regular) ? family.find((f) => f.bold && !f.italic && f !== regular) : null;
+  // 보통은 굵기 400, 굵게는 700 에 가장 가까운 얼굴(같으면 색인 차례)
+  const near = (faces, w) => faces.reduce((best, f) => (!best || Math.abs((f.weight ?? 400) - w) < Math.abs((best.weight ?? 400) - w) ? f : best), null);
+  const regular = near(family.filter((f) => !f.bold && !f.italic), 400) ?? index.find((f) => f.full.includes(key)) ?? family.find((f) => !f.italic) ?? family[0];
+  const bold = regular && family.includes(regular) ? near(family.filter((f) => f.bold && !f.italic && f !== regular), 700) : null;
   const out = [];
   for (const [face, isBold] of [[regular, false], [bold, true]]) {
     if (!face) continue;

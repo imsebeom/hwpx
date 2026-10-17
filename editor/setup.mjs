@@ -507,6 +507,8 @@ const RUST_PATCHES = [
     ['page-end-fit-typeset', 'src/renderer/typeset.rs'],
     // 제목 외톨이 보정은 한/글이 저장한 줄 위치가 있을 때만 쓴다(합성 줄 vpos 로 오판하지 않게)
     ['heading-orphan-stored-typeset', 'src/renderer/typeset.rs'],
+    // 「!」 는 글꼴과 상관없이 글자 크기의 절반 폭(한/글 PDF 실측, 글꼴 6종)
+    ['exclam-half-text-measurement', 'src/renderer/layout/text_measurement.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));
