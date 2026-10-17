@@ -31,6 +31,25 @@ function isBodyTable(doc, c) {
   }
 }
 
+/**
+ * 표 전체 높이와 한 쪽 본문 높이(px). 칸 bbox 는 쪽마다 나뉜 조각이 따로 오므로 (행, 쪽) 조각마다 가장 큰 높이를 더한다.
+ * 쪽을 넘는 표를 「나누지 않음」으로 두면 한글이 넘친 행을 그리지 않는다(2026-10-17 한글 2024 실측: 30행 표가 0~5행만,
+ * 40행 표가 28행만 렌더). 그래서 none 을 걸기 전에 잰다.
+ */
+function tableVsBody(doc, t) {
+  const cells = J(doc.getTableCellBboxes(t.section, t.para, t.ctrl));
+  const frag = new Map();
+  for (const c of cells) {
+    if (c.rowSpan > 1) continue;
+    const k = `${c.row}:${c.pageIndex}`;
+    frag.set(k, Math.max(frag.get(k) || 0, c.h));
+  }
+  const height = [...frag.values()].reduce((a, b) => a + b, 0);
+  const info = J(doc.getPageInfo(cells.length ? cells[0].pageIndex : 0));
+  const body = info.footerArea.y - (info.headerArea.y + info.headerArea.height);
+  return { height, body };
+}
+
 /** 셀 안에 든 표의 수. 개요에는 보이지 않으므로 따로 알린다. */
 function nestedTableCount(doc) {
   return J(doc.getControls()).filter((c) => c.ctrlId === 'tbl').length - listTables(doc).length;
@@ -465,7 +484,7 @@ export const TOOLS = [
   },
   {
     name: 'table_props',
-    description: '표가 쪽 경계에 걸릴 때의 처리(page_break: split=나눔, cell=셀 단위로 나눔, none=나누지 않음)와 제목 줄 반복(repeat_header)을 정한다. 한 쪽에 들어가는 작은 표는 none 이 잘림을 막는다.',
+    description: '표가 쪽 경계에 걸릴 때의 처리(page_break)와 제목 줄 반복(repeat_header)을 정한다. cell=행 경계에서만 나눔(칸 안 글은 쪼개지 않음, 긴 표의 기본값으로 repeat_header 와 함께), split=칸 안 글까지 쪼개 나눔, none=나누지 않고 통째로 다음 쪽으로. none 은 한 쪽에 들어가는 작은 표에만 쓴다. 한 쪽보다 긴 표에 none 을 쓰면 넘친 행이 한글에서 그려지지 않아 도구가 거부한다.',
     parameters: { type: 'object', properties: { table: { type: 'string' }, page_break: { type: 'string', enum: ['split', 'cell', 'none'] }, repeat_header: { type: 'boolean' } }, required: ['table'] },
   },
   {
@@ -781,6 +800,15 @@ function exec(doc, name, a) {
       const props = {};
       if (a.page_break) {
         if (!(a.page_break in PAGE_BREAK)) throw new Error('page_break 는 split, cell, none 중 하나입니다.');
+        if (a.page_break === 'none') {
+          const { height, body } = tableVsBody(doc, t);
+          if (height > body) {
+            throw new Error(
+              `표 ${t.id} 는 높이(${Math.round(height)}px)가 한 쪽 본문(${Math.round(body)}px)보다 커서 none 이면 넘친 행이 한글에서 그려지지 않습니다. ` +
+                'cell(행 경계에서 나눔)과 repeat_header 를 쓰세요.',
+            );
+          }
+        }
         props.pageBreak = PAGE_BREAK[a.page_break];
       }
       if (typeof a.repeat_header === 'boolean') props.repeatHeader = a.repeat_header;
