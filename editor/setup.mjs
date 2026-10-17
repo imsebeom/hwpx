@@ -535,6 +535,12 @@ const RUST_PATCHES = [
     ['para-float-text-host-typeset', 'src/renderer/typeset.rs'],
     // 고정폭 빈칸 0.25em, 묶음 빈칸 0.5em(한/글 2024 실측, 글꼴과 설정 무관, lab e26)
     ['fixed-spaces-text-measurement', 'src/renderer/layout/text_measurement.rs'],
+    // 번호 문단은 「번호 글의 실제 폭 + 본문과의 거리 + 너비 보정」을 줄 나눔에서 뺀다. 자동 내어쓰기가 꺼져 있으면 첫 줄만(lab e29)
+    ['number-head-line-breaking', 'src/renderer/composer/line_breaking.rs'],
+    // 표만 담은 빈 문단(위아래 배치)은 오프셋과 바깥 여백이 0 이어도 선언 표 높이만 흐름에 더한다(문단 아래 간격 없음)
+    ['empty-host-no-after-typeset', 'src/renderer/typeset.rs'],
+    // 줄 배치를 다시 만든 문단의 vpos 사슬에 한/글처럼 문단 위아래 간격을 넣는다(표만 담은 문단의 아래 간격 제외)
+    ['synth-vpos-spacing-document', 'src/document_core/commands/document.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));
