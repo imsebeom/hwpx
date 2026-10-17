@@ -543,6 +543,12 @@ const RUST_PATCHES = [
     ['synth-vpos-spacing-document', 'src/document_core/commands/document.rs'],
     // 「표 나눔」(HWPX TABLE, 엔진 CellBreak) 표는 쪽 첫 행이 아니면 행을 칸 안에서 자르지 않고 통째로 다음 쪽에 넘긴다(REA hwpx_lab, 정답본 10/12)
     ['table-whole-rows-typeset', 'src/renderer/typeset.rs'],
+    // 줄 시작은 앞 줄 마지막 글자 바로 다음(줄 경계의 조판 부호를 새 줄에 둔다, d309)
+    ['break-ctrl-start-line-breaking', 'src/renderer/composer/line_breaking.rs'],
+    // 글머리표 글자 모양 크기가 0 이면 문단 글자 크기로 자리를 잡는다(lab e31)
+    ['bullet-zero-size-line-breaking', 'src/renderer/composer/line_breaking.rs'],
+    // 글자 단위 문단에서 「•」 뒤 한글 앞도 꺾는 자리(lab e33)
+    ['bullet-dot-word-line-breaking', 'src/renderer/composer/line_breaking.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));
