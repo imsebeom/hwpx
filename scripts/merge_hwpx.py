@@ -225,12 +225,19 @@ def _strip_section_control(para):
 
     문단 자체는 보존하므로 같은 문단에 들어있던 <hp:tbl>·본문 run 등은 남는다.
     """
-    for el in list(para.iter()):
-        local = etree.QName(el).localname
-        if local in ("secPr", "ctrl"):
-            parent = el.getparent()
-            if parent is not None:
-                parent.remove(el)
+    # 문단 바로 아래 run 의 구역 설정만 지운다. para.iter() 로 끝까지 내려가면 첫 문단 안 표(제목 표,
+    # 읽을거리 상자)에 든 메모 필드와 각주까지 지워졌다(2026-10-18 가이드북 합본에서 메모 74개 유실).
+    # 메모, 누름틀 같은 필드의 시작과 끝(fieldBegin, fieldEnd)을 담은 ctrl 은 남긴다
+    for run in para.findall(f"{{{HP}}}run"):
+        for el in list(run):
+            local = etree.QName(el).localname
+            if local == "secPr" or (
+                local == "ctrl"
+                and not any(
+                    etree.QName(c).localname in ("fieldBegin", "fieldEnd") for c in el
+                )
+            ):
+                run.remove(el)
     for run in list(para.iter(f"{{{HP}}}run")):
         if len(run) == 0 and not (run.text or "").strip():
             parent = run.getparent()
