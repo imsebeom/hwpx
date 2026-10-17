@@ -18,6 +18,14 @@ fn main() {
         let core = DocumentCore::from_bytes(&data).expect("문서 열기");
         let cm: serde_json::Value = serde_json::from_str(&core.get_cursor_model_json()).expect("커서 모형");
         println!("{}\tPAGES\t{}", path, core.page_count());
+        // CLAUDE_SVG=<폴더> 이면 쪽마다 SVG 를 <폴더>/<쪽>.svg 로
+        if let Ok(dir) = std::env::var("CLAUDE_SVG") {
+            for pg in 0..core.page_count() {
+                if let Ok(svg) = core.render_page_svg_native(pg) {
+                    let _ = std::fs::write(format!("{}/{}.svg", dir, pg), svg);
+                }
+            }
+        }
         // CLAUDE_ITEMS=1 이면 쪽마다 놓인 항목(문단, 표 조각의 행 범위)을 stderr 로
         if std::env::var("CLAUDE_ITEMS").is_ok() {
             eprintln!("{}", core.dump_page_items(None));

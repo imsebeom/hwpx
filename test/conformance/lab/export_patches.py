@@ -20,6 +20,7 @@ def main():
     by_file = {}
     for rel, find, repl, *_ in mod.EDITS:
         by_file.setdefault(rel, []).append((find, repl))
+    stems = [Path(r).stem for r in by_file]
     for rel, blocks in by_file.items():
         # 표지가 든 블록을 앞으로
         blocks.sort(key=lambda b: "[claude-hwpx" not in b[1])
@@ -30,7 +31,11 @@ def main():
             if find.endswith("\n") and repl.endswith("\n"):
                 find, repl = find[:-1], repl[:-1]
             parts.append(f"{find}\n// ==== replace ====\n{repl}")
-        pid = f"{prefix}-{Path(rel).stem.replace('_', '-')}"
+        # 같은 이름 파일이 둘이면(parser/hwpx/header.rs, serializer/hwpx/header.rs) 위 폴더 이름을 앞에 붙인다
+        stem = Path(rel).stem
+        if stems.count(stem) > 1:
+            stem = f"{Path(rel).parts[0]}-{stem}"
+        pid = f"{prefix}-{stem.replace('_', '-')}"
         (PATCHES / f"{pid}.rs").write_text(
             "// ==== find ====\n" + "\n// ==== next ====\n".join(parts) + "\n",
             encoding="utf-8",
