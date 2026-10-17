@@ -509,6 +509,14 @@ const RUST_PATCHES = [
     ['heading-orphan-stored-typeset', 'src/renderer/typeset.rs'],
     // 「!」 는 글꼴과 상관없이 글자 크기의 절반 폭(한/글 PDF 실측, 글꼴 6종)
     ['exclam-half-text-measurement', 'src/renderer/layout/text_measurement.rs'],
+    // 문단 모양 「한 줄로 입력」(lineWrap=SQUEEZE)을 읽고 되쓰며, 그 문단은 한 줄로 조판한다
+    ['para-line-wrap-style', 'src/model/style.rs'],
+    ['para-line-wrap-doc-info', 'src/parser/doc_info.rs'],
+    ['para-line-wrap-tests', 'src/serializer/doc_info/tests.rs'],
+    ['para-line-wrap-parser-header', 'src/parser/hwpx/header.rs'],
+    ['para-line-wrap-serializer-header', 'src/serializer/hwpx/header.rs'],
+    ['para-line-wrap-style-resolver', 'src/renderer/style_resolver.rs'],
+    ['para-line-wrap-document', 'src/document_core/commands/document.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));
