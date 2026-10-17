@@ -483,6 +483,11 @@ export const TOOLS = [
     parameters: { type: 'object', properties: { table: { type: 'string' }, row: { type: 'integer' }, col: { type: 'integer' } }, required: ['table', 'row', 'col'] },
   },
   {
+    name: 'row_height',
+    description: '표의 row 행(to_row 를 주면 row~to_row)의 높이를 height_mm(mm)로 정한다. 칸 높이는 최솟값이라 글이 더 많으면 그보다 크게 그려지며, 결과에 실제 높이를 알려 준다.',
+    parameters: { type: 'object', properties: { table: { type: 'string' }, row: { type: 'integer' }, to_row: { type: 'integer' }, height_mm: { type: 'number' } }, required: ['table', 'row', 'height_mm'] },
+  },
+  {
     name: 'table_props',
     description: '표가 쪽 경계에 걸릴 때의 처리(page_break)와 제목 줄 반복(repeat_header)을 정한다. cell=행 경계에서만 나눔(칸 안 글은 쪼개지 않음, 긴 표의 기본값으로 repeat_header 와 함께), split=칸 안 글까지 쪼개 나눔, none=나누지 않고 통째로 다음 쪽으로. none 은 한 쪽에 들어가는 작은 표에만 쓴다. 한 쪽보다 긴 표에 none 을 쓰면 넘친 행이 한글에서 그려지지 않아 도구가 거부한다.',
     parameters: { type: 'object', properties: { table: { type: 'string' }, page_break: { type: 'string', enum: ['split', 'cell', 'none'] }, repeat_header: { type: 'boolean' } }, required: ['table'] },
@@ -793,6 +798,35 @@ function exec(doc, name, a) {
       findCell(doc, t, a.row, a.col);
       const r = J(doc.splitTableCell(t.section, t.para, t.ctrl, a.row, a.col));
       return { result: { ok: true, cellCount: r.cellCount }, mark: { kind: 'table', where: t.id, after: `r${a.row}c${a.col} 나누기` } };
+    }
+
+    case 'row_height': {
+      // 칸 높이(cellSz height)는 최솟값이다: 한/글은 글이 넘치면 칸을 키우고, 더 작게 줄이지는 않는다(2026-10-17 한/글 2024 실측).
+      const t = findTable(doc, a.table);
+      if (!(a.height_mm > 0)) throw new Error('height_mm 는 0보다 큰 mm 값이어야 합니다.');
+      const { dim, cells } = tableCells(doc, t);
+      const from = a.row, to = a.to_row ?? a.row;
+      if (!(from >= 0 && to >= from && to < dim.rowCount)) throw new Error(`${t.id} 는 r0~r${dim.rowCount - 1} 행입니다.`);
+      const hu = Math.round((a.height_mm * 7200) / 25.4);
+      const targets = cells.filter((c) => c.rowSpan === 1 && c.row >= from && c.row <= to);
+      if (!targets.length) throw new Error('그 행에는 여러 행에 걸친 칸뿐이라 높이를 정할 칸이 없습니다.');
+      for (const c of targets) doc.setCellProperties(t.section, t.para, t.ctrl, c.idx, JSON.stringify({ height: hu }));
+      // 실제로 그려진 높이(mm): 쪽마다 나뉜 조각을 (행, 쪽)별로 가장 큰 것만 더한다
+      const frag = new Map();
+      for (const b of J(doc.getTableCellBboxes(t.section, t.para, t.ctrl))) {
+        if (b.rowSpan !== 1 || b.row < from || b.row > to) continue;
+        const k = `${b.row}:${b.pageIndex}`;
+        frag.set(k, Math.max(frag.get(k) || 0, b.h));
+      }
+      const rows = [];
+      for (let r = from; r <= to; r++) {
+        const px = [...frag].filter(([k]) => k.startsWith(`${r}:`)).reduce((s, [, v]) => s + v, 0);
+        rows.push({ row: r, drawn_mm: Math.round(((px * 25.4) / 96) * 10) / 10 });
+      }
+      const taller = rows.filter((x) => x.drawn_mm > a.height_mm + 0.5);
+      const result = { ok: true, rows };
+      if (taller.length) result.note = `r${taller.map((x) => x.row).join(', r')} 은 글이 많아 지정한 높이보다 크게 그려집니다(칸 높이는 최솟값).`;
+      return { result, mark: { kind: 'table', where: t.id, after: `r${from}${to !== from ? `~r${to}` : ''} 높이 ${a.height_mm}mm` } };
     }
 
     case 'table_props': {
