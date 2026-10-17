@@ -447,6 +447,10 @@ const RUST_PATCHES = [
     // 줄 배치 없는 빈 문단의 위아래 배치 표가 세로 오프셋만큼 내려 그려지는데 흐름은 표 높이만 전진해 다음 문단이 표 아래를 덮던 것
     ['empty-float-offset-flow', 'src/renderer/layout.rs'],
     ['empty-float-offset-flow-typeset', 'src/renderer/typeset.rs'],
+    // 같은 문단의 표가 바깥 위 여백 없이 그려져 그만큼 높던 것
+    ['empty-float-outer-top', 'src/renderer/layout.rs'],
+    // 다음도 빈 문단 표일 때 표-표 줄 간격을 또 더해 다음 표가 밀리던 것
+    ['empty-float-offset-gap', 'src/renderer/layout.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));
