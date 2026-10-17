@@ -364,8 +364,9 @@ export function docFontMetrics(hwpxBuf, mod) {
     }
     const faces = metricsFor(name);
     if (!faces.length) {
-      // 파일도 내장 표도 없으면 한/글에서 잰 내장 글꼴 표
-      const hft = !builtin && !process.env.NO_HFT_METRICS && hftMetrics().get(name);
+      // 파일이 없으면 한/글에서 잰 글꼴 표. 엔진 내장 표가 있어도 실측 표가 있으면 그것을 쓴다(lab e21: 한양신명조,
+      // 한양중고딕, 한양견고딕, 한양견명조 — 내장 표의 × ° ± 와 따옴표가 한/글과 달랐다)
+      const hft = !process.env.NO_HFT_METRICS && hftMetrics().get(name);
       if (hft) { result.read.push(name); result.metrics.push(hft); continue; }
       if (!builtin) result.missing.push(name);
       continue;
@@ -392,7 +393,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   for (const name of docFontFaces(buf)) {
     const builtin = mod.hasBuiltinFontMetric?.(name);
     if (builtin && /^(함초롬|HCR\b)/i.test(name)) { console.log(`${hftMetrics().has(name) ? '한/글 실측' : '내장      '} ${name}`); continue; }
-    if (!builtin && !metricsFor(name).length && hftMetrics().has(name)) { console.log(`한/글 실측 ${name}`); continue; }
+    if (!metricsFor(name).length && hftMetrics().has(name)) { console.log(`한/글 실측 ${name}`); continue; }
     if (builtin && !metricsFor(name).length) { console.log(`내장      ${name}`); continue; }
     const faces = metricsFor(name);
     if (!faces.length) { console.log(`못 찾음   ${name}`); continue; }
