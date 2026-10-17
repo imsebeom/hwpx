@@ -529,6 +529,8 @@ const RUST_PATCHES = [
     ['tac-caption-line-typeset', 'src/renderer/typeset.rs'],
     // 실행 중 등록한 폭 표(글꼴 파일, 한/글 실측)의 폭은 문장 부호 덮어쓰기와 ㆍ 대체 없이 그대로 쓴다(lab e20)
     ['runtime-no-overlay-text-measurement', 'src/renderer/layout/text_measurement.rs'],
+    // 등록 표가 있는 글꼴은 한양중고딕, 한양신명조 빈칸 예외(0.55em, 0.40em)를 쓰지 않는다(한/글 2024 는 0.5em, lab e24)
+    ['runtime-no-space-overlay-text-measurement', 'src/renderer/layout/text_measurement.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));
