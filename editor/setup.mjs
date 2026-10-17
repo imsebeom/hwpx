@@ -517,6 +517,8 @@ const RUST_PATCHES = [
     ['para-line-wrap-serializer-header', 'src/serializer/hwpx/header.rs'],
     ['para-line-wrap-style-resolver', 'src/renderer/style_resolver.rs'],
     ['para-line-wrap-document', 'src/document_core/commands/document.rs'],
+    // 줄 끝 빈칸 묶음은 시작 위치가 줄 폭 이하인 빈칸까지만 앞줄에, 나머지는 다음 줄 앞에(한/글 실측 e19)
+    ['space-no-overflow-line-breaking', 'src/renderer/composer/line_breaking.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));
