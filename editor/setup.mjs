@@ -549,6 +549,8 @@ const RUST_PATCHES = [
     ['bullet-zero-size-line-breaking', 'src/renderer/composer/line_breaking.rs'],
     // 글자 단위 문단에서 「•」 뒤 한글 앞도 꺾는 자리(lab e33)
     ['bullet-dot-word-line-breaking', 'src/renderer/composer/line_breaking.rs'],
+    // 쪽을 넘는 표에서 자르는 행에서 시작하는 병합 칸도 높이로 잘라 그린다(쪽 아래로 넘쳐 그리고 다음 쪽에 처음부터 다시 그리던 문제, d243)
+    ['rowspan-cut-row-table-partial', 'src/renderer/layout/table_partial.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));
