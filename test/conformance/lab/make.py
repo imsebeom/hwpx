@@ -26,6 +26,15 @@ def make(v, out_dir):
     header = src.read("Contents/header.xml").decode("utf-8")
     section = src.read("Contents/section0.xml").decode("utf-8")
 
+    # langFaces: {"HANGUL": "휴먼명조", "LATIN": "맑은 고딕", ...} — 언어 범주마다 글자 모양 0 이 쓰는 글꼴(id 1)을 바꾼다
+    for lang, face in (v.get("langFaces") or {}).items():
+        block = re.search(
+            rf'<hh:fontface lang="{lang}"[\s\S]*?</hh:fontface>', header
+        ).group(0)
+        header = header.replace(
+            block,
+            re.sub(r'(<hh:font id="1" face=")[^"]*"', rf'\g<1>{escape(face)}"', block),
+        )
     if "face" in v:
         header = header.replace('face="Pretendard"', f'face="{escape(v["face"])}"')
     cp = re.search(r'<hh:charPr id="0"[\s\S]*?</hh:charPr>', header).group(0)

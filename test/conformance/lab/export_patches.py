@@ -18,7 +18,7 @@ def main():
     mod = importlib.import_module(sys.argv[1])
     prefix = sys.argv[2]
     by_file = {}
-    for rel, find, repl in mod.EDITS:
+    for rel, find, repl, *_ in mod.EDITS:
         by_file.setdefault(rel, []).append((find, repl))
     for rel, blocks in by_file.items():
         # 표지가 든 블록을 앞으로

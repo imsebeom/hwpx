@@ -10,6 +10,7 @@ fn main() {
         let data = std::fs::read(&path).expect("파일 읽기");
         let core = DocumentCore::from_bytes(&data).expect("문서 열기");
         let cm: serde_json::Value = serde_json::from_str(&core.get_cursor_model_json()).expect("커서 모형");
+        println!("{}\tPAGES\t{}", path, core.page_count());
         let n = cm["root"]["paraCount"].as_u64().unwrap_or(0);
         for p in 0..n {
             println!("{}\t{}\t{}", path, p, core.line_starts_json(0, p as usize));
