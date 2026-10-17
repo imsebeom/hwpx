@@ -541,6 +541,8 @@ const RUST_PATCHES = [
     ['empty-host-no-after-typeset', 'src/renderer/typeset.rs'],
     // 줄 배치를 다시 만든 문단의 vpos 사슬에 한/글처럼 문단 위아래 간격을 넣는다(표만 담은 문단의 아래 간격 제외)
     ['synth-vpos-spacing-document', 'src/document_core/commands/document.rs'],
+    // 「표 나눔」(HWPX TABLE, 엔진 CellBreak) 표는 쪽 첫 행이 아니면 행을 칸 안에서 자르지 않고 통째로 다음 쪽에 넘긴다(REA hwpx_lab, 정답본 10/12)
+    ['table-whole-rows-typeset', 'src/renderer/typeset.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));
