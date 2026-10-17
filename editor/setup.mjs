@@ -472,7 +472,16 @@ const RUST_PATCHES = [
     // 세로 가운데 정렬 칸이 줄 배치 없는 문단의 칸 안 글자처럼 취급 표가 자란 몫을 빼고 재 내용을 내려 그리던 것
     ['cell-tac-nested-valign', 'src/renderer/layout/table_layout.rs'],
     // 칸 안의 표를 지울 경로 메서드가 없던 것(deleteCellPictureControlByPath 가 표도 받고, 지운 뒤 바깥 표 높이를 다시 잰다)
-    ['cell-table-delete', 'src/document_core/commands/object_ops/table.rs'],  ].flatMap(([id, file]) => {
+    ['cell-table-delete', 'src/document_core/commands/object_ops/table.rs'],
+    // 줄 배치를 새로 짤 때 빈칸을 늘 반각으로 재던 것. 「글꼴에 어울리는 빈칸」(useFontSpace)이 켜진 글자 모양은 글꼴 고유 폭이다
+    // (한/글 2024 실측 2026-10-17, test/conformance/lab 의 e1 실험: 글꼴 5종 × 설정 2 × 장평과 자간 2)
+    ['use-font-space-mod', 'src/renderer/mod.rs'],
+    ['use-font-space-style-resolver', 'src/renderer/style_resolver.rs'],
+    ['use-font-space-text-measurement', 'src/renderer/layout/text_measurement.rs'],
+    ['use-font-space-composer', 'src/renderer/composer.rs'],
+    // upstream 시험이 옛 캡션 글(「표」+빈칸 둘)을 기대하던 것을 한/글과 같은 캡션(table-caption-default)에 맞춘다
+    ['table-caption-default-tests', 'src/wasm_api/tests.rs'],
+  ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));
     const marker = (blocks[0][1].match(/\[claude-hwpx [\w-]+\]/) ?? [])[0];
