@@ -14,7 +14,9 @@
  * 셀 안의 표도 같은 규칙에 걸리므로 경로 API(…ByPath)로 함께 잰다(2026-10-05 문항카드: 문항 전체가 큰 표 한 칸에
  * 들어 있고 안쪽 글상자와 그래프 상자 높이가 6082 로 낡아 글 줄이 겹치고 그래프가 잘렸다). 글상자 안의 표는 건드리지 않는다.
  */
+import crypto from 'node:crypto';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { readZip, writeZip, stripDummyLinesegs } from './hwpx-zip.mjs';
@@ -117,8 +119,31 @@ function allTables(body) {
   return out.sort((a, b) => a.start - b.start);
 }
 
-/** 표마다 (node.start → 높이) 를 적는다(글자처럼 취급하는 표만, 값이 없으면 그대로). 바꾼 수도 돌려준다. */
-function setHeights(xml, heightOf) {
+/** 표 이름(본문 T1, 표 속 표 T3/칸1/T1 — 칸 번호는 XML 순서)을 node.start 로 찾는 표. 작업 기록용 */
+function tableLabels(body) {
+  const out = new Map();
+  const walk = (t, label) => {
+    out.set(t.start, { label, size: `${t.rows}×${t.cols}` });
+    t.cells.forEach((c, ci) => {
+      let k = 0;
+      for (const ts of c.paras) for (const n of ts ?? []) walk(n, `${label}/칸${ci}/T${++k}`);
+    });
+  };
+  body.forEach((t, i) => walk(t, `T${i + 1}`));
+  return out;
+}
+
+/** 이 엔진(WASM) 파일의 지문 앞 12자. 작업 기록에 어느 엔진으로 쟀는지 남긴다 */
+export function engineId() {
+  try {
+    const dir = process.env.RHWP_ENGINE || path.join(HERE, 'studio-dist', 'node');
+    return crypto.createHash('sha256').update(fs.readFileSync(path.join(dir, 'rhwp_bg.wasm'))).digest('hex').slice(0, 12);
+  } catch { return null; }
+}
+
+/** 표마다 (node.start → 높이) 를 적는다(글자처럼 취급하는 표만, 값이 없으면 그대로). 바꾼 수도 돌려준다.
+ *  diffs 를 주면 값이 달라진 표의 { start, from, to } 를 담는다. */
+function setHeights(xml, heightOf, diffs) {
   const pos = allTables(tableTree(xml)).map((t) => t.start);
   let res = xml, changed = 0;
   for (let i = pos.length - 1; i >= 0; i--) {
@@ -129,6 +154,10 @@ function setHeights(xml, heightOf) {
     if (posAt < 0 || !/^<hp:pos [^>]*treatAsChar="1"/.test(res.slice(posAt, posAt + 300))) continue;
     const szAt = res.indexOf('<hp:sz ', start);
     const szEnd = res.indexOf('/>', szAt);
+    if (diffs) {
+      const from = Number(/height="(\d+)"/.exec(res.slice(szAt, szEnd))?.[1]);
+      if (from !== h) diffs.push({ start, from, to: h });
+    }
     res = res.slice(0, szAt) + res.slice(szAt, szEnd).replace(/height="\d+"/, `height="${h}"`) + res.slice(szEnd);
     changed++;
   }
@@ -163,18 +192,26 @@ export async function rhwpLayout(input) {
   const heights = orig.map(() => new Map());   // 구역마다 node.start → 높이
   for (let j = 0; j <= maxLevel; j++) {
     const got = measure((s, start) => ((level[s].get(start) ?? 0) >= j ? 0 : heights[s].get(start)));
-    if (!got) { secs.forEach((e, s) => { e.data = Buffer.from(orig[s], 'utf8'); }); return { buf: writeZip(entries), tables: 0 }; }
+    if (!got) { secs.forEach((e, s) => { e.data = Buffer.from(orig[s], 'utf8'); }); return { buf: writeZip(entries), tables: 0, changes: [] }; }
     got.forEach((m, s) => m.forEach((h, start) => { if ((level[s].get(start) ?? 0) === j) heights[s].set(start, h); }));
   }
 
-  // ② 잰 높이를 적는다
+  // ② 잰 높이를 적는다. 값이 바뀐 표는 작업 기록용으로 이름, 크기, 전후 높이를 모은다(2026-10-17 KTX: 안쪽 표가 9000 → 1560 으로
+  // 잘못 적혔는데 기록에는 「표 5개」만 남아, 판마다 파일을 열어 언제 들어갔는지 찾았다)
   let tables = 0;
+  const changes = [];
   secs.forEach((e, s) => {
-    const r = setHeights(orig[s], (start) => heights[s].get(start));
+    const diffs = [];
+    const r = setHeights(orig[s], (start) => heights[s].get(start), diffs);
     tables += r.changed;
+    const names = tableLabels(trees[s]);
+    for (const d of diffs.sort((a, b) => a.start - b.start)) {
+      const n = names.get(d.start);
+      changes.push({ ...(secs.length > 1 ? { sec: s } : {}), table: n?.label ?? '?', size: n?.size, from: d.from, to: d.to });
+    }
     e.data = Buffer.from(r.xml, 'utf8');
   });
-  return { buf: writeZip(entries), tables };
+  return { buf: writeZip(entries), tables, changes };
 
   /** heightOf(구역, node.start) 로 높이를 적은 판을 열어 표마다 잰 높이를 돌려준다. 0 으로 둔 표가 없으면 null. */
   function measure(heightOf) {
@@ -249,4 +286,11 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const r = await rhwpLayout(fs.readFileSync(inp));
   fs.writeFileSync(outp, r.buf);
   console.log(`표 높이 보정 ${r.tables}개: ${outp}`);
+  // 스킬 빌드 단계(rhwp_convert.apply_layout)가 이 명령으로 표 높이를 적는다. 어느 파일의 어느 표를 몇에서 몇으로 바꿨는지
+  // 에디터 작업 기록 옆에 남긴다(에디터를 열기 전에 들어간 값의 출처를 찾을 수 있게)
+  try {
+    const log = path.join(os.homedir(), '.claude', 'cache', 'hwpx-editor', 'build-log.jsonl');
+    fs.mkdirSync(path.dirname(log), { recursive: true });
+    fs.appendFileSync(log, JSON.stringify({ ts: new Date().toISOString(), ev: 'layout', file: path.resolve(inp), engine: engineId(), tables: r.tables, heights: r.changes.slice(0, 60) }) + '\n');
+  } catch { /* 기록 실패가 보정을 막지 않는다 */ }
 }

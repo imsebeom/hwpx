@@ -8,7 +8,8 @@ export function formatLog(e) {
   const who = e.by === 'user' ? '사용자' : e.by === 'claude' ? 'Claude' : '';
   switch (e.ev) {
     case 'start': return `${t}  시작      ${e.file}`;
-    case 'load': return `${t}  불러옴    ${e.doc} — ${LAYOUT[e.layout] ?? e.layout}${e.tables ? ` ${e.tables}개` : ''}${e.note ? ` (${e.note})` : ''}${e.error ? ` (${e.error})` : ''}`;
+    case 'load': return `${t}  불러옴    ${e.doc} — ${LAYOUT[e.layout] ?? e.layout}${e.tables ? ` ${e.tables}개` : ''}${e.note ? ` (${e.note})` : ''}${e.error ? ` (${e.error})` : ''}${e.engine ? ` [엔진 ${e.engine}]` : ''}${heightLines(e.heights)}`;
+    case 'run': return `${t}  Claude 명령 ${e.ok ? '' : '실패 '}${(e.ops ?? []).length}개${(e.ops ?? []).map((o) => `\n        · ${o}`).join('')}${e.result ? `\n        → ${e.result}` : ''}`;
     case 'open': return `${t}  열림      ${e.doc} ${kb(e.bytes)}`;
     case 'proxy': return `${t}  그림 축소 ${e.images}장, ${e.fromMB}MB → ${e.toMB}MB${e.cached ? ' (캐시)' : ''}`;
     case 'fonts': return `${t}  글꼴 폭   파일에서 읽음: ${e.read.join(', ')}${e.missing?.length ? ` / 이 PC 에 없어 어림: ${e.missing.join(', ')}` : ''}`;
@@ -19,6 +20,12 @@ export function formatLog(e) {
     case 'stop': return `${t}  종료`;
     default: return `${t}  ${e.ev} ${JSON.stringify(e)}`;
   }
+}
+
+/** 표 높이 보정이 바꾼 값(표 이름 크기 전 → 후, HWPUNIT). 줄마다 하나 */
+function heightLines(hs) {
+  if (!hs?.length) return '';
+  return hs.map((h) => `\n        · 표 높이 ${h.sec != null ? `구역${h.sec} ` : ''}${h.table} ${h.size ?? ''} ${h.from} → ${h.to}`).join('');
 }
 
 export const localTime = (t) => new Date(t).toTimeString().slice(0, 8);

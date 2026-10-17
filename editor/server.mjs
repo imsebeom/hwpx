@@ -19,7 +19,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { readZip, stripDummyLinesegs, fixHfFields } from './hwpx-zip.mjs';
-import { rhwpLayout, engineModule } from './rhwp_layout.mjs';
+import { rhwpLayout, engineModule, engineId } from './rhwp_layout.mjs';
 import { docFontMetrics } from './font-metrics.mjs';
 import { makeProxy, restoreImages, PROXY_MIN_BYTES } from './image-proxy.mjs';
 import { formatLog, formatOp, coalesceOps } from './log-format.mjs';
@@ -83,6 +83,27 @@ const SESSION = path.join(STATE_DIR, 'session.json');
  * 이것은 비우지 않고 쌓는 기록이다 — 세션 시작, 문서 열기(줄 배치 경로), 편집, 저장(화면 저장 포함), 종료, 오류.
  */
 const LOG = path.join(STATE_DIR, 'editor-log.jsonl');
+/** 값을 JSON 글로 바꿔 n 자로 자른다. */
+function clip(v, n) {
+  if (v == null) return undefined;
+  const s = typeof v === 'string' ? v : JSON.stringify(v);
+  return s.length > n ? `${s.slice(0, n)}…(${s.length}자)` : s;
+}
+
+/** run 배치를 한 op 한 줄로 줄인다(그림 base64 는 뺀다). 최대 30개. */
+function summarizeOps(ops) {
+  if (!Array.isArray(ops)) return undefined;
+  const one = (op) => {
+    if (op?.tool) return `${op.tool} ${clip(op.args ?? {}, 200)}`;
+    if (op?.doc) return `doc.${op.doc}(${clip(op.a ?? [], 200).replace(/^\[|\]$/g, '')})`;
+    if (op?.m) return `m.${op.m}(${clip(op.a ?? [], 200).replace(/^\[|\]$/g, '')})`;
+    if (op?.run) return `run ${op.run}`;
+    if (op?.image) { const { base64, ...rest } = op.image; return `image ${clip(rest, 200)} (${Math.round((base64?.length ?? 0) * 0.75 / 1024)}KB)`; }
+    return clip(op, 200);
+  };
+  return ops.length > 30 ? [...ops.slice(0, 30).map(one), `…외 ${ops.length - 30}개`] : ops.map(one);
+}
+
 export function logEvent(ev, data = {}) {
   try {
     const s = readSession();
@@ -109,18 +130,20 @@ function lacksLinesegsWithTacTable(buf) {
 
 async function editorBytes(src) {
   const raw = fs.readFileSync(src);
-  if (!/\.hwpx$/i.test(src)) { logEvent('load', { layout: 'raw' }); return raw; }
+  // engine: 이 창이 쓰는 WASM 지문(옛 창과 새 빌드 창을 가린다)
+  const engine = engineId();
+  if (!/\.hwpx$/i.test(src)) { logEvent('load', { layout: 'raw', engine }); return raw; }
   const stripped = stripDummyLinesegs(raw);
   // 더미가 없어도 줄 배치가 빠진 문단과 글자처럼 취급하는 표가 함께 있으면 같은 결함(rhwp#7419)에 걸린다 —
   // 양식 수정 도구(hwpx_modifier, hwpx_form_filler)는 고친 칸의 줄 배치를 지우고, 줄 배치 없이 저장하는 생성기도 있다.
-  if (!stripped.removed && !lacksLinesegsWithTacTable(raw)) { logEvent('load', { layout: 'stored' }); return raw; }
-  // rhwp 로 표 높이를 잰다(rhwp_layout.mjs). 안 되면 더미만 걷는다.
+  if (!stripped.removed && !lacksLinesegsWithTacTable(raw)) { logEvent('load', { layout: 'stored', engine }); return raw; }
+  // rhwp 로 표 높이를 잰다(rhwp_layout.mjs). 안 되면 더미만 걷는다. 바뀐 표 높이(표 이름, 크기, 전후)를 남긴다
   try {
     const r = await rhwpLayout(raw);
-    logEvent('load', { layout: 'rhwp', dummy: stripped.removed, tables: r.tables });
+    logEvent('load', { layout: 'rhwp', engine, dummy: stripped.removed, tables: r.tables, heights: r.changes.slice(0, 60) });
     return r.buf;
   } catch (e) {
-    logEvent('load', { layout: 'strip', dummy: stripped.removed, error: `rhwp 보정 실패: ${e?.message ?? e}` });
+    logEvent('load', { layout: 'strip', engine, dummy: stripped.removed, error: `rhwp 보정 실패: ${e?.message ?? e}` });
     return stripped.buf;
   }
 }
@@ -320,7 +343,10 @@ const server = http.createServer(async (req, res) => {
       }
       const timeoutMs = Number(body.timeoutMs) || 60_000;
       delete body.timeoutMs;
-      return sendJson(res, 200, await enqueue(body, timeoutMs));
+      const result = await enqueue(body, timeoutMs);
+      // Claude 의 편집 배치는 명령과 결과를 줄여 남긴다. 종전에는 「claude:run(9)」처럼 개수만 남아 무엇을 했는지 되짚을 수 없었다(2026-10-17)
+      if (body.type === 'run') logEvent('run', { ops: summarizeOps(body.ops), ok: Boolean(result?.ok), result: clip(result?.ok ? result.result : result?.error, 400) });
+      return sendJson(res, 200, result);
     }
     if (p === '/api/poll') {
       lastPollAt = Date.now();
