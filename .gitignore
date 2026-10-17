@@ -14,3 +14,6 @@ test/*_편집본.hwpx
 test/사전시험_결과.hwpx
 test/pn/
 __pycache__/
+
+# 일치율 채점 산출물(실사용 문서 사본, 한글 정답본)
+test/conformance/out/
