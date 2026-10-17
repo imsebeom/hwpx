@@ -3,8 +3,9 @@
  *
  * 한/글은 설치된 글꼴 파일의 폭으로 줄을 나눈다. 엔진(rhwp)은 브라우저 안에서 돌아 글꼴 파일을 읽지 못하고 빌드에 넣은
  * 폭 표만 쓰므로, 표가 없는 글꼴은 한글 1.0em, 그 밖 0.5em 으로 어림해 줄 나눔이 어긋났다(2026-10-06 한컴산뜻돋움).
- * 이 PC 에서 도는 서버는 글꼴 파일을 읽을 수 있다 — 문서가 쓰는 글꼴 가운데 엔진에 표가 없는 것만 여기서 읽어
- * 엔진 패치 `registerFontMetrics`(patches/font-metrics-runtime*.rs)로 넘긴다. 서버 전처리(rhwp_layout.mjs)와
+ * 이 PC 에서 도는 서버는 글꼴 파일을 읽을 수 있다 — 문서가 쓰는 글꼴을 여기서 읽어 엔진 패치
+ * `registerFontMetrics`(patches/font-metrics-runtime*.rs)로 넘긴다. 2026-10-17 부터는 내장 표가 있는 글꼴도 파일을
+ * 우선한다(patches/font-file-first-*.rs, 내장 표의 기호 폭이 파일, 한/글과 달랐다). 서버 전처리(rhwp_layout.mjs)와
  * 브라우저 엔진이 같은 표를 받는다.
  *
  *   node font-metrics.mjs <문서.hwpx>      문서의 글꼴마다: 엔진 내장 / 파일에서 읽음(파일, 한글 폭) / 못 찾음
@@ -21,6 +22,19 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { readZip } from './hwpx-zip.mjs';
 
 const CACHE = path.join(os.homedir(), '.claude', 'cache', 'hwpx-editor', 'font-index.json');
+// 글꼴 파일이 없는 한컴 내장 글꼴(HCI Poppy, 윤명조, 신명 계열 등)의 폭 표. 한/글 2024 에서 40pt 로 글자마다 잰 PDF
+// 글자 위치로 만들었다(hwpx 에디터기반 에이전트스킬 test/conformance/lab/build_hft_metrics.py, e9).
+let hftMemo = null;
+function hftMetrics() {
+  if (hftMemo) return hftMemo;
+  try {
+    const file = path.join(path.dirname(fileURLToPath(import.meta.url)), 'hft-metrics.json');
+    hftMemo = new Map(JSON.parse(fs.readFileSync(file, 'utf8')).map((m) => [m.name, m]));
+  } catch {
+    hftMemo = new Map();
+  }
+  return hftMemo;
+}
 const CACHE_VERSION = 1;
 // 폭을 싣는 구간(엔진 내장 표와 같은 범위). 한글 음절과 한자는 따로 싣는다
 const BLOCKS = [
@@ -306,7 +320,7 @@ export function docFontFaces(hwpxBuf) {
 }
 
 /**
- * 문서가 쓰는 글꼴 가운데 엔진에 폭 표가 없는 것을 글꼴 파일에서 읽는다.
+ * 문서가 쓰는 글꼴을 글꼴 파일에서 읽는다(엔진에 내장 표가 있어도 파일을 우선, 함초롬 계열만 내장 표).
  * mod = 엔진 모듈(rhwp.js). 반환 { metrics: 등록할 폭 표, read: 읽은 글꼴 이름, missing: 이 PC 에 없는 글꼴 이름 }.
  * 패치가 없는 엔진(npm 원본)이면 아무것도 하지 않는다.
  */
@@ -314,9 +328,19 @@ export function docFontMetrics(hwpxBuf, mod) {
   const result = { metrics: [], read: [], missing: [] };
   if (typeof mod?.hasBuiltinFontMetric !== 'function') return result;
   for (const name of docFontFaces(hwpxBuf)) {
-    if (mod.hasBuiltinFontMetric(name)) continue;
+    // 한/글 2024 는 설치된 글꼴 파일의 폭으로 조판한다 — 엔진에 내장 표가 있어도 파일을 찾으면 그것을 쓴다(엔진 패치
+    // font-file-first 가 등록한 표를 먼저 본다). 내장 표의 기호 폭이 파일과 달랐다(test/conformance/lab e2, e5).
+    // 함초롬 계열만은 한/글 값이 Windows 글꼴 파일과 달라(`…` 0.964em 대 0.702em) 내장 표를 그대로 쓴다.
+    const builtin = mod.hasBuiltinFontMetric(name);
+    if (builtin && /^(함초롬|HCR\b)/i.test(name)) continue;
     const faces = metricsFor(name);
-    if (!faces.length) { result.missing.push(name); continue; }
+    if (!faces.length) {
+      // 파일도 내장 표도 없으면 한/글에서 잰 내장 글꼴 표
+      const hft = !builtin && !process.env.NO_HFT_METRICS && hftMetrics().get(name);
+      if (hft) { result.read.push(name); result.metrics.push(hft); continue; }
+      if (!builtin) result.missing.push(name);
+      continue;
+    }
     result.read.push(name);
     result.metrics.push(...faces.map(({ file, ...metric }) => metric));
   }
@@ -337,7 +361,10 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   mod.initSync({ module: fs.readFileSync(path.join(dir, 'rhwp_bg.wasm')) });
   const buf = fs.readFileSync(file);
   for (const name of docFontFaces(buf)) {
-    if (mod.hasBuiltinFontMetric?.(name)) { console.log(`내장      ${name}`); continue; }
+    const builtin = mod.hasBuiltinFontMetric?.(name);
+    if (builtin && /^(함초롬|HCR\b)/i.test(name)) { console.log(`내장      ${name}`); continue; }
+    if (!builtin && !metricsFor(name).length && hftMetrics().has(name)) { console.log(`한/글 실측 ${name}`); continue; }
+    if (builtin && !metricsFor(name).length) { console.log(`내장      ${name}`); continue; }
     const faces = metricsFor(name);
     if (!faces.length) { console.log(`못 찾음   ${name}`); continue; }
     for (const f of faces) {

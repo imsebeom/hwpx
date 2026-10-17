@@ -481,6 +481,20 @@ const RUST_PATCHES = [
     ['use-font-space-composer', 'src/renderer/composer.rs'],
     // upstream 시험이 옛 캡션 글(「표」+빈칸 둘)을 기대하던 것을 한/글과 같은 캡션(table-caption-default)에 맞춘다
     ['table-caption-default-tests', 'src/wasm_api/tests.rs'],
+    // 실행 중 등록한 글꼴 파일 폭 표를 내장 표보다 먼저 본다(한/글 = 글꼴 파일 폭, test/conformance/lab e2, e5)
+    ['font-file-first-font-metrics-data', 'src/renderer/font_metrics_data.rs'],
+    // 한컴 내장 글꼴(휴먼명조)의 기호 폭을 한/글 2024 실측값으로(`·`, `…`, 따옴표 전각, `—` 0.879em, lab e5)
+    ['hft-symbol-widths-text-measurement', 'src/renderer/layout/text_measurement.rs'],
+    // 빈칸, 문장 부호, 기호를 앞 글자 범주가 아니라 한/글처럼 고정 범주(라틴, 기호)의 글꼴로 잰다(lab e7, e8)
+    ['lang-category-style-resolver', 'src/renderer/style_resolver.rs'],
+    ['lang-category-composer', 'src/renderer/composer.rs'],
+    ['lang-category-text-editing', 'src/document_core/commands/text_editing.rs'],
+    ['lang-category-tests', 'src/renderer/composer/tests.rs'],
+    // 문서를 열 때 줄 배치 없는 칸 문단을 다시 짜며 문단 여백을 빼지 않던 것(편집 경로와 같게, 한/글도 뺀다)
+    ['cell-para-margin-document', 'src/document_core/commands/document.rs'],
+    // 대체 글꼴로 바뀌는 한컴 글꼴도 한/글에서 잰 폭 표(editor/hft-metrics.json)가 있으면 원래 이름으로 잰다
+    ['hft-source-name-font-metrics-data', 'src/renderer/font_metrics_data.rs'],
+    ['hft-source-name-style-resolver', 'src/renderer/style_resolver.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));
