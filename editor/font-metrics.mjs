@@ -330,9 +330,15 @@ export function docFontMetrics(hwpxBuf, mod) {
   for (const name of docFontFaces(hwpxBuf)) {
     // 한/글 2024 는 설치된 글꼴 파일의 폭으로 조판한다 — 엔진에 내장 표가 있어도 파일을 찾으면 그것을 쓴다(엔진 패치
     // font-file-first 가 등록한 표를 먼저 본다). 내장 표의 기호 폭이 파일과 달랐다(test/conformance/lab e2, e5).
-    // 함초롬 계열만은 한/글 값이 Windows 글꼴 파일과 달라(`…` 0.964em 대 0.702em) 내장 표를 그대로 쓴다.
+    // 함초롬 계열만은 한/글 값이 Windows 글꼴 파일과 달라(`…` 0.964em 대 0.702em) 파일을 읽지 않는다. 한/글에서 잰 표
+    // (hft-metrics.json, lab e15)가 있으면 그것을, 없으면 내장 표를 쓴다. 내장 표에 없는 기호(①, → 등)를 엔진은 1em 으로
+    // 어림하는데 한/글은 0.970em 이다.
     const builtin = mod.hasBuiltinFontMetric(name);
-    if (builtin && /^(함초롬|HCR\b)/i.test(name)) continue;
+    if (builtin && /^(함초롬|HCR\b)/i.test(name)) {
+      const hft = !process.env.NO_HFT_METRICS && hftMetrics().get(name);
+      if (hft) { result.read.push(name); result.metrics.push(hft); }
+      continue;
+    }
     const faces = metricsFor(name);
     if (!faces.length) {
       // 파일도 내장 표도 없으면 한/글에서 잰 내장 글꼴 표
@@ -362,7 +368,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const buf = fs.readFileSync(file);
   for (const name of docFontFaces(buf)) {
     const builtin = mod.hasBuiltinFontMetric?.(name);
-    if (builtin && /^(함초롬|HCR\b)/i.test(name)) { console.log(`내장      ${name}`); continue; }
+    if (builtin && /^(함초롬|HCR\b)/i.test(name)) { console.log(`${hftMetrics().has(name) ? '한/글 실측' : '내장      '} ${name}`); continue; }
     if (!builtin && !metricsFor(name).length && hftMetrics().has(name)) { console.log(`한/글 실측 ${name}`); continue; }
     if (builtin && !metricsFor(name).length) { console.log(`내장      ${name}`); continue; }
     const faces = metricsFor(name);
