@@ -451,6 +451,12 @@ const RUST_PATCHES = [
     ['empty-float-outer-top', 'src/renderer/layout.rs'],
     // 다음도 빈 문단 표일 때 표-표 줄 간격을 또 더해 다음 표가 밀리던 것
     ['empty-float-offset-gap', 'src/renderer/layout.rs'],
+    // 「한 줄로 입력」 칸 문단을 문서를 열 때 칸 폭으로 나누던 것, 긴 한글 어절을 글자 단위로 나눌 때 글자 폭을 어림하던 것
+    ['cell-squeeze-one-line', 'src/document_core/commands/document.rs'],
+    ['hangul-word-char-widths', 'src/renderer/composer/line_breaking.rs'],
+    // 줄 배치 없는 문단의 글자처럼 취급 표 뒤에 줄 간격을 절반만 더하던 것
+    ['tac-synthetic-full-spacing', 'src/renderer/layout.rs'],
+    ['partial-float-outer-top', 'src/renderer/layout/table_partial.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));
