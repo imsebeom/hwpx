@@ -71,7 +71,7 @@ op 는 네 가지다. **먼저 `tool` 을 쓰고, 도구에 없는 일만 `doc` 
 
 - 읽기: `read_document`(from_para, to_para), `search_text`(query) — 위치와 앞뒤 문맥
 - 문단: `replace_paragraph`(para, text, keep_bullet, keep_style), `insert_paragraphs`(after_para, texts[]), `delete_paragraphs`, `find_replace`(find, replace, **expected_count**, keep_width)
-- 표: `set_cell`, **`fill_by_label`**(label, text, direction, occurrence — 좌표를 몰라도 라벨 옆 칸을 채운다), 행과 열 넣기/지우기, `merge_cells`, `split_cell`, `table_props`(page_break, repeat_header), `table_formula`(=SUM(B2:B5)), `create_table`(after_para, rows[][]), `delete_table`
+- 표: `set_cell`, **`fill_by_label`**(label, text, direction, occurrence — 좌표를 몰라도 라벨 옆 칸을 채운다), 행과 열 넣기/지우기, `merge_cells`, `split_cell`, `table_props`(page_break, repeat_header), `table_formula`(=SUM(B2:B5)), `create_table`(after_para, rows[][]), `delete_table`(table — 본문 표 `T5`, **표 속 표 `T3r1c0/T1`**: T3 의 r1c0 칸 안 첫째 표. 2026-10-17 엔진 패치 `cell-table-delete` 로 칸 안 표도 지운다. 표를 담던 칸 문단은 빈 문단으로 남으니 걷으려면 `delete_cell_paragraphs {cell, only_empty:true}`. 지운 뒤 바깥 표 높이는 저절로 줄어든다)
 - 서식: `format_text`(at, text?, bold, size_pt, color …), `format_paragraph`(align, line_spacing, keep_with_next, page_break_before …), `apply_style`, `set_list`(number | bullet | none)
   - ⚠ **`format_paragraph`의 `left_margin_pt`, `indent_pt`, `space_before_pt`, `space_after_pt`는 이름과 달리 pt가 아니다 — 값 X가 X/200 pt가 된다**(2026-10-06 실측, `doc-tools.js` `paraProps()`가 환산 없이 넘긴다. 15를 주면 0.075pt라 여백이 안 보인다). 고치기 전까지는 **pt × 200**을 넘긴다(15pt → 3000, 내어쓰기 16.9pt → -3380). 저장본의 `<hp:case>` 쪽 값이 X/2(HWPUNIT), `<hp:default>` 쪽이 X다. 코드 수정은 `setup.mjs --build`와 `release.mjs`가 따라야 한다
 - ⚠ **`{"run": "Undo"}`는 `null`만 돌려주고 되돌리지 않는다**(2026-10-07 실측, `format_text` 30pt 뒤). 되돌릴 때는 원래 값을 원본 hwpx의 `charPr height`(또는 `getCharPropertiesAt`)로 읽어 같은 도구로 다시 넣고, `getCharPropertiesAt`로 확인한다
@@ -198,6 +198,11 @@ rhwp 저장본은 기존 스크립트가 그대로 받는다(왕복 보존력 �
 저장(Claude 는 전체 경로, 사용자 화면 저장은 파일 이름과 크기) / 다른 파일 열기 / 오류 / 종료.
 화면 저장은 호스트 페이지가 iframe 의 `FileSystemFileHandle.createWritable` 과 `showOpenFilePicker` 를 감싸 잡는다(스튜디오는 저장 이벤트를 내보내지 않는다).
 "뭘 저장했지", "아까 뭘 고쳤지" 같은 물음에는 이것부터 본다.
+**디버깅용으로 더 남는 것**(2026-10-17, KTX 표 잘림을 기록으로 못 짚어 판마다 파일을 열어 찾은 뒤 넣었다):
+- 불러옴 줄의 `[엔진 xxxxxxxxxxxx]` — 그 창이 쓰는 WASM 지문(`studio-dist/node/rhwp_bg.wasm` sha256 앞 12자). 옛 창과 새로 빌드한 창을 가린다
+- 불러옴 아래 `· 표 높이 T3/칸1/T1 3×2 9000 → 1560` — 열 때 표 높이 보정(rhwp_layout)이 바꾼 표마다 이름(본문 `T번호`, 표 속 표는 `/칸<XML 순서>/T번호`), 크기, 전후 높이(HWPUNIT). 값이 이상하면 여기부터 본다
+- `Claude 명령 N개` 아래 op 마다 한 줄(도구와 인자, `doc.메서드(인자)`, 그림은 base64 대신 크기)과 `→ 결과`(400자까지). 실패한 배치도 남는다
+- 스킬 빌드 단계(`fix_namespaces.py` → `rhwp_convert.apply_layout`)의 표 높이 보정은 에디터 밖에서 일어나므로 `~/.claude/cache/hwpx-editor/build-log.jsonl` 에 따로 쌓인다(파일 경로, 엔진, 바뀐 표 높이). 에디터를 열기 전에 들어간 값의 출처는 여기서 찾는다
 
 ### 메모 보기 `$E memos [번호] [--json]` (2026-10-06, plugin/memo-panel.ts)
 

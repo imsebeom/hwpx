@@ -210,6 +210,20 @@ function nestedCharProps(a) {
 
 /** 표 속 표 좌표가 든 도구 호출을 처리한다. 해당 없으면 null. */
 function runNestedTool(doc, name, a) {
+  // delete_table 은 표 속 표를 「T3r1c0/T1」(T3 의 r1c0 칸 안 첫째 표)로 받는다. 종전에는 본문 표만 지워, 다른 세션이 칸 안 표를
+  // 지울 길을 못 찾고 멈췄다(2026-10-17 문항 4 자료 1). 표를 담던 문단은 빈 문단으로 남는다(한/글과 같음)
+  if (name === 'delete_table' && String(a.table).includes('/')) {
+    const ref = String(a.table).replace(/\s+/g, '');
+    const m = ref.match(/^(.+)\/T(\d+)$/i);
+    if (!m || !NESTED_RE.test(`${ref}r0c0`)) throw new Error(`표 속 표는 「T3r1c0/T1」처럼 바깥 칸 좌표 뒤에 /T번호로 적습니다: ${a.table}`);
+    const x = resolveNested(doc, m[1]);
+    const tables = innerTables(doc, x.s, x.para, x.path);
+    const hit = tables[Number(m[2]) - 1];
+    if (!hit) throw new Error(`${m[1]} 칸 안에 표가 ${tables.length}개라 T${m[2]} 가 없습니다.`);
+    const dim = parseMaybe(doc.getTableDimensionsByPath(x.s, x.para, PJ([...pathAt(x.path, hit.cp), { controlIndex: hit.ci, cellIndex: 0, cellParaIndex: 0 }])));
+    doc.deleteCellPictureControlByPath(x.s, x.para, PJ(pathAt(x.path, hit.cp)), hit.ci);
+    return { ok: true, at: ref, removed: `${dim.rowCount}×${dim.colCount} 표`, cellPara: hit.cp, note: `${m[1]} 칸 문단 ${hit.cp} 는 빈 문단으로 남았습니다. 걷으려면 delete_cell_paragraphs {cell:"${m[1]}", only_empty:true}` };
+  }
   // set_cell 은 table 에 바깥 칸까지 적고(「T15r0c0/T1」) row, col 로 안쪽 표 칸을 고른다
   if (name === 'set_cell' && String(a.table).includes('/')) {
     const x = resolveNested(doc, `${a.table}r${a.row}c${a.col}`);
