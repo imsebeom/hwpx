@@ -35,6 +35,17 @@ function hftMetrics() {
   }
   return hftMemo;
 }
+// 한/글이 파일에 없는 글자에 쓰는 함초롬바탕 폭(1000 단위 em). hft-metrics.json 의 함초롬바탕 표(lab e15)에서 만든다
+let hcrMemo = null;
+function hcrFallback() {
+  if (hcrMemo) return hcrMemo;
+  hcrMemo = new Map();
+  const hcr = !process.env.NO_HFT_METRICS && hftMetrics().get('함초롬바탕');
+  for (const [start, widths] of hcr?.ranges ?? []) {
+    widths.forEach((w, i) => { if (w > 0) hcrMemo.set(start + i, (w * 1000) / (hcr.em || 1000)); });
+  }
+  return hcrMemo;
+}
 const CACHE_VERSION = 2;   // 2: 굵기(usWeightClass)를 싣는다
 // 폭을 싣는 구간(엔진 내장 표와 같은 범위). 한글 음절과 한자는 따로 싣는다
 const BLOCKS = [
@@ -259,10 +270,16 @@ function readWidths(face) {
       const w = hmtx.readUInt16BE(at);
       return w > 2 * em ? 0 : w;   // em 의 두 배를 넘는 폭은 깨진 값으로 보고 없는 것으로 친다
     };
+    // 파일에 없는 글자는 한/글이 함초롬바탕 폭으로 잰다(lab e20: 맑은 고딕, 굴림, 바탕, HY헤드라인M 의 ‧ ◦ − ‣ • 등이
+    // 모두 함초롬바탕 실측값과 같다). 엔진은 이런 글자를 1em 이나 0.5em 으로 어림했다
+    const fallback = hcrFallback();
     const ranges = [];
     for (const [start, end] of BLOCKS) {
       const widths = [];
-      for (let code = start; code <= end; code++) widths.push(width(code));
+      for (let code = start; code <= end; code++) {
+        const fb = fallback.get(code);
+        widths.push(width(code) || (fb ? Math.round((fb * em) / 1000) : 0));
+      }
       while (widths.length && widths[widths.length - 1] === 0) widths.pop();
       if (widths.some((w) => w > 0)) ranges.push([start, widths]);
     }
