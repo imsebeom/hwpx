@@ -95,6 +95,11 @@ const RUST_PATCHES = [
     const [find, replace] = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n').split('\n// ==== replace ====\n');
     return { id, file: 'src/renderer/height_measurer.rs', find: find.replace(/^\/\/ ==== find ====\n/, ''), replace, done: `[claude-hwpx ${id}]` };
   }),
+  // 새로 만든 표 캡션의 글자 위치표가 글자 수와 어긋나 번호가 두 빈칸 뒤로 가고 끝에 글을 넣으면 패닉 나던 것(patches/table-caption-default.rs)
+  ...['table-caption-default'].map((id) => {
+    const [find, replace] = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n').split('\n// ==== replace ====\n');
+    return { id, file: 'src/document_core/commands/table_ops.rs', find: find.replace(/^\/\/ ==== find ====\n/, ''), replace, done: `[claude-hwpx ${id}]` };
+  }),
   // 문단 모양 대화상자에서 아무것도 안 바꾸고 설정을 눌러도 문단에 네 변 실선 상자가 생기던 것(patches/para-bf-base-*.rs)
   {
     id: 'para-bf-base',
