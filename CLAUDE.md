@@ -55,6 +55,12 @@
   - 도구: `~/.cache/rhwp-devel/cmp.mjs`(2쪽 글자 줄과 셀 상자), `allpages.mjs <pkg> <a> <b>`(전 쪽 글자 좌표 대조), `variants.py`, `winshot.py`(에디터 창을 앞으로 올리지 않고 PrintWindow 로 캡처 — 사용자 화면을 뺏지 않는다)
 
 ## 컨텍스트 앵커
+- **10-17 여섯째(조판 2단계)**: 사용자 「조판 엔진 작업 해라」 → 블랙박스 실측(한/글로 실험 문서를 열어 다시 저장한 줄 배치, PDF 글자 위치)으로 규칙을 찾아 엔진 패치. 실험실 `test/conformance/lab/`(README 에 한 바퀴 절차, 찾은 규칙 표, 함정). 한/글 실행 파일 분석은 쓰지 않는다(저작권 원칙)
+  - 규칙과 패치(스킬 editor/patches): ① 빈칸 폭 useFontSpace(`use-font-space-*`) ② 글꼴 파일 폭 우선, 함초롬 제외(`font-file-first-*`, font-metrics.mjs) ③ 휴먼명조 기호 전각(`hft-symbol-widths-*`) ④ 글자 언어 범주 고정: 문장 부호 라틴, 대시 줄임표 참고표 기호, 빈칸은 중립 유지(`lang-category-*`, 커서 예측 경로와 upstream 시험 3개도 맞춤) ⑤ 한컴 내장 글꼴 11종 40pt 실측 폭 표(`editor/hft-metrics.json`) + 대체 글꼴로 바뀌어도 원래 이름으로 잼(`hft-source-name-*`) ⑥ 칸 문단 문단 여백(`cell-para-margin-*`, 끝 빈칸 빼고 「거의 꽉 참」 판정)
+  - 채점(wasm): 본문 여러 줄 81.8 → 92.0%, 칸 여러 줄 89.1 → 92.9%, 문단 쪽 91.8 → 92.1%, 쪽수 88.4 → 87.8%(d302, d314 같은 문서 둘이 24 → 25쪽: 칸 폭이 정확해지며 숨어 있던 글꼴 폭 오차가 드러남). `cargo test --lib` 3889 통과, 에디터 시험 5개 통과. 회귀 svghash 354개 중 쪽수 바뀐 문서 0, 그림 바뀐 문서 319(글자 위치 이동, 한/글 PDF 와 문서별 대조는 안 함)
+  - 네이티브 채점 `lab/nativescore.py --pages`(28초, wasm 빌드 10분 대신). 개발 도구 `lab/claude-linestarts.rs` 를 `.build/rhwp/src/bin/` 에 둔다
+  - 🔴 함정: `setup.mjs --build` 는 `rhwp/pkg/.claude-patched` 에 ID 가 있으면 Rust 빌드를 건너뛴다 — 이미 넣은 패치를 고치면 표지에서 그 ID 를 지운다(오늘 세 번 걸림)
+  - next_steps: ⓐ d302/d314 쪽수(386:2 칸, 맑은 고딕 추정 폭 오차) ⓑ upstream 「가짜 칸 줄」 보정(`append_synthetic_cell_line`)이 한/글 줄과 안 맞음 — 끄면 칸 여러 줄 91.9 → 93.6%(네이티브), 쪽수 그대로. wasm 문단 쪽 확인 뒤 결정 ⓒ 좁은 칸 문단 여백 무시(d034, 최소 줄 폭 1440) ⓓ 함초롬돋움 `…` 등 Windows 글꼴 파일과 다른 값 ⓔ 쪽수 일치(88%) 원인 분석 ⓕ 이 CLAUDE.md 46k 자 — 옛 앵커를 CLAUDE-ARCHIVE 로 내릴 것
 - **10-17 다섯째**: 사용자 「한글을 대신할 조판 엔진도 리버스」 → 「한/글과 얼마나 같은가」를 재는 채점기 `test/conformance/`(eb23386, README 에 방법과 전제). 정답 = 한/글 재저장본 lineseg, 비교 = 줄 배치 지운 사본의 `getLineStarts`. 354개 첫 결과: 본문 97.5%(여러 줄 81.8%), 칸 98.1%(여러 줄 89.1%), 쪽수 88.4%, 문단 쪽 91.8%. 표 안 표 칸은 API 가 `[]` 라 측정 불가(1,770). 불일치 1,768: 늦게 끊음 1~3칸 538, 줄 수 다름 448, 크게 어긋남 353(d306 학교평가서 하나가 210, 2줄 문단마다 4칸 일찍 — 한글 낱말 나눔 규칙 의심), 일찍 끊음 326
   - next_steps: 2단계(원인별 실측 → 엔진 패치 → `node score.mjs` 재채점, 회귀 svghash) 는 사용자 합의 뒤
 - **10-17 넷째**: 사용자 「여러 셀을 선택하고 마지막 셀에서 셀 크기를 늘리면 선택된 셀들이 균등비율로 늘어나는 한/컴 방식」 → 스킬 789174a(스튜디오 패치 `cell-drag-proportional.ts`, WASM 그대로, **릴리스, 푸시 안 함**, 로컬 `setup.mjs --build` 끝남)
