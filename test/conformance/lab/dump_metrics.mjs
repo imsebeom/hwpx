@@ -1,6 +1,6 @@
 // 정답본 문서마다 에디터가 엔진에 등록할 글꼴 폭 표(font-metrics.mjs docFontMetrics)를 out/metrics/<id>.json 으로 뽑는다.
 // 네이티브 채점(nativescore.py)이 같은 표를 등록해 wasm 채점(score.mjs)과 같은 조건에서 재게 한다.
-//   node dump_metrics.mjs [--force]
+//   node dump_metrics.mjs [--force] [원본 폴더 출력 폴더]   (기본 ../out/oracle → ../out/metrics)
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -11,8 +11,9 @@ const m = await import(pathToFileURL(ED + 'studio-dist/node/rhwp.js').href);
 m.initSync({ module: fs.readFileSync(ED + 'studio-dist/node/rhwp_bg.wasm') });
 const { docFontMetrics } = await import(pathToFileURL(ED + 'font-metrics.mjs').href);
 
-const src = path.join(HERE, '..', 'out', 'oracle');
-const dst = path.join(HERE, '..', 'out', 'metrics');
+const dirs = process.argv.slice(2).filter((a) => !a.startsWith('--'));
+const src = dirs[0] ?? path.join(HERE, '..', 'out', 'oracle');
+const dst = dirs[1] ?? path.join(HERE, '..', 'out', 'metrics');
 fs.mkdirSync(dst, { recursive: true });
 let n = 0;
 for (const f of fs.readdirSync(src).filter((x) => x.endsWith('.hwpx'))) {
