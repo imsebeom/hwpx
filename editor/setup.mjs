@@ -457,7 +457,13 @@ const RUST_PATCHES = [
     // 줄 배치 없는 문단의 글자처럼 취급 표 뒤에 줄 간격을 절반만 더하던 것
     ['tac-synthetic-full-spacing', 'src/renderer/layout.rs'],
     ['partial-float-outer-top', 'src/renderer/layout/table_partial.rs'],
-  ].flatMap(([id, file]) => {
+    // 쪽에 걸쳐 잘린 행의 높이에 줄인 칸 여백을 쓰던 것(내용이 선언을 넘으면 원래 여백)
+    ['cut-row-pad', 'src/renderer/layout/table_layout.rs'],
+    // 단보다 넓은 단 기준 가운데 표를 단 왼쪽에 붙이던 것(한/글은 단 가운데, 양쪽으로 넘침)
+    ['wide-table-column-center', 'src/renderer/layout/table_layout.rs'],
+    ['wide-table-column-center-float', 'src/renderer/float_placement.rs'],
+    // 병합 칸이 다음 쪽으로 이어지는 조각의 마지막 행을 본문 끝까지 늘리지 않던 것
+    ['rspan-fragment-fill', 'src/renderer/layout/table_partial.rs'],  ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));
     const marker = (blocks[0][1].match(/\[claude-hwpx [\w-]+\]/) ?? [])[0];
