@@ -3,6 +3,7 @@
  * Claude 가 쓰는 에디터 조작 CLI.
  *
  *   node cli.mjs start [문서.hwpx]     (문서를 빼면 빈 문서 「새 문서.hwpx」를 작업 폴더에 만들어) 서버를 띄우고 앱 창(터미널) 또는 데스크탑 앱 미리보기(.claude/launch.json)에 연다 [--app|--preview|--browser]
+ *                                       같은 문서(같은 이름의 다른 판 포함)가 이미 떠 있으면 열지 않는다 — 고칠 것은 run 으로. 꼭 다시 열 때만 --reopen
  *   node cli.mjs hold <상태 폴더>      미리보기가 실행한다 — 떠 있는 에디터 서버에 붙어 있다
  *   node cli.mjs run <ops.json | ->    JSON 명령 배열을 에디터에 적용 (한 트랜잭션, undo 1스텝)
  *   node cli.mjs text                  현재 본문 텍스트
@@ -318,13 +319,25 @@ switch (sub) {
     if (blocker && !args.includes('--force')) die(`열지 않음: ${blocker}. 사용자가 원하면 --force`);
     if (!process.env.HWPX_EDITOR_PORT) { PORT = await allocatePort(); BASE = `http://127.0.0.1:${PORT}`; }
     // 빌드 끝에 자동으로 열 때 떠 있는 창의 저장 안 한 편집을 덮지 않는다(세션 파일을 바꾸기 전에 본다)
-    if ((await health())?.browser && !args.includes('--force')) {
+    const shown = (await health())?.browser;
+    if (shown && !args.includes('--force')) {
       let dirty = false;
       try {
         const r = await (await fetch(`${BASE}/api/cmd`, { method: 'POST', body: JSON.stringify({ type: 'state', timeoutMs: 5000 }) })).json();
         dirty = Boolean(r.ok && r.state?.dirty);
       } catch { /* 창이 응답하지 않으면 연다 */ }
       if (dirty) die('에디터에 저장하지 않은 편집이 있다. 사용자에게 저장을 부탁하거나, 버리려면 start --force');
+    }
+    if (shown) {
+      // 떠 있는 문서를 고치려고 다시 빌드해 같은 문서(같은 파일, 같은 이름의 다른 판)를 다시 여는 것을 막는다(2026-10-17 사용자 지적)
+      let open;
+      try { open = JSON.parse(fs.readFileSync(SESSION, 'utf8')).source; } catch { /* 열린 문서 기록 없음 */ }
+      const stem = (f) => path.basename(f, path.extname(f)).replace(/_\d{6}_\d{2}$/, '').normalize('NFC');
+      if (open && !args.includes('--reopen') && (path.resolve(open) === file || stem(open) === stem(file))) {
+        die(`열지 않음: 같은 문서가 이미 에디터에 떠 있다(${path.basename(open)}).\n`
+          + `고치는 일이면 다시 빌드하거나 새로 열지 말고 cli.mjs run 으로 에디터 위에서 고친다(editor-mode.md 「대화 규칙」).\n`
+          + `사용자가 다시 열라고 했거나 저장본을 정본으로 다시 빌드한 경우에만 start --reopen`);
+      }
     }
     fs.mkdirSync(STATE_DIR, { recursive: true });
     fs.writeFileSync(SESSION, JSON.stringify({ source: file, startedAt: new Date().toISOString() }, null, 2));
