@@ -533,6 +533,8 @@ const RUST_PATCHES = [
     ['runtime-no-space-overlay-text-measurement', 'src/renderer/layout/text_measurement.rs'],
     // 글 줄 뒤 어울림 표의 흐름 전진은 오프셋 + 바깥 여백 + 선언 높이(문단 줄 간격이 아니라)로 본다(d160)
     ['para-float-text-host-typeset', 'src/renderer/typeset.rs'],
+    // 고정폭 빈칸 0.25em, 묶음 빈칸 0.5em(한/글 2024 실측, 글꼴과 설정 무관, lab e26)
+    ['fixed-spaces-text-measurement', 'src/renderer/layout/text_measurement.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));
