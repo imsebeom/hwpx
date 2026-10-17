@@ -531,6 +531,8 @@ const RUST_PATCHES = [
     ['runtime-no-overlay-text-measurement', 'src/renderer/layout/text_measurement.rs'],
     // 등록 표가 있는 글꼴은 한양중고딕, 한양신명조 빈칸 예외(0.55em, 0.40em)를 쓰지 않는다(한/글 2024 는 0.5em, lab e24)
     ['runtime-no-space-overlay-text-measurement', 'src/renderer/layout/text_measurement.rs'],
+    // 글 줄 뒤 어울림 표의 흐름 전진은 오프셋 + 바깥 여백 + 선언 높이(문단 줄 간격이 아니라)로 본다(d160)
+    ['para-float-text-host-typeset', 'src/renderer/typeset.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));
