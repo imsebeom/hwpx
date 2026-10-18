@@ -53,19 +53,35 @@ function claudeFnSelectedText(this: any): string {
   return parts.join('\n');
 }
 
-/** 한 문단 안의 각주 선택을 지운다. 문단을 넘는 선택은 지우지 않는다(복사만 된다). 지웠으면 true */
-function claudeFnDeleteSelection(this: any): boolean {
+/** 각주 안 고른 범위를 지운다(여러 문단이면 끝 문단부터 지우고 문단을 합친다). 빈 범위면 풀기만 하고 false */
+export function claudeFnDeleteSelection(this: any): boolean {
   const sel = this.cursor.getFootnoteSelectionOrdered();
-  if (!sel || sel.start.fnParaIdx !== sel.end.fnParaIdx) return false;
-  const n = sel.end.charOffset - sel.start.charOffset;
+  if (!sel) return false;
+  const { start, end } = sel;
   this.cursor.clearSelection();
-  if (n <= 0) return true;
+  if (start.fnParaIdx === end.fnParaIdx && end.charOffset <= start.charOffset) return false;
   const target = claudeFnTarget.call(this);
-  const res = this.wasm.deleteTextInFootnote(target.sectionIdx, target.paraIdx, target.controlIdx, sel.start.fnParaIdx, sel.start.charOffset, n);
-  if (res.deletedText) {
-    this.executeOperation({ kind: 'record', command: new DeleteTextInFootnoteCommand(target, sel.start.fnParaIdx, sel.start.charOffset, res.deletedText, sel.end.charOffset) });
+  const info = this.wasm.getFootnoteInfo(target.sectionIdx, target.paraIdx, target.controlIdx);
+  const del = (p: number, off: number, n: number, undoCaret: number) => {
+    if (n <= 0) return;
+    const res = this.wasm.deleteTextInFootnote(target.sectionIdx, target.paraIdx, target.controlIdx, p, off, n);
+    if (res.deletedText) {
+      this.executeOperation({ kind: 'record', command: new DeleteTextInFootnoteCommand(target, p, off, res.deletedText, undoCaret) });
+    }
+  };
+  if (start.fnParaIdx === end.fnParaIdx) {
+    del(start.fnParaIdx, start.charOffset, end.charOffset - start.charOffset, end.charOffset);
+  } else {
+    del(end.fnParaIdx, 0, end.charOffset, end.charOffset);
+    for (let p = end.fnParaIdx - 1; p > start.fnParaIdx; p--) del(p, 0, (info.texts?.[p] ?? '').length, 0);
+    const startLen = (info.texts?.[start.fnParaIdx] ?? '').length;
+    del(start.fnParaIdx, start.charOffset, startLen - start.charOffset, start.charOffset);
+    for (let p = end.fnParaIdx; p > start.fnParaIdx; p--) {
+      const result = this.wasm.mergeParagraphInFootnote(target.sectionIdx, target.paraIdx, target.controlIdx, p);
+      this.executeOperation({ kind: 'record', command: new MergeParagraphInFootnoteCommand(target, p, result.fnParaIndex, result.charOffset, p, 0, result.removedParaMeta) });
+    }
   }
-  this.cursor.setFnCursorPosition(sel.start.fnParaIdx, sel.start.charOffset);
+  this.cursor.setFnCursorPosition(start.fnParaIdx, start.charOffset);
   this.afterEdit();
   return true;
 }
@@ -134,5 +150,55 @@ export function onCut(this: any, e: ClipboardEvent): void {
       claudeFnDeleteSelection.call(this);
       claudeFnInsertText.call(this, text.replace(/\r?\n/g, ' '));
     }
+    return;
+  }
+// ==== next ====
+    // Enter → 각주 내 문단 분할
+// ==== replace ====
+    // [claude-hwpx footnote-clipboard] 위아래 방향키 → 각주 안 윗줄, 아랫줄(같은 가로 위치). Shift 면 고르기를 늘린다
+    if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      e.preventDefault();
+      const r = this.cursor.getRect();
+      if (r) {
+        const y = e.key === 'ArrowUp' ? r.y - r.height * 0.5 : r.y + r.height * 1.5;
+        try {
+          const hit = this.wasm.hitTestInFootnote(r.pageIndex, r.x, y);
+          if (hit.hit && hit.footnoteIndex === this.cursor.fnFootnoteIndex && hit.fnParaIndex !== undefined && hit.charOffset !== undefined) {
+            if (e.shiftKey) this.cursor.setFnAnchor();
+            else this.cursor.clearSelection();
+            this.cursor.setFnCursorPosition(hit.fnParaIndex, hit.charOffset);
+          }
+        } catch { /* 각주 밖이면 움직이지 않는다 */ }
+      }
+      this.updateCaret();
+      return;
+    }
+
+    // Enter → 각주 내 문단 분할
+// ==== next ====
+    if (e.key === 'Backspace' || e.key === 'Delete') {
+      e.preventDefault();
+      const target = { sectionIdx: this.cursor.fnSectionIdx,
+// ==== replace ====
+    if (e.key === 'Backspace' || e.key === 'Delete') {
+      e.preventDefault();
+      // [claude-hwpx footnote-clipboard] 고른 범위가 있으면 그 범위를 지운다(한 글자만 지우던 문제)
+      if (claudeFnDeleteSelection.call(this)) return;
+      const target = { sectionIdx: this.cursor.fnSectionIdx,
+// ==== next ====
+export function handleSelectAll(this: any): void {
+// ==== replace ====
+export function handleSelectAll(this: any): void {
+  // [claude-hwpx footnote-clipboard] 각주 편집 중 Ctrl+A 는 그 각주 글 전체를 고른다(본문 전체를 고르던 문제)
+  if (this.cursor.isInFootnote()) {
+    try {
+      const info = this.wasm.getFootnoteInfo(this.cursor.fnSectionIdx, this.cursor.fnParaIdx, this.cursor.fnControlIdx);
+      const last = Math.max(0, (info.paraCount ?? 1) - 1);
+      this.cursor.clearSelection();
+      this.cursor.setFnCursorPosition(0, 0);
+      this.cursor.setFnAnchor();
+      this.cursor.setFnCursorPosition(last, (info.texts?.[last] ?? '').length);
+    } catch { /* 각주 정보를 못 얻으면 그대로 둔다 */ }
+    this.updateCaret();
     return;
   }

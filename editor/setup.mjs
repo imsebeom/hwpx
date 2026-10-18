@@ -815,7 +815,9 @@ for (const [id, rel] of [['wrap-text-labels', 'ui/picture-props-dialog.ts'], ['w
   // 찾아 바꾸기가 각주, 미주 안 글도 찾고 바꾼다(엔진 footnote-search-* 와 짝, 사용자 보고 2026-10-18)
   ['footnote-search-bridge', 'core/wasm-bridge.ts'], ['footnote-search-find', 'ui/find-dialog.ts'],
   // 각주 편집 중 Ctrl+C, X, V 와 Shift+방향키 고르기(사용자 보고 2026-10-18)
-  ['footnote-clipboard', 'engine/input-handler-keyboard.ts']]) {
+  ['footnote-clipboard', 'engine/input-handler-keyboard.ts'],
+  // 각주 편집 중 고른 범위 위 타자와 조합 시작이 각주 범위를 지운다(Ctrl+A, 위아래 방향키, Backspace 범위는 footnote-clipboard)
+  ['footnote-edit-handler', 'engine/input-handler.ts'], ['footnote-edit-text', 'engine/input-handler-text.ts']]) {
   const f = path.join(STUDIO, 'src', ...rel.split('/'));
   let src = fs.readFileSync(f, 'utf8');
   if (src.includes(`[claude-hwpx ${id}]`)) continue;
