@@ -621,6 +621,9 @@ const RUST_PATCHES = [
     // 새 각주를 「각주」 스타일(9pt)로 만들고 표 칸 안에도 넣는다(insertFootnoteInCell, 사용자 요청 2026-10-19)
     ['fn-insert-note', 'src/document_core/commands/object_ops/note.rs'],
     ['fn-insert-wasm-api', 'src/wasm_api.rs'],
+    // 각주, 미주 글에 글자 모양을 적용하고 읽는다(스튜디오 fn-char-format-* 와 짝, 각주 편집 중 Ctrl+B 무반응)
+    ['fn-char-format-footnote-ops', 'src/document_core/commands/footnote_ops.rs'],
+    ['fn-char-format-wasm-api', 'src/wasm_api.rs'],
     // 엔진이 만든 줄의 첫 vpos 0 은 저장 쪽 경계로 읽지 않는다(format_text 뒤 문단이 다음 쪽으로 넘어가던 문제)
     ['synth-no-reset-typeset', 'src/renderer/typeset.rs'],
     // 표 속성(캡션 등)을 바꾸면 표 높이를 다시 잰다(캡션 높이가 빠지던 문제)
@@ -836,7 +839,10 @@ for (const [id, rel] of [['wrap-text-labels', 'ui/picture-props-dialog.ts'], ['w
   // 표 칸 안 각주도 각주 영역을 눌러 편집한다(엔진 fn-cell-target-* 와 짝). 편집 중 다른 각주를 누르면 그 각주로 옮겨 탄다
   ['fn-cell-target-bridge', 'core/wasm-bridge.ts'], ['fn-cell-target-mouse', 'engine/input-handler-mouse.ts'],
   // 각주 첫 문단의 커서가 번호 앞(0, 1)으로 가지 않게 한다(Home, 왼쪽 키, 누르기, Ctrl+A, Backspace)
-  ['fn-number-floor-cursor', 'engine/cursor.ts'], ['fn-number-floor-keyboard', 'engine/input-handler-keyboard.ts']]) {
+  ['fn-number-floor-cursor', 'engine/cursor.ts'], ['fn-number-floor-keyboard', 'engine/input-handler-keyboard.ts'],
+  // 각주 편집 중 글자 모양(Ctrl+B, 툴바)을 고른 범위에 입히고, 툴바 표시와 토글 방향을 각주 글에서 읽는다(엔진 fn-char-format-* 와 짝)
+  ['fn-char-format-bridge', 'core/wasm-bridge.ts'], ['fn-char-format-handler', 'engine/input-handler.ts'],
+  ['fn-char-format-keyboard', 'engine/input-handler-keyboard.ts']]) {
   const f = path.join(STUDIO, 'src', ...rel.split('/'));
   let src = fs.readFileSync(f, 'utf8');
   if (src.includes(`[claude-hwpx ${id}]`)) continue;
