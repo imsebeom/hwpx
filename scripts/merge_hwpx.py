@@ -17,7 +17,8 @@ Usage:
 관례:
   - 첫 파일의 secPr/ctrl은 그대로 유지 (문서 섹션 설정)
   - 추가 파일의 선두 문단이 secPr/ctrl을 포함하면 그 요소만 제거, 나머지 콘텐츠
-    (예: 부서명·제목·표)는 보존하고 본체에 이어붙임
+    (예: 부서명·제목·표)는 보존하고 본체에 이어붙임. 각주, 미주, 책갈피, 필드를 담은 ctrl 은 남긴다
+  - 각주, 미주 번호 모양은 첫 파일을 따르되, 첫 파일에 그 주가 없으면(간지 등) 그 주를 처음 가진 파일의 것을 쓴다
   - 추가 파일의 paraPr 내 <hh:border>와 charPr의 borderFillIDRef는 안전한 기본값
     "1"로 고정 (뷰어가 type=NONE이어도 박스 테두리를 렌더링하는 이슈 방지)
 """
@@ -227,15 +228,15 @@ def _strip_section_control(para):
     """
     # 문단 바로 아래 run 의 구역 설정만 지운다. para.iter() 로 끝까지 내려가면 첫 문단 안 표(제목 표,
     # 읽을거리 상자)에 든 메모 필드와 각주까지 지워졌다(2026-10-18 가이드북 합본에서 메모 74개 유실).
-    # 메모, 누름틀 같은 필드의 시작과 끝(fieldBegin, fieldEnd)을 담은 ctrl 은 남긴다
+    # 메모, 누름틀 같은 필드의 시작과 끝(fieldBegin, fieldEnd)을 담은 ctrl 은 남긴다. 각주, 미주, 책갈피도
+    # ctrl 안에 들어 있어 첫 문단에 단 각주가 합본에서 사라졌다(2026-10-19 확인)
+    keep = ("fieldBegin", "fieldEnd", "footNote", "endNote", "bookmark")
     for run in para.findall(f"{{{HP}}}run"):
         for el in list(run):
             local = etree.QName(el).localname
             if local == "secPr" or (
                 local == "ctrl"
-                and not any(
-                    etree.QName(c).localname in ("fieldBegin", "fieldEnd") for c in el
-                )
+                and not any(etree.QName(c).localname in keep for c in el)
             ):
                 run.remove(el)
     for run in list(para.iter(f"{{{HP}}}run")):
@@ -314,6 +315,14 @@ def merge_hwpx(files, output, pagebreak=True, img_prefix_tpl="s{idx}_"):
 
     pid = get_max_id(root_tgt) + 1000
 
+    # 합본은 구역 하나라 각주, 미주 번호 모양(secPr 의 footNotePr, endNotePr)이 기반 파일을 따른다. 기반이
+    # 각주 없는 간지(로마 숫자)면 합본 각주가 iii, xvi 로 찍혔다(2026-10-18 보고). 기반에 그 주가 없으면
+    # 그 주를 처음 가진 파일의 번호 모양을 쓴다
+    note_donor = {}
+    for tag in ("footNote", "endNote"):
+        if root_tgt.find(f".//{{{HP}}}{tag}") is None:
+            note_donor[tag] = None
+
     for idx, src_path in enumerate(files[1:], start=1):
         img_prefix = img_prefix_tpl.format(idx=idx)
         print(f"[{idx}/{len(files) - 1}] {src_path.name} (prefix={img_prefix})")
@@ -323,6 +332,12 @@ def merge_hwpx(files, output, pagebreak=True, img_prefix_tpl="s{idx}_"):
             src_bindata = {
                 n: z.read(n) for n in z.namelist() if n.startswith("BinData/")
             }
+
+        for tag, donor in note_donor.items():
+            if donor is None and root_src.find(f".//{{{HP}}}{tag}") is not None:
+                pr = root_src.find(f".//{{{HP}}}secPr/{{{HP}}}{tag}Pr")
+                if pr is not None:
+                    note_donor[tag] = (src_path.name, deepcopy(pr))
 
         cp_map, pp_map, bf_map = integrate_header(header_tgt, header_src)
         pid = remap_and_append_section(
@@ -339,6 +354,19 @@ def merge_hwpx(files, output, pagebreak=True, img_prefix_tpl="s{idx}_"):
         for name, data in src_bindata.items():
             fname_only = name.split("/", 1)[1]
             all_bindata[f"BinData/{img_prefix}{fname_only}"] = data
+
+    base_sec = root_tgt.find(f".//{{{HP}}}secPr")
+    for tag, donor in note_donor.items():
+        if donor is None or base_sec is None:
+            continue
+        name, pr = donor
+        old = base_sec.find(f"{{{HP}}}{tag}Pr")
+        if old is not None:
+            base_sec.replace(old, pr)
+        else:
+            base_sec.append(pr)
+        kind = "각주" if tag == "footNote" else "미주"
+        print(f"{kind} 번호 모양: 기반 파일에 {kind}가 없어 {name} 의 것을 씀")
 
     # 재조립
     new_hdr = etree.tostring(
