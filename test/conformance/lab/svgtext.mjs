@@ -19,8 +19,10 @@ const doc = new m.HwpDocument(buf);
 const svg = doc.renderPageSvg(Number(pageArg) - 1);
 const rows = new Map();
 for (const mm of svg.matchAll(/<text\b([^>]*)>([^<]*)<\/text>/g)) {
-  const y = Number((/\by="([-\d.]+)"/.exec(mm[1]) ?? [])[1]);
-  const x = Number((/\bx="([-\d.]+)"/.exec(mm[1]) ?? [])[1]);
+  // 장평이 있는 글자는 x, y 대신 transform="translate(x,y) scale(..)" 로 놓인다
+  const tr = /translate\(([-\d.]+),([-\d.]+)\)/.exec(mm[1]);
+  const y = Number(tr ? tr[2] : (/\by="([-\d.]+)"/.exec(mm[1]) ?? [])[1]);
+  const x = Number(tr ? tr[1] : (/\bx="([-\d.]+)"/.exec(mm[1]) ?? [])[1]);
   if (!(y >= Number(lo) && y <= Number(hi))) continue;
   const k = y.toFixed(1);
   if (!rows.has(k)) rows.set(k, []);
