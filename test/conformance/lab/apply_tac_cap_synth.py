@@ -1,4 +1,4 @@
-"""개발용(넣지 않음, README 「남은 것」 참고): 엔진이 만든 줄(줄 배치 없는 HWPX, 편집 뒤 다시 만든 줄)의 글자처럼 취급 표 문단은 전진을 cap 으로 깎지 않는다.
+"""개발용: 엔진이 만든 줄(줄 배치 없는 HWPX, 편집 뒤 다시 만든 줄)의 글자처럼 취급 표 문단은 전진을 cap 으로 깎지 않는다.
 
     python apply_tac_cap_synth.py [--revert]
 
@@ -6,6 +6,12 @@
 1,685건이 다음 문단까지 「줄 높이 + 줄 간격 전체(+ 문단 아래, 다음 문단 위 간격)」만큼 내려간다. 엔진 cap
 「줄 높이 + 줄 간격 절반 + 바깥 위 여백」과 맞는 것은 0건이다. 저장 줄이 있으면 tac-cap-ladder 가 저장 스텝으로 cap 을 풀지만,
 엔진이 만든 줄에는 그 증거가 없어 표마다 1~2px 덜 내려갔다(d193 1쪽: 표 셋에 −6.7px, 한/글보다 한 줄 더 담아 쪽이 갈림).
+cap 만 풀면 쪽수 95.1 → 95.4% 인데 문단 쪽 98.7 → 94.7% 였다. 그동안 cap 이 덮던 결함이 드러났기 때문이다. 한 줄짜리
+글자처럼 취급 표의 쪽 끝 들어감 판정(블록 표 경로 whole_fit)이 뒤 줄 간격까지 요구해, d292 p75(표 379.9px)가 남은 386.7px 에
+못 들어갔다. 한/글은 「위 간격 + 줄 높이」만 요구한다(tac-caption-line 과 같은 마지막 줄 규칙). 둘을 함께 넣으면
+쪽수 95.7%, 문단 쪽 99.2%, 줄바꿈 불일치 그대로. 새로 어긋난 d010 은 p8 줄바꿈 불일치(한/글 1줄, rhwp 2줄)를 cap 이 덮던 것이고,
+d034 p400(그룹 개체 줄)은 일반 문단 경로의 쪽 끝 판정이 앞 항목이 표일 때만 뒤 간격을 빼서였다. 글 없이 글자처럼 취급 개체만 든
+문단도 빼도록 넣었다(글 문단까지 넓히면 d033 이 틀린다). 셋을 함께 넣어 쪽수 96.0%, 문단 쪽 99.2%.
 """
 
 import sys
@@ -47,18 +53,22 @@ EDITS = [
         "        {\n"
         "            table_total = fmt.total_height;\n"
         "        }\n",
-        f"        // {TAG} 이 정합으로 table_total 이 품게 된 줄 간격과 문단 아래 간격. 쪽 끝 들어감 판정에서는 뺀다\n"
-        "        // (tac-caption-line 과 같은 한/글 마지막 줄 규칙: 위 간격 + 줄 높이만 들어가면 된다. d292 p75: 표 379.9px 가 남은 386.7px 에\n"
-        "        // 들어가는데 간격 12px 까지 요구해 다음 쪽으로 밀렸다)\n"
-        "        let mut claude_fit_tail = 0.0;\n"
         "        if table.common.treat_as_char\n"
         "            && fmt.line_heights.len() == 1\n"
         "            && fmt.total_height > table_total\n"
         "        {\n"
-        "            claude_fit_tail = (fmt.total_height - (fmt.spacing_before + fmt.line_heights[0]))\n"
-        "                .clamp(0.0, fmt.total_height - table_total);\n"
         "            table_total = fmt.total_height;\n"
-        "        }\n",
+        "        }\n"
+        f"        // {TAG} 한 줄짜리 글자처럼 취급 표가 쪽 끝에 들어가려면 한/글은 「위 간격 + 줄 높이」(표 + 바깥 여백)만 요구한다\n"
+        "        // (tac-caption-line 과 같은 마지막 줄 규칙). table_total 은 뒤 줄 간격(host_spacing.after_for_fit, 위 정합의 fmt.total)을\n"
+        "        // 품어, d292 p75(표 379.9px)가 남은 386.7px 에 못 들어가고 다음 쪽으로 갔다. 판정에서만 그 꼬리를 뺀다\n"
+        "        let claude_fit_tail = if table.common.treat_as_char && fmt.line_heights.len() == 1 {\n"
+        "            let need = (fmt.spacing_before + fmt.line_heights[0])\n"
+        "                .max(ft.effective_height + ft.host_spacing.before);\n"
+        "            (table_total - need).max(0.0)\n"
+        "        } else {\n"
+        "            0.0\n"
+        "        };\n",
     ),
     (
         "renderer/typeset.rs",
@@ -73,6 +83,21 @@ EDITS = [
         f"            // {TAG} 한 줄짜리 글자처럼 취급 표의 뒤 간격은 들어감 판정에서 뺀다(위 claude_fit_tail)\n"
         "            table_total - claude_fit_tail\n"
         "        };\n",
+    ),
+    (
+        "renderer/typeset.rs",
+        "                let overflow_threshold = if prev_is_table {\n",
+        f"                // {TAG} 글 없이 글자처럼 취급 개체만 든 문단도 마지막 줄 뒤 줄 간격 없이 들어가면 된다(표 경로와 같은 마지막 줄 규칙).\n"
+        "                // 앞 표들이 한/글만큼 내려가자 d034 p400(그룹 개체 줄 17383, 남은 자리에 들어감)이 뒤 간격 때문에 다음 쪽으로 밀렸다.\n"
+        "                // 글 문단까지 넓히면 d033 이 틀려 개체만 든 문단으로 좁힌다\n"
+        "                let claude_object_only = st.profile.hwpx_container()\n"
+        "                    && !para_has_visible_text(para)\n"
+        "                    && para.controls.iter().any(|c| match c {\n"
+        "                        Control::Picture(p) => p.common.treat_as_char,\n"
+        "                        Control::Shape(s) => s.common().treat_as_char,\n"
+        "                        _ => false,\n"
+        "                    });\n"
+        "                let overflow_threshold = if prev_is_table || claude_object_only {\n",
     ),
 ]
 
