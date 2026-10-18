@@ -3,6 +3,10 @@
 `/hwpx` 스킬(`~/.claude/skills/hwpx`, 저장소 imsebeom/hwpx2)에 rhwp 에디터 모드를 붙이는 개발 폴더.
 사용자는 브라우저의 rhwp 에디터로 문서를 보고, 터미널 Claude 가 같은 문서를 실시간으로 고친다.
 **2026-09-25 스킬로 통합 완료** — 코드 원본은 이제 `~/.claude/skills/hwpx/editor/`(설명서 `references/editor-mode.md`, 시험 `editor/tests/`)이다. 이 폴더의 `editor/` 는 개발 당시 사본이고 **여기서 고치지 않는다.** `.build/`(rhwp 소스, Rust 빌드 캐시)는 이 폴더에만 있다.
+- 🔑 **hwpx 스킬 업데이트 세션은 이 폴더에서 시작한다**(2026-10-18 사용자 결정). 저장소가 둘이고 원격은 같다(imsebeom/hwpx, imsebeom/hwpx2):
+  - 스킬 본체 `~/.claude/skills/hwpx` = 두 저장소의 **main**. 스킬 코드, 엔진 패치(`editor/patches/`), 문서는 거기서 고치고 커밋한다. 푸시 전 `node editor/setup.mjs --build && node editor/release.mjs` 로 미리 빌드 묶음을 올리고 `prebuilt.json` 을 커밋한다(pre-push 훅이 막는다). 원격은 `origin`(hwpx2), `hwpx`(hwpx), `jkf87`(푸시 금지).
+  - 이 폴더 = 두 저장소의 **dev** 브랜치(실험실 `test/conformance/lab`, 채점기, 줄 나눔 도구, 앵커). 로컬 브랜치 master 가 `origin/dev` 를 따른다. 푸시는 `git push origin master:dev && git push hwpx master:dev`.
+  - 푸시는 사용자가 요청할 때만, 그 전에 저작권 검토(한컴 바이너리에서 읽은 값 없음, 블랙박스 실측과 독자 구현만)를 거친다. REA 저장소의 한컴 추출물은 어느 쪽에도 옮기지 않는다.
 - 노션: https://app.notion.com/p/3f1b9a4fc96d81799519c353c423deee (「hwpx 스킬 개발」 — 2026-10-06 사용자 결정으로 스킬 전체 범위, 2026-03-21 시작, **상태는 「관리」**(운영 중이 아니라는 사용자 지시 — 세션정리가 「진행 중」으로 바꾸지 않는다). 세션정리 2단계의 프로젝트 relation 은 여기)
 - 구분: 앱 개발
 
