@@ -208,6 +208,12 @@ def main():
                 miss = sum(a != b for a, b in zip(para_pages, han_bp))
                 if miss and os.environ.get("NATIVE_PP"):
                     print(f"문단 쪽 다름 {name} {miss}/{len(han_bp)}", file=sys.stderr)
+            elif os.environ.get("NATIVE_QC") and hp is not None and han_bp:
+                # NATIVE_QC=1 이면 문단 쪽 셈에서 빠진 문서와 까닭(한/글 vertpos 쪽 수, 문단 수)을 찍는다
+                print(
+                    f"문단 쪽 제외 {name} 쪽 {han_bp[-1] + 1}/{hp} 문단 {len(para_pages)}/{len(han_bp)}",
+                    file=sys.stderr,
+                )
             if len(rb) == len(body):
                 for p, h in enumerate(body):
                     if not h:
