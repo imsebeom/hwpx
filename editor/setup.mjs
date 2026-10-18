@@ -641,6 +641,10 @@ const RUST_PATCHES = [
     ['fit-sb-typeset', 'src/renderer/typeset.rs'],
     // 글자처럼 취급 표가 여럿 든 문단에서 마지막이 아닌 표 뒤에 줄 간격을 두 번 더하지 않는다(d159 p134 +6px)
     ['tac-multi-trail-typeset', 'src/renderer/typeset.rs'],
+    // 한 줄짜리 글자처럼 취급 개체 문단의 「시작이 본문 안이면 담는다」 판정에 위 간격을 센다(d268 둘째 구역 p200, 한/글 새 조판)
+    ['atomic-top-sb-typeset', 'src/renderer/typeset.rs'],
+    // 글 없는 문단의 자리 차지 표 바로 뒤 문단은 위 간격을 표 아래에 묻는다(정답본 19/19, d268 23쪽)
+    ['tbl-next-sb-typeset', 'src/renderer/typeset.rs'],
     // 엔진이 만든 줄의 첫 vpos 0 은 저장 쪽 경계로 읽지 않는다(format_text 뒤 문단이 다음 쪽으로 넘어가던 문제)
     ['synth-no-reset-typeset', 'src/renderer/typeset.rs'],
     // 표 속성(캡션 등)을 바꾸면 표 높이를 다시 잰다(캡션 높이가 빠지던 문제)

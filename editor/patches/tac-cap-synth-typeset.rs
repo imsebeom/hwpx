@@ -8,9 +8,10 @@
             // [claude-hwpx tac-cap-synth] 엔진이 만든 줄의 HWPX 문단은 줄 높이 + 줄 간격 전체로 전진한다(harvest_tacstep.py: 한/글 1,685건 모두 전체,
             // cap 과 맞는 것 0건). 저장 사다리 증거(위 두 판정)가 없어 cap 이 표마다 줄 간격 절반을 깎았다(d193)
             // 줄 하나뿐인(표만 든) 문단만 — 글 줄이 앞에 있으면 표가 다음 쪽으로 갈 때 fmt.total 이 앞 쪽 글 줄까지 품는다(d043 p6)
+            // 빈칸만 있는 문단도 글 없는 문단이다(d268 둘째 구역 p152 「 」 + 표: 한/글 새 조판 4488 + 1200, cap 이 320 깎았다)
             let claude_synth_hwpx = st.profile.hwpx_container()
                 && para.line_segs.len() == 1
-                && !para_has_visible_text(para)
+                && !para_has_non_whitespace_text(para)
                 && para.line_segs.first().is_some_and(|s| {
                     s.tag & crate::model::paragraph::LineSeg::TAG_IMPLEMENTATION_PROPERTY != 0
                 });
