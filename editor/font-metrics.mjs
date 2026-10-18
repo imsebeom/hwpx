@@ -301,7 +301,10 @@ function readWidths(face) {
     const hangul = syllables.every((w) => w > 0 && w === syllables[0]) ? syllables[0] : syllables.some((w) => w > 0) ? syllables : null;
     const hanja = new Set();
     for (let code = 0x4e00; code <= 0x9fff; code++) { const w = width(code); if (w) hanja.add(w); }
-    return { em, hangul, ranges, uniform: hanja.size === 1 ? [[0x4e00, 0x9fff, [...hanja][0]]] : [] };
+    // 세로 수치(hhea ascender, -descender, lineGap). Word 호환 문서의 줄 높이가 이것으로 정해진다(lab harvest_wordcompat.py)
+    const hh = readAt(fd, t.hhea.offset + 4, 6);
+    const vm = [hh.readInt16BE(0), -hh.readInt16BE(2), hh.readInt16BE(4)];
+    return { em, vm, hangul, ranges, uniform: hanja.size === 1 ? [[0x4e00, 0x9fff, [...hanja][0]]] : [] };
   } finally {
     fs.closeSync(fd);
   }
