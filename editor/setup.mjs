@@ -553,6 +553,20 @@ const RUST_PATCHES = [
     ['rowspan-cut-row-table-partial', 'src/renderer/layout/table_partial.rs'],
     // HWP5 에서 온 HWPX 라도 본문 문단 전체에 줄 배치가 없으면(스킬이 캐시를 지운 저장본) 열 때 줄 배치를 다시 만든다(선택 음영이 첫 줄에만 칠해지던 문제)
     ['hwp5-origin-stripped-document', 'src/document_core/commands/document.rs'],
+    // 줄 배치 없는 문단의 글자처럼 취급 수식은 스크립트로 잰 크기가 적힌 높이보다 크면 그 크기로(빌더 수식이 칸에서 잘리던 문제)
+    ['eq-intrinsic-size-document', 'src/document_core/commands/document.rs'],
+    // 엔진이 만든 줄의 vpos 로 누적 높이를 되맞추지 않는다(에디터 편집 뒤 쪽이 어긋나던 문제, tests/edit_consistency.mjs)
+    ['synth-no-snap-typeset', 'src/renderer/typeset.rs'],
+    // 편집으로 구역 본문 줄을 모두 새로 만든 뒤(쪽 설정) 문서 열기처럼 vpos 사슬을 잇는다(문단마다 0 이던 문제, tests/edit_consistency.mjs)
+    ['edit-vpos-chain-formatting', 'src/document_core/commands/formatting.rs'],
+    // 문단 서식 바꾸기에서 번호, 글머리표 머리와 탭 설정이 바뀌어도 줄을 다시 나눈다(set_list 뒤 번호 폭이 빠지던 문제)
+    ['head-reflow-gate-formatting', 'src/document_core/commands/formatting.rs'],
+    // 엔진이 만든 줄의 첫 vpos 0 은 저장 쪽 경계로 읽지 않는다(format_text 뒤 문단이 다음 쪽으로 넘어가던 문제)
+    ['synth-no-reset-typeset', 'src/renderer/typeset.rs'],
+    // 표 속성(캡션 등)을 바꾸면 표 높이를 다시 잰다(캡션 높이가 빠지던 문제)
+    ['table-props-dirty-table-ops', 'src/document_core/commands/table_ops.rs'],
+    // 문단 수가 바뀐 구역은 표 측정 캐시를 버린다(표 넣기 뒤 뒤쪽 표들이 다른 표 높이를 받던 문제)
+    ['measure-cache-shift-rendering', 'src/document_core/queries/rendering.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));
@@ -599,7 +613,7 @@ if (hasRust && RUST_PATCHES.some((p) => !builtIds.includes(p.id))) {
 // 3. claude 플러그인 복사와 allowlist 등록
 for (const f of ['claude-plugin.ts', 'hancom-keys.ts', 'edit-log.ts', 'k-commands.ts', 'log-panel.ts', 'memo-panel.ts', 'color-palette.ts', 'para-preview.ts', 'dialog-enter.ts', 'cell-block-erase.ts', 'cell-clipboard.ts', 'picture-crop.ts', 'move-drop.ts', 'system-fonts.ts']) fs.copyFileSync(path.join(HERE, 'plugin', f), path.join(STUDIO, 'src', 'plugin', f));
 // 편집 도구 라이브러리(lib/SOURCE.md)도 같은 자리로. 플러그인이 './doc-tools.js' 로 부른다.
-for (const f of ['doc-tools.js', 'doc-rules.js', 'collab-ops.js']) {
+for (const f of ['doc-tools.js', 'doc-rules.js', 'collab-ops.js', 'run-ops.js']) {
   fs.copyFileSync(path.join(HERE, 'plugin', 'lib', f), path.join(STUDIO, 'src', 'plugin', f));
 }
 const mainTs = path.join(STUDIO, 'src', 'main.ts');
@@ -748,7 +762,9 @@ for (const [id, rel] of [['wrap-text-labels', 'ui/picture-props-dialog.ts'], ['w
   // 본문에서 끌다 표를 만나면 칸 안으로 들어가지 않고 표를 글자 하나처럼 통째로 넣고 뺀다(사용자 보고 2026-10-18)
   ['drag-skip-table', 'engine/input-handler.ts'],
   // 에디터 서버가 읽은 설치 글꼴을 로컬 글꼴로(host-fonts), 처음 고르는 글꼴은 폭 표를 받아 등록한 뒤 적용(font-metrics-on-pick)
-  ['host-fonts', 'core/local-fonts.ts'], ['font-metrics-on-pick', 'ui/toolbar.ts']]) {
+  ['host-fonts', 'core/local-fonts.ts'], ['font-metrics-on-pick', 'ui/toolbar.ts'],
+  // 여러 칸 테두리를 바깥 네 변, 안쪽 가로, 안쪽 세로 여섯 부분으로 나눠 바꾼 부분만 적용(「아래」만 바꿔도 안쪽 선까지 바뀌던 문제)
+  ['cell-border-parts', 'ui/cell-border-bg-dialog.ts'], ['cell-border-parts-cmd', 'engine/command.ts']]) {
   const f = path.join(STUDIO, 'src', ...rel.split('/'));
   let src = fs.readFileSync(f, 'utf8');
   if (src.includes(`[claude-hwpx ${id}]`)) continue;

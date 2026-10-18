@@ -1,0 +1,327 @@
+[
+ {
+  "label": "(기준) 바꾸지 않음",
+  "op": {
+   "tool": "read_document",
+   "args": {}
+  }
+ },
+ {
+  "label": "replace_paragraph",
+  "op": {
+   "tool": "replace_paragraph",
+   "args": {
+    "para": 5,
+    "text": "짧게 바꾼 문단입니다."
+   }
+  }
+ },
+ {
+  "label": "insert_paragraphs",
+  "op": {
+   "tool": "insert_paragraphs",
+   "args": {
+    "after_para": 8,
+    "texts": [
+     "새로 넣은 긴 문단입니다. 새로 넣은 긴 문단입니다. 새로 넣은 긴 문단입니다. 새로 넣은 긴 문단입니다. 새로 넣은 긴 문단입니다. 새로 넣은 긴 문단입니다.",
+     "둘째 새 문단"
+    ]
+   }
+  }
+ },
+ {
+  "label": "delete_paragraphs",
+  "op": {
+   "tool": "delete_paragraphs",
+   "args": {
+    "from_para": 12,
+    "to_para": 13
+   }
+  }
+ },
+ {
+  "label": "find_replace",
+  "op": {
+   "tool": "find_replace",
+   "args": {
+    "find": "태양 고도",
+    "replace": "태양의 고도 각도"
+   }
+  }
+ },
+ {
+  "label": "regex_replace",
+  "op": {
+   "tool": "regex_replace",
+   "args": {
+    "pattern": "학생",
+    "replace": "학습자들"
+   }
+  }
+ },
+ {
+  "label": "set_cell",
+  "op": {
+   "tool": "set_cell",
+   "args": {
+    "table": "T5",
+    "row": 1,
+    "col": 0,
+    "text": "짧은 프롬프트"
+   }
+  }
+ },
+ {
+  "label": "format_text",
+  "op": {
+   "tool": "format_text",
+   "args": {
+    "at": "p9",
+    "size_pt": 14
+   }
+  }
+ },
+ {
+  "label": "format_paragraph",
+  "op": {
+   "tool": "format_paragraph",
+   "args": {
+    "at": "p9",
+    "line_spacing": 220
+   }
+  }
+ },
+ {
+  "label": "insert_table_row",
+  "op": {
+   "tool": "insert_table_row",
+   "args": {
+    "table": "T8",
+    "row": 1,
+    "below": true
+   }
+  }
+ },
+ {
+  "label": "duplicate_row",
+  "op": {
+   "tool": "duplicate_row",
+   "args": {
+    "table": "T8",
+    "row": 1,
+    "count": 2
+   }
+  }
+ },
+ {
+  "label": "delete_table_row",
+  "op": {
+   "tool": "delete_table_row",
+   "args": {
+    "table": "T8",
+    "row": 1
+   }
+  }
+ },
+ {
+  "label": "insert_table_column",
+  "op": {
+   "tool": "insert_table_column",
+   "args": {
+    "table": "T1",
+    "col": 1,
+    "right": true
+   }
+  }
+ },
+ {
+  "label": "merge_cells",
+  "op": {
+   "tool": "merge_cells",
+   "args": {
+    "table": "T1",
+    "from_row": 1,
+    "from_col": 0,
+    "to_row": 1,
+    "to_col": 1
+   }
+  }
+ },
+ {
+  "label": "cell_style",
+  "op": {
+   "tool": "cell_style",
+   "args": {
+    "table": "T5",
+    "from_row": 0,
+    "from_col": 0,
+    "bg_color": "#FFEEAA"
+   }
+  }
+ },
+ {
+  "label": "column_width",
+  "op": {
+   "tool": "column_width",
+   "args": {
+    "table": "T1",
+    "col": 0,
+    "width_mm": 60
+   }
+  }
+ },
+ {
+  "label": "row_height",
+  "op": {
+   "tool": "row_height",
+   "args": {
+    "table": "T5",
+    "row": 1,
+    "height_mm": 60
+   }
+  }
+ },
+ {
+  "label": "table_caption",
+  "op": {
+   "tool": "table_caption",
+   "args": {
+    "table": "T5",
+    "text": "시험 캡션"
+   }
+  }
+ },
+ {
+  "label": "table_props",
+  "op": {
+   "tool": "table_props",
+   "args": {
+    "table": "T8",
+    "page_break": "cell"
+   }
+  }
+ },
+ {
+  "label": "page_setup",
+  "op": {
+   "tool": "page_setup",
+   "args": {
+    "margins_mm": {
+     "left": 30,
+     "right": 30
+    }
+   }
+  }
+ },
+ {
+  "label": "create_table",
+  "op": {
+   "tool": "create_table",
+   "args": {
+    "after_para": 9,
+    "rows": [
+     [
+      "가",
+      "나"
+     ],
+     [
+      "다",
+      "라"
+     ],
+     [
+      "마",
+      "바"
+     ]
+    ]
+   }
+  }
+ },
+ {
+  "label": "delete_table",
+  "op": {
+   "tool": "delete_table",
+   "args": {
+    "table": "T5"
+   }
+  }
+ },
+ {
+  "label": "set_list",
+  "op": {
+   "tool": "set_list",
+   "args": {
+    "at": "p8-p9",
+    "kind": "number",
+    "level": 0
+   }
+  }
+ },
+ {
+  "label": "set_header_footer",
+  "op": {
+   "tool": "set_header_footer",
+   "args": {
+    "which": "footer",
+    "text": "- {쪽} -"
+   }
+  }
+ },
+ {
+  "label": "add_footnote",
+  "op": {
+   "tool": "add_footnote",
+   "args": {
+    "para": 9,
+    "text": "각주입니다. 각주입니다. 각주입니다."
+   }
+  }
+ },
+ {
+  "label": "add_endnote",
+  "op": {
+   "tool": "add_endnote",
+   "args": {
+    "para": 9,
+    "text": "미주입니다."
+   }
+  }
+ },
+ {
+  "label": "insert_equation",
+  "op": {
+   "tool": "insert_equation",
+   "args": {
+    "para": 9,
+    "script": "x = {-b +- sqrt{b^2 -4ac}} over {2a}"
+   }
+  }
+ },
+ {
+  "label": "clone_table",
+  "op": {
+   "tool": "clone_table",
+   "args": {
+    "model": "T5",
+    "after_para": 9,
+    "rows": [
+     [
+      "복제 제목"
+     ],
+     [
+      "복제 본문"
+     ]
+    ]
+   }
+  }
+ },
+ {
+  "label": "delete_cell_paragraphs",
+  "op": {
+   "tool": "delete_cell_paragraphs",
+   "args": {
+    "cell": "T5r1c0",
+    "only_empty": true
+   }
+  }
+ }
+]
