@@ -645,6 +645,12 @@ const RUST_PATCHES = [
     ['atomic-top-sb-typeset', 'src/renderer/typeset.rs'],
     // 글 없는 문단의 자리 차지 표 바로 뒤 문단은 위 간격을 표 아래에 묻는다(정답본 19/19, d268 23쪽)
     ['tbl-next-sb-typeset', 'src/renderer/typeset.rs'],
+    // 그리기 위치(한/글 PDF 기준선 대조 lab exp/rendery.py): 엔진이 만든 줄의 쪽 머리 위 간격, 쪽 vpos 기준점에서 쪽 머리 위 간격 빼기,
+    // 문단 기준 표의 바깥 위 여백, 저장 줄 배치는 표와 개체 뒤에도 기준점 유지
+    ['pagetop-sb-synth-paragraph-layout', 'src/renderer/layout/paragraph_layout.rs'],
+    ['page-base-sb-layout', 'src/renderer/layout.rs'],
+    ['para-tbl-omtop-table-layout', 'src/renderer/layout/table_layout.rs'],
+    ['keep-stored-base-layout', 'src/renderer/layout.rs'],
     // 엔진이 만든 줄의 첫 vpos 0 은 저장 쪽 경계로 읽지 않는다(format_text 뒤 문단이 다음 쪽으로 넘어가던 문제)
     ['synth-no-reset-typeset', 'src/renderer/typeset.rs'],
     // 표 속성(캡션 등)을 바꾸면 표 높이를 다시 잰다(캡션 높이가 빠지던 문제)
