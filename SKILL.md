@@ -382,7 +382,8 @@ subprocess.run([sys.executable, str(SKILL_DIR/"scripts/fix_namespaces.py"), str(
 ```bash
 # 도장: 문구 위에 글 앞 그림으로 띄운다. 칸과 쪽 높이는 그대로다. 결과(JSON)의 warnings 를 본다
 python3 "${CLAUDE_SKILL_DIR}/scripts/seal_hwpx.py" 서식.hwpx 날인본.hwpx --image 도장.png \
-  --anchor "(인)" --occurrence all        # 0, 0,2, all. --mode right 는 문구 오른쪽, --size mm, --dx/--dy mm
+  --anchor "(인)" --occurrence all        # 0, 0,2, all. --mode right 는 문구 오른쪽, --size 긴 변 mm, --dx/--dy mm
+# 서명처럼 가로로 긴 그림: --width 가로 mm 만 주면 세로는 그림 비율대로(2026-10-19부터 비율을 지킨다. 종전에는 늘 정사각형)
 
 # 차트: 그림이 아니라 한글에서 고칠 수 있는 차트. 자료는 .json, .csv, kordoc 펜스 글
 python3 "${CLAUDE_SKILL_DIR}/scripts/chart_hwpx.py" 문서.hwpx 차트본.hwpx --data 자료.csv \
@@ -391,6 +392,11 @@ python3 "${CLAUDE_SKILL_DIR}/scripts/chart_hwpx.py" 문서.hwpx 차트본.hwpx -
 > 도장은 투명 배경 PNG 를 쓴다. 세로 위치는 저장된 줄 배치로 잡으므로 한글로 저장한 적 없는 생성본은
 > `fix_namespaces.py`(한글 줄 배치 넣기)를 먼저 거친다. **쪽을 넘는 긴 칸 뒤쪽의 문구는 한글이 도장을 앞 쪽에 걸거나
 > 그리지 않는다**(경고가 뜬다) — PDF 로 확인하고, 필요하면 그 칸을 나누거나 손으로 찍는다.
+> 칸 안 도장의 자리는 표 위에서 앞 행 높이, 표 바깥 여백, 칸 안 여백(hasMargin=0 이면 표 안 여백), 칸 세로 정렬 몫을 더해 잡는다
+> (2026-10-19 한/글 PDF 실측: 여백과 가운데 정렬을 빠뜨려 가로 2.3mm, 세로 3.3mm 어긋나던 것을 0.1mm 안으로).
+> **「글자와 함께 이동」(flowWithText) 선택**: 도구는 끈 채(0) 넣어 칸과 쪽 높이가 그대로다. 켜면 한글이 그림 높이만큼 칸을 키워
+> 쪽이 늘 수 있다(6쪽이 된 사례). 끈 채로는 표 위치가 바뀌면(앞에 글을 더 넣는 등) 도장이 제자리를 벗어나니, 날인은 글을 다 고친 뒤 마지막에 한다.
+> **그림을 손으로 자를 때(imgClip) 단위는 표시 크기가 아니라 원본 그림 픽셀 x 75 다**(규칙 20). 표시 크기로 계산하면 서명이 가는 띠로만 나온다.
 > 차트 종류: column, column_stacked, line, bar, bar_stacked, scatter, pie, pie_explode, doughnut, area,
 > area_stacked, radar, bar3d, pie3d(한글 이름 막대, 선, 원, 도넛 등도 된다). 원은 첫 계열만 쓴다.
 > 한글 PDF 로 14종을 확인했다(2026-09-28).

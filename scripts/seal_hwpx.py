@@ -12,6 +12,8 @@ kordoc(chrisryugj/kordoc, MIT) `src/form/seal.ts` 를 표준 라이브러리로 
 - 세로는 저장된 줄 배치(linesegarray)로 문구가 든 줄 가운데에 앉힌다. 한글은 칸 문단의 글 앞 그림을
   칸이 아니라 표 위에서 재므로 앞 행 높이와 칸 위 여백을 더한다(원본 kordoc 에는 없는 보정, 한글 PDF 실측).
   줄 배치가 없으면 원본처럼 문단 첫 줄 기준으로 어림한다.
+- 칸 안 자리에는 표 바깥 여백, 칸 안 여백(hasMargin=0 이면 표 안 여백), 칸 세로 정렬(가운데, 아래) 몫을 더한다.
+- 그림 가로세로 비율을 지킨다(--size 는 긴 변, --width 는 가로).
 - 표가 쪽을 넘으면 뒤 쪽 문구의 도장은 한글이 앞 쪽에 걸거나 그리지 않는다. 이때는 경고를 낸다.
 - 기본은 문구 위에 겹쳐 찍는다(overlap). 원본 기본값(auto, 자리가 있으면 오른쪽)은 --mode auto.
 
@@ -19,7 +21,7 @@ kordoc(chrisryugj/kordoc, MIT) `src/form/seal.ts` 를 표준 라이브러리로 
 
 사용:
   python seal_hwpx.py 입력.hwpx 출력.hwpx --image 도장.png [--anchor "(인)"]
-      [--occurrence 0 | --occurrence 0,2 | --occurrence all] [--size 12] [--mode overlap|right|auto]
+      [--occurrence 0 | --occurrence 0,2 | --occurrence all] [--size 12 | --width 30] [--mode overlap|right|auto]
       [--dx 0] [--dy 0]
 """
 
@@ -107,6 +109,7 @@ class Cell:
 @dataclass
 class Table:
     cells: list = field(default_factory=list)
+    attrs: dict = field(default_factory=dict)  # outL, outT(바깥 여백), inL, inR, inT, inB(안 여백)
 
 
 @dataclass
@@ -214,11 +217,21 @@ def scan_section(xml: str) -> list[Para]:
         if local == "tc":
             table = _innermost(stack, "tbl")
             cell = Cell(table=table)
+            cell.attrs["hasMargin"] = _attr(attrs, "hasMargin") == "1"
             if table is not None:
                 table.cells.append(cell)
             if not selfclose:
                 stack.append(("tc", cell))
             continue
+        # 표의 바깥 여백과 안 여백(표의 직계일 때만)
+        if local in ("outMargin", "inMargin") and stack and stack[-1][0] == "tbl":
+            t_attrs = stack[-1][1].attrs
+            k = "out" if local == "outMargin" else "in"
+            for side, key in (("left", "L"), ("right", "R"), ("top", "T"), ("bottom", "B")):
+                t_attrs[k + key] = int(_attr(attrs, side) or 0)
+        # 칸 글의 세로 정렬
+        if local == "subList" and stack and stack[-1][0] == "tc":
+            stack[-1][1].attrs["vertAlign"] = _attr(attrs, "vertAlign") or "TOP"
         cell = (
             _innermost(stack, "tc")
             if local in ("cellAddr", "cellSpan", "cellSz", "cellMargin")
@@ -239,6 +252,7 @@ def scan_section(xml: str) -> list[Para]:
                 cell.attrs["marginL"] = int(_attr(attrs, "left") or 0)
                 cell.attrs["marginR"] = int(_attr(attrs, "right") or 0)
                 cell.attrs["marginT"] = int(_attr(attrs, "top") or 0)
+                cell.attrs["marginB"] = int(_attr(attrs, "bottom") or 0)
         if local in SPECIAL_CHARS:
             para = _innermost(stack, "p")
             run = _innermost(stack, "run")
@@ -314,11 +328,30 @@ def parse_styles(header_xml: str) -> tuple[dict, dict]:
     return char_h, para_align
 
 
+def cell_margins(cell: Cell) -> tuple[int, int, int, int]:
+    """칸 안 여백(왼, 오른, 위, 아래, HWPUNIT). hasMargin="1" 이면 칸 자신의 cellMargin, 아니면 표의 inMargin
+    (한글 PDF 실측 2026-10-19: hasMargin=0 칸은 표 안 여백 1.8mm 만큼 글이 들어가 도장이 그만큼 왼쪽에 찍혔다)"""
+    a = cell.attrs
+    t = cell.table.attrs if cell.table is not None else {}
+    if a.get("hasMargin") or "inL" not in t:
+        return a.get("marginL", 0), a.get("marginR", 0), a.get("marginT", 0), a.get("marginB", 0)
+    return t["inL"], t.get("inR", 0), t.get("inT", 0), t.get("inB", 0)
+
+
+def cell_origin_mm(cell: Cell) -> tuple[float, float]:
+    """칸 글 영역 왼쪽 위가 그 표의 기준점(표 바깥 여백 포함)에서 떨어진 거리(가로, 세로 mm 중 여백 몫).
+    한글은 표를 바깥 여백만큼 안쪽에 그린다(실측: 바깥 여백 0.5mm 표의 칸 도장이 0.5mm 어긋남)"""
+    left, _, top, _ = cell_margins(cell)
+    t = cell.table.attrs if cell.table is not None else {}
+    return (t.get("outL", 0) + left) / HU_PER_MM, (t.get("outT", 0) + top) / HU_PER_MM
+
+
 def cell_content_mm(cell: Cell) -> float | None:
     w = cell.attrs.get("width")
     if not w:
         return None
-    w -= cell.attrs.get("marginL", 0) + cell.attrs.get("marginR", 0)
+    left, right, _, _ = cell_margins(cell)
+    w -= left + right
     return w / HU_PER_MM if w > 0 else None
 
 
@@ -350,9 +383,32 @@ def cell_top_mm(cell: Cell) -> float:
             if r is None or c.attrs.get("rowSpan", 1) > 1:
                 continue
             row_h[r] = max(row_h.get(r, 0), c.attrs.get("height", 0))
-    return (
-        sum(row_h.get(i, 0) for i in range(row)) + cell.attrs.get("marginT", 0)
-    ) / HU_PER_MM
+    return sum(row_h.get(i, 0) for i in range(row)) / HU_PER_MM + cell_origin_mm(cell)[1]
+
+
+def cell_valign_mm(cell: Cell, paras: list) -> float:
+    """세로 가운데, 아래 정렬 칸에서 글 덩어리가 칸 글 영역 위에서 내려온 거리(mm).
+    줄 배치 vertpos 는 글 덩어리 위에서 재므로 정렬 몫이 빠져 있다(실측: 가운데 정렬 칸의 도장이 3mm 위)."""
+    align = cell.attrs.get("vertAlign", "TOP")
+    if align not in ("CENTER", "BOTTOM") or not cell.attrs.get("height"):
+        return 0.0
+    lines = [
+        ln
+        for q in paras
+        if q.cell is cell
+        for ln in q.lines
+        if ln["vertsize"] > 0 and not _is_dummy(ln)
+    ]
+    if not lines:
+        return 0.0
+    content = max(ln["vertpos"] + ln["vertsize"] for ln in lines) - min(
+        ln["vertpos"] for ln in lines
+    )
+    _, _, top, bottom = cell_margins(cell)
+    room = cell.attrs["height"] - top - bottom - content
+    if room <= 0:
+        return 0.0
+    return (room / 2 if align == "CENTER" else room) / HU_PER_MM
 
 
 def body_column_mm(xml: str) -> float:
@@ -391,8 +447,10 @@ def build_float_pic(
     pid: int,
     instid: int,
     pixel_size: tuple[int, int] | None = None,
+    height_hu: int | None = None,
 ) -> str:
-    w = h = size_hu
+    # 가로 size_hu, 세로 height_hu(없으면 정사각형)
+    w, h = size_hu, height_hu or size_hu
     # 원본 크기(imgDim)와 보일 범위(imgClip)는 그림 픽셀 수 x 75(한/글 규칙, hwpx_helpers.HU_PER_PX). 표시 크기를 넣으면 한/글 2022 가 그림을 못 그렸다
     dw, dh = (pixel_size[0] * 75, pixel_size[1] * 75) if pixel_size else (w, h)
     return (
@@ -472,6 +530,7 @@ def place_seals(
     mode="overlap",
     dx=0.0,
     dy=0.0,
+    width_mm=None,
 ) -> list[dict]:
     ext = ext.lower()
     if ext not in MIME:
@@ -530,6 +589,10 @@ def place_seals(
             for v in re.findall(r'\b(?:id|instid)="(\d+)"', x):
                 max_id = max(max_id, int(v))
 
+        # 그림 가로세로 비율을 지킨다. 종전에는 늘 정사각형(한 변 size)으로 넣어 가로로 긴 서명이 눌렸다
+        px = image_pixel_size(image)
+        ratio = px[1] / px[0] if px and px[0] else 1.0  # 세로/가로
+
         splices: list[list[tuple[int, str]]] = [[] for _ in secs]
         additions: dict[str, bytes] = {}
         items = []
@@ -560,6 +623,13 @@ def place_seals(
             size = (
                 size_mm if size_mm and size_mm > 0 else max(7.0, min(18.0, em_mm * 1.6))
             )
+            # --width 를 주면 그 가로에 비율대로 세로, 아니면 긴 변이 size
+            if width_mm and width_mm > 0:
+                w_mm, h_mm = width_mm, width_mm * ratio
+            elif ratio <= 1:
+                w_mm, h_mm = size, size * ratio
+            else:
+                w_mm, h_mm = size / ratio, size
 
             avail = (cell_content_mm(p.cell) if p.cell else None) or body_column_mm(xml)
             align = para_align.get(_attr(p.open_tag, "paraPrIDRef") or "0")
@@ -573,18 +643,19 @@ def place_seals(
             if m == "auto":
                 m = (
                     "right"
-                    if avail - (shift + start_x + anchor_w) >= size + 2
+                    if avail - (shift + start_x + anchor_w) >= w_mm + 2
                     else "overlap"
                 )
             cell_shift = 0.0
             if p.cell is not None:
-                cell_shift = cell_left_mm(p.cell) + sum(
-                    cell_left_mm(c) for c in p.outer
+                # 앞 열 폭에 표 바깥 여백과 칸 안 여백을 더한다(표 속 표는 바깥 칸 몫까지)
+                cell_shift = sum(
+                    cell_left_mm(c) + cell_origin_mm(c)[0] for c in [*p.outer, p.cell]
                 )
             base = (
                 start_x + anchor_w + 2
                 if m == "right"
-                else start_x + anchor_w / 2 - size / 2
+                else start_x + anchor_w / 2 - w_mm / 2
             )
             pos_x = base + shift + cell_shift + dx
             if line:
@@ -592,11 +663,11 @@ def place_seals(
                 top = line["vertpos"] - (
                     0 if p.cell is not None else lines[0]["vertpos"]
                 )
-                pos_y = (top + line["vertsize"] / 2) / HU_PER_MM - size / 2 + dy
+                pos_y = (top + line["vertsize"] / 2) / HU_PER_MM - h_mm / 2 + dy
                 if p.cell is not None:
-                    pos_y += cell_top_mm(p.cell)
+                    pos_y += cell_top_mm(p.cell) + cell_valign_mm(p.cell, scans[si])
             else:
-                pos_y = -(size - em_mm) / 2 + dy
+                pos_y = -(h_mm - em_mm) / 2 + dy
 
             n = 1
             while n in used_nums or f"image{n}" in used_ids:
@@ -613,12 +684,13 @@ def place_seals(
             max_id += 2
             pic = build_float_pic(
                 item_id,
-                round(size * HU_PER_MM),
+                round(w_mm * HU_PER_MM),
                 round(pos_x * HU_PER_MM),
                 round(pos_y * HU_PER_MM),
                 max_id - 1,
                 max_id,
-                pixel_size=image_pixel_size(image),
+                pixel_size=px,
+                height_hu=round(h_mm * HU_PER_MM),
             )
             splices[si].append(
                 (
@@ -637,7 +709,7 @@ def place_seals(
             ]
             # 본문 줄 배치 vertpos 는 쪽마다 0 에서 다시 시작하므로 표를 담은 문단의 vertpos 가 쪽 안 표 위치다
             table_top = host_lines[0]["vertpos"] / HU_PER_MM if host_lines else 0.0
-            if p.cell is not None and table_top + pos_y + size > body_height_mm(xml):
+            if p.cell is not None and table_top + pos_y + h_mm > body_height_mm(xml):
                 # 한글은 세로 위치를 표 위(첫 쪽)에서 재므로 쪽을 넘는 칸의 뒤쪽 문구에는 도장이 앞 쪽에 걸리거나 사라진다
                 warnings.append(
                     "칸이 쪽을 넘을 만큼 길어 도장이 앞 쪽에 찍히거나 보이지 않을 수 있습니다. PDF 로 확인하세요"
@@ -663,7 +735,8 @@ def place_seals(
                     "mode": m,
                     "x_mm": round(pos_x, 2),
                     "y_mm": round(pos_y, 2),
-                    "size_mm": round(size, 2),
+                    "width_mm": round(w_mm, 2),
+                    "height_mm": round(h_mm, 2),
                     "entry": entry,
                     **({"warnings": warnings} if warnings else {}),
                 }
@@ -715,7 +788,13 @@ def main() -> int:
         "--size",
         type=float,
         default=None,
-        help="도장 한 변 mm(기본: 글자 크기의 1.6배, 7~18mm)",
+        help="도장 긴 변 mm(기본: 글자 크기의 1.6배, 7~18mm). 가로세로 비율은 그림을 따른다",
+    )
+    ap.add_argument(
+        "--width",
+        type=float,
+        default=None,
+        help="그림 가로 mm. 세로는 그림 비율대로(서명처럼 가로로 긴 그림). 주면 --size 는 쓰지 않는다",
     )
     ap.add_argument(
         "--mode",
@@ -745,6 +824,7 @@ def main() -> int:
             a.mode,
             a.dx,
             a.dy,
+            a.width,
         )
     except ValueError as e:
         print(f"오류: {e}", file=sys.stderr)
