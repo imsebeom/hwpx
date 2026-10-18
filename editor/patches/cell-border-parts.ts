@@ -89,7 +89,7 @@
   /** 여러 칸(2칸 이상 범위)을 골랐는가 */
   private claudeMulti(): boolean {
     const r = this.selectionRange;
-    return !!r && (r.endRow > r.startRow || r.endCol > r.startCol);
+    return this.applyMode !== 'asOne' && !!r && (r.endRow > r.startRow || r.endCol > r.startCol);
   }
 // ==== next ====
     drawLine(2, 98, 118, 98, this.borderEdits[3]);
@@ -185,3 +185,21 @@
     };
     // [#5959] 적용 대상을 데이터로 고정한다 — 커맨드 execute 가 다시 읽지 않는다.
     const buildTargets = (): CellBorderFillTarget => {
+// ==== next ====
+      if (this.applyMode === 'asOne') {
+        if (scope === 'all') {
+// ==== replace ====
+      // 하나의 셀처럼: 테두리만 바꿨으면 범위 바깥 네 변만 칸마다 바꾼다. 영역(cellzone) 테두리는 영역 안 모든 칸에 같은 선을 입혀
+      // 「아래」만 바꿔도 칸마다 아래 변, 곧 안쪽 가로선까지 바뀌었다(2026-10-18 사용자 보고). 배경이나 대각선을 건드렸으면 종전대로 영역에
+      if (this.applyMode === 'asOne' && !this.claudeBgTouched && !this.claudeDiagTouched) {
+        this.claudeTouched.delete(4);
+        this.claudeTouched.delete(5);
+        const dims = this.wasm.getTableDimensions(sec, ppi, ci);
+        const range = scope === 'all' || !this.selectionRange
+          ? { startRow: 0, startCol: 0, endRow: Math.max(0, dims.rowCount - 1), endCol: Math.max(0, dims.colCount - 1) }
+          : this.selectionRange;
+        const cellIndices = this.selectedCellIndicesForRange(range);
+        return claudePerCell(cellIndices.length > 0 ? cellIndices : [this.cellIdx], range);
+      }
+      if (this.applyMode === 'asOne') {
+        if (scope === 'all') {

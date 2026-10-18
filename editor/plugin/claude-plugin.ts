@@ -347,15 +347,50 @@ function installCellBlockDialogs(getInputHandler) {
     const base = this.cellProps;
     const anchor = this.cellIdx;
     const setOrig = wasm.setCellProperties;
+    // 테두리 네 방향은 블록의 바깥 변으로 본다: 블록 가장자리에 있는 칸의 그 변만 바꾼다(2026-10-18 사용자 보고 — 「아래」만 바꿔도
+    // 칸마다 아래 변이 바뀌어 안쪽 가로선까지 바뀌었다). 엔진은 borderLeft 키로 테두리 변경을 알아보므로 네 변은 늘 보내고
+    // 안 바꾸는 변은 그 칸의 제 값을 보낸다
+    const SIDES = ['borderLeft', 'borderRight', 'borderTop', 'borderBottom'];
+    const boxes = new Map();
+    for (const b of wasm.getTableCellBboxes(sec, ppi, ci)) if (!boxes.has(b.cellIdx)) boxes.set(b.cellIdx, b);
+    const blockBoxes = [anchor, ...others].map((i) => boxes.get(i)).filter(Boolean);
+    const range = {
+      r0: Math.min(...blockBoxes.map((b) => b.row)), c0: Math.min(...blockBoxes.map((b) => b.col)),
+      r1: Math.max(...blockBoxes.map((b) => b.row + Math.max(1, b.rowSpan) - 1)), c1: Math.max(...blockBoxes.map((b) => b.col + Math.max(1, b.colSpan) - 1)),
+    };
+    const onEdge = (i, key) => {
+      const b = boxes.get(i);
+      if (!b) return true;
+      if (key === 'borderLeft') return b.col <= range.c0;
+      if (key === 'borderRight') return b.col + Math.max(1, b.colSpan) - 1 >= range.c1;
+      if (key === 'borderTop') return b.row <= range.r0;
+      return b.row + Math.max(1, b.rowSpan) - 1 >= range.r1;
+    };
+    // 칸 i 에 보낼 속성: 바뀐 테두리 변은 블록 가장자리일 때만, 나머지 변은 제 값
+    const withEdges = (i, props, changedSides) => {
+      const out = { ...props };
+      for (const k of SIDES) delete out[k];
+      if (!changedSides.length) return out;
+      const own = wasm.getCellOwnProperties(sec, ppi, ci, i);
+      if (own.borderFillId != null) out.borderFillId = own.borderFillId;
+      for (const k of SIDES) {
+        const o = own[k];
+        out[k] = changedSides.includes(k) && onEdge(i, k) ? props[k] : o ? { type: o.type, width: o.width, color: o.color } : props[k];
+      }
+      return out;
+    };
     wasm.setCellProperties = function (s, p, c, idx, props) {
-      const r = setOrig.call(this, s, p, c, idx, props);
-      if (idx === anchor && s === sec && p === ppi && c === ci) {
-        const diff = {};
-        for (const [k, v] of Object.entries(props)) {
-          if (JSON.stringify(v) !== JSON.stringify(base[k])) diff[k] = v;
-        }
-        if (Object.keys(diff).some((k) => k.startsWith('padding'))) diff.applyInnerMargin = props.applyInnerMargin;
-        if (Object.keys(diff).length) for (const i of others) setOrig.call(this, s, p, c, i, diff);
+      if (!(idx === anchor && s === sec && p === ppi && c === ci)) return setOrig.call(this, s, p, c, idx, props);
+      const diff = {};
+      for (const [k, v] of Object.entries(props)) {
+        if (JSON.stringify(v) !== JSON.stringify(base[k])) diff[k] = v;
+      }
+      if (Object.keys(diff).some((k) => k.startsWith('padding'))) diff.applyInnerMargin = props.applyInnerMargin;
+      const changedSides = SIDES.filter((k) => k in diff);
+      const r = setOrig.call(this, s, p, c, idx, changedSides.length ? withEdges(idx, props, changedSides) : props);
+      for (const i of others) {
+        const q = withEdges(i, diff, changedSides);
+        if (Object.keys(q).length) setOrig.call(this, s, p, c, i, q);
       }
       return r;
     };
