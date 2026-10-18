@@ -24,6 +24,7 @@
  *   node cli.mjs undo                  마지막 배치 되돌리기
  *   node cli.mjs log [N | --all]       작업 기록(시작, 불러옴, 편집, 화면 저장 포함 저장, 종료, 오류). 비우지 않고 쌓인다
  *   node cli.mjs list                  떠 있는 에디터 전부(세션마다 하나. * 는 이 세션의 것)
+ *   node cli.mjs url                   이 인스턴스 서버의 주소(떠 있고 이 인스턴스 것일 때만). 브라우저 자동화는 이 주소로만 연다
  *   node cli.mjs status | stop
  */
 import fs from 'node:fs';
@@ -339,6 +340,14 @@ switch (sub) {
     const blocker = editBlocker(file);
     if (blocker && !args.includes('--force')) die(`열지 않음: ${blocker}. 사용자가 원하면 --force`);
     if (!process.env.HWPX_EDITOR_PORT) { PORT = await allocatePort(); BASE = `http://127.0.0.1:${PORT}`; }
+    else {
+      // 포트를 정해 주었는데 그 포트에 다른 에디터가 떠 있으면 그 서버에 묻거나 열지 않고 멈춘다(2026-10-18: 시험용으로 7781 을 정해
+      // 띄웠는데 다른 세션의 문항3 에디터가 그 포트에 있었고, 브라우저를 그 주소로 열어 남의 창을 만졌다)
+      const h = await health();
+      if (h?.stateDir && !ours(h)) {
+        die(`포트 ${PORT} 는 다른 에디터(${path.basename(h.stateDir)}, ${h.session?.source ? path.basename(h.session.source) : '문서 없음'})가 쓰고 있다. HWPX_EDITOR_PORT 를 빼면 빈 포트를 고른다`);
+      }
+    }
     // 빌드 끝에 자동으로 열 때 떠 있는 창의 저장 안 한 편집을 덮지 않는다(세션 파일을 바꾸기 전에 본다)
     const shown = (await health())?.browser;
     if (shown && !args.includes('--force')) {
@@ -501,6 +510,11 @@ switch (sub) {
     break;
   }
   case 'status': out((await health()) ?? '서버 꺼짐'); break;
+  case 'url': {                                     // 이 인스턴스 서버의 주소. 브라우저 자동화는 이 주소로만 연다(포트를 짐작하지 않는다)
+    if (!ours(await health())) die(`이 인스턴스(${path.basename(STATE_DIR)})의 서버가 떠 있지 않다 — start 로 연다`);
+    out(`${BASE}/`);
+    break;
+  }
   case 'list': {                                    // 떠 있는 에디터 전부(세션마다 하나). * 는 이 세션의 것
     const dirs = [ROOT, ...fs.readdirSync(ROOT, { withFileTypes: true }).filter((d) => d.isDirectory() && d.name !== 'webview').map((d) => path.join(ROOT, d.name))];
     const rows = [];
