@@ -150,6 +150,17 @@ EDITS = [
     ),
     (
         "renderer/typeset.rs",
+        "                            let fn_height = estimate_footnote_note_height(fn_ctrl, self.dpi);\n",
+        f"                            // {TAG} HWPX 본문 각주도 조판한 줄(줄 높이 + 줄 간격)로 잰다. 줄 높이만 세면 2줄 각주가 24px(실제 31.2px)로\n"
+        "                            // 잡혀 한/글보다 한 줄을 더 담고 각주와 겹쳤다(가이드북 3장 2쪽 각주 6, 7)\n"
+        "                            let fn_height = if st.profile.hwpx_container() {\n"
+        "                                composed_footnote_content_height(fn_ctrl, self.dpi)\n"
+        "                            } else {\n"
+        "                                estimate_footnote_note_height(fn_ctrl, self.dpi)\n"
+        "                            };\n",
+    ),
+    (
+        "renderer/typeset.rs",
         "                    if break_after_current_table {\n",
         f"                    // {TAG} 각주를 다음 쪽으로 넘겼으면 이 쪽은 찼다. 뒤 흐름은 다음 쪽에서 시작한다(한/글: 표 2-1 캡션이 7쪽 머리)\n"
         "                    if st.profile.hwpx_container() && !st.claude_carry_notes.is_empty() {\n"
