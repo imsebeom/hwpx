@@ -38,11 +38,16 @@ if str(SCRIPT_DIR) not in sys.path:
 from fix_namespaces import fix_hwpx_namespaces  # noqa: E402
 from form_gate import TemplateGateError, guard_write, record_template  # noqa: E402
 from hwpx_helpers import (  # noqa: E402
-    force_default_print_method, inject_dummy_linesegs, replace_in_text_nodes, risky_replacement_keys,
+    force_default_print_method,
+    inject_dummy_linesegs,
+    replace_in_text_nodes,
+    risky_replacement_keys,
 )
 
 
-def _clone_zipinfo(info: zipfile.ZipInfo, *, force_stored: bool = False) -> zipfile.ZipInfo:
+def _clone_zipinfo(
+    info: zipfile.ZipInfo, *, force_stored: bool = False
+) -> zipfile.ZipInfo:
     cloned = copy.copy(info)
     if force_stored:
         cloned.compress_type = zipfile.ZIP_STORED
@@ -153,7 +158,9 @@ def zip_replace_all(
                     except UnicodeDecodeError:
                         stats["decode_failed"] += 1
                         zout.writestr(
-                            _clone_zipinfo(info, force_stored=info.filename == "mimetype"),
+                            _clone_zipinfo(
+                                info, force_stored=info.filename == "mimetype"
+                            ),
                             data,
                         )
                         continue
@@ -348,7 +355,10 @@ def main(argv: list[str]) -> int:
                 print(f"[OK] backup: {backup_path}")
             os.replace(produced_path, final_path)
         elif args.backup:
-            print("[WARN] --backup is ignored when output does not overwrite input", file=sys.stderr)
+            print(
+                "[WARN] --backup is ignored when output does not overwrite input",
+                file=sys.stderr,
+            )
     finally:
         if produced_path != final_path and Path(produced_path).exists():
             Path(produced_path).unlink(missing_ok=True)

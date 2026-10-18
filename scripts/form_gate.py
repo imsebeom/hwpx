@@ -53,6 +53,7 @@ class TemplateGateError(RuntimeError):
 # 플레이스홀더 판별
 # ---------------------------------------------------------------------------
 
+
 def is_placeholder(value: Any) -> bool:
     """문자열 전체가 플레이스홀더 하나인가"""
     if not isinstance(value, str):
@@ -105,6 +106,7 @@ def scan_placeholders(hwpx_path: str) -> Dict[str, List[str]]:
 # 매니페스트
 # ---------------------------------------------------------------------------
 
+
 def manifest_path(hwpx_path: str) -> Path:
     return Path(str(hwpx_path) + MANIFEST_SUFFIX)
 
@@ -133,8 +135,9 @@ def write_manifest(hwpx_path: str, data: Dict[str, Any]) -> Path:
     return mp
 
 
-def record_template(template_path: str, source: Optional[str] = None,
-                    note: Optional[str] = None) -> Dict[str, Any]:
+def record_template(
+    template_path: str, source: Optional[str] = None, note: Optional[str] = None
+) -> Dict[str, Any]:
     """템플릿 제작 결과를 매니페스트에 기록한다 (미승인 상태).
 
     이미 승인된 매니페스트가 있고 파일이 그대로면 승인을 유지한다.
@@ -157,7 +160,8 @@ def record_template(template_path: str, source: Optional[str] = None,
         "source": os.path.basename(source) if source else prev.get("source"),
         "placeholders": found["ok"],
         "split_placeholders": found["split"],
-        "created_at": prev.get("created_at") or datetime.now().isoformat(timespec="seconds"),
+        "created_at": prev.get("created_at")
+        or datetime.now().isoformat(timespec="seconds"),
         "updated_at": datetime.now().isoformat(timespec="seconds"),
         "preview": prev.get("preview", []) if keep_approval else [],
         "approved": keep_approval,
@@ -168,8 +172,12 @@ def record_template(template_path: str, source: Optional[str] = None,
     return data
 
 
-def approve(template_path: str, note: Optional[str] = None,
-            no_preview: bool = False, pages: int = 2) -> Dict[str, Any]:
+def approve(
+    template_path: str,
+    note: Optional[str] = None,
+    no_preview: bool = False,
+    pages: int = 2,
+) -> Dict[str, Any]:
     """사용자 확인을 기록한다. 미리보기 PNG 가 없으면 먼저 생성한다."""
     data = read_manifest(template_path)
     if not data or data.get("template_sha256") != sha256(template_path):
@@ -197,12 +205,16 @@ def approve(template_path: str, note: Optional[str] = None,
 # 게이트 검사
 # ---------------------------------------------------------------------------
 
-def require_approved(hwpx_path: str, action: str = "값 채우기",
-                     skip: bool = False) -> Optional[Dict[str, Any]]:
+
+def require_approved(
+    hwpx_path: str, action: str = "값 채우기", skip: bool = False
+) -> Optional[Dict[str, Any]]:
     """승인된 플레이스홀더 템플릿인지 확인한다. 아니면 TemplateGateError."""
     if skip:
-        print(f"[게이트 우회] {SKIP_FLAG} 지정 — {action} 을 검사 없이 진행한다.",
-              file=sys.stderr)
+        print(
+            f"[게이트 우회] {SKIP_FLAG} 지정 — {action} 을 검사 없이 진행한다.",
+            file=sys.stderr,
+        )
         return None
 
     name = os.path.basename(hwpx_path)
@@ -225,7 +237,7 @@ def require_approved(hwpx_path: str, action: str = "값 채우기",
             f"  플레이스홀더 {len(data.get('placeholders', []))}개 — "
             f"{', '.join(data.get('placeholders', [])[:5])}\n"
             f"  사용자에게 미리보기를 제시한 뒤 "
-            f"form_gate.py approve \"{hwpx_path}\" 를 실행하라."
+            f'form_gate.py approve "{hwpx_path}" 를 실행하라.'
         )
 
     if data.get("template_sha256") != sha256(hwpx_path):
@@ -243,8 +255,9 @@ def require_approved(hwpx_path: str, action: str = "값 채우기",
     return data
 
 
-def guard_write(target_path: str, values: Iterable[Any], action: str,
-                skip: bool = False) -> bool:
+def guard_write(
+    target_path: str, values: Iterable[Any], action: str, skip: bool = False
+) -> bool:
     """쓰기 작업 진입점. 템플릿 제작이면 통과, 값 채우기면 승인 검사.
 
     Returns:
@@ -260,6 +273,7 @@ def guard_write(target_path: str, values: Iterable[Any], action: str,
 # 미리보기 (rhwp → PDF → pdftoppm PNG). 한글이 필요 없다
 # ---------------------------------------------------------------------------
 
+
 def _pdftoppm() -> Optional[str]:
     exe = shutil.which("pdftoppm")
     if exe:
@@ -268,8 +282,9 @@ def _pdftoppm() -> Optional[str]:
     return fallback if os.path.exists(fallback) else None
 
 
-def render_preview(hwpx_path: str, out_dir: Optional[str] = None,
-                   pages: int = 2, dpi: int = 110) -> List[str]:
+def render_preview(
+    hwpx_path: str, out_dir: Optional[str] = None, pages: int = 2, dpi: int = 110
+) -> List[str]:
     """템플릿을 PDF 로 변환하고 앞 몇 쪽을 PNG 로 만든다."""
     src = os.path.abspath(hwpx_path)
     out = Path(out_dir).resolve() if out_dir else Path(src).parent / "_preview"
@@ -280,29 +295,47 @@ def render_preview(hwpx_path: str, out_dir: Optional[str] = None,
     # 이전 산출물이 남아 있으면 조용한 실패를 성공으로 오판한다
     if os.path.exists(pdf_path):
         os.remove(pdf_path)
-    for old in out.glob(f"{stem}-*.png"):   # 옛 PNG가 남으면 쪽 수가 실제보다 많아 보인다
+    for old in out.glob(
+        f"{stem}-*.png"
+    ):  # 옛 PNG가 남으면 쪽 수가 실제보다 많아 보인다
         old.unlink()
 
     from rhwp_convert import to_pdf
 
-    to_pdf(src, pdf_path)  # 스킬 산출물(더미 줄 배치)은 사본에 줄 배치 보정을 한 뒤 그린다
+    to_pdf(
+        src, pdf_path
+    )  # 스킬 산출물(더미 줄 배치)은 사본에 줄 배치 보정을 한 뒤 그린다
 
     exe = _pdftoppm()
     if not exe:
         return [pdf_path]
 
     subprocess.run(
-        [exe, "-r", str(dpi), "-png", "-f", "1", "-l", str(pages),
-         pdf_path, str(out / stem)],
-        check=True, capture_output=True,
+        [
+            exe,
+            "-r",
+            str(dpi),
+            "-png",
+            "-f",
+            "1",
+            "-l",
+            str(pages),
+            pdf_path,
+            str(out / stem),
+        ],
+        check=True,
+        capture_output=True,
     )
     pngs = sorted(str(p) for p in out.glob(f"{stem}-*.png"))
     # 앞 N쪽만 PNG로 만들므로 뒤쪽 표가 통째로 안 보일 수 있다 (2026-09-13 강의일지 3쪽 중 충실도 표를 못 봄)
     total = _pdf_pages(exe, pdf_path)
     if total and total > pages:
         import sys
-        print(f"⚠ PDF {total}쪽 중 앞 {pages}쪽만 PNG로 만들었다. 나머지는 --pages {total} 로 다시 뽑거나 {pdf_path} 를 직접 본다",
-              file=sys.stderr)
+
+        print(
+            f"⚠ PDF {total}쪽 중 앞 {pages}쪽만 PNG로 만들었다. 나머지는 --pages {total} 로 다시 뽑거나 {pdf_path} 를 직접 본다",
+            file=sys.stderr,
+        )
     return pngs or [pdf_path]
 
 
@@ -324,6 +357,7 @@ def _pdf_pages(pdftoppm_exe: str, pdf_path: str) -> Optional[int]:
 # 템플릿 제작 (표 내용 셀 자동 플레이스홀더화)
 # ---------------------------------------------------------------------------
 
+
 def make_template(source: str, output: str, table_index: int = 0) -> Dict[str, Any]:
     """원본 양식의 표 내용 셀을 {{레이블}} 플레이스홀더로 바꾼 템플릿을 만든다."""
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -342,6 +376,7 @@ def make_template(source: str, output: str, table_index: int = 0) -> Dict[str, A
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
+
 
 def find_templates(root: str) -> List[str]:
     """디렉터리에서 플레이스홀더를 가진 hwpx 를 찾는다 (기존 양식 일괄 승인용)."""
@@ -364,11 +399,15 @@ def _print_scan(hwpx_path: str) -> None:
     print(f"플레이스홀더 {len(found['ok'])}개: {', '.join(found['ok']) or '없음'}")
     single = [p for p in found["ok"] if not p.startswith("{{")]
     if single:
-        print(f"  ※ 단일 중괄호 {len(single)}개 — 본문의 버튼명·용어 표기일 수 있으니 "
-              f"승인 전에 확인하라: {', '.join(single[:5])}")
+        print(
+            f"  ※ 단일 중괄호 {len(single)}개 — 본문의 버튼명·용어 표기일 수 있으니 "
+            f"승인 전에 확인하라: {', '.join(single[:5])}"
+        )
     if found["split"]:
-        print(f"⚠ run 이 쪼개진 플레이스홀더 {len(found['split'])}개: "
-              f"{', '.join(found['split'])}")
+        print(
+            f"⚠ run 이 쪼개진 플레이스홀더 {len(found['split'])}개: "
+            f"{', '.join(found['split'])}"
+        )
         print("  → 그대로 두면 치환이 실패한다. 해당 셀을 다시 입력하라.")
     if data is None:
         print("게이트: 매니페스트 없음 (값 채우기 불가)")
@@ -383,10 +422,13 @@ def _print_scan(hwpx_path: str) -> None:
 
 def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(
-        description="HWPX 양식 채우기 게이트 (템플릿 제작 → 사용자 확인 → 채우기)")
+        description="HWPX 양식 채우기 게이트 (템플릿 제작 → 사용자 확인 → 채우기)"
+    )
     sub = parser.add_subparsers(dest="cmd", required=True)
 
-    p = sub.add_parser("scan", help="플레이스홀더 목록·게이트 상태 (디렉터리면 재귀 탐색)")
+    p = sub.add_parser(
+        "scan", help="플레이스홀더 목록·게이트 상태 (디렉터리면 재귀 탐색)"
+    )
     p.add_argument("hwpx")
 
     p = sub.add_parser("make", help="표 내용 셀을 플레이스홀더로 바꾼 템플릿 생성")
@@ -402,8 +444,11 @@ def main(argv: Optional[List[str]] = None) -> int:
     p = sub.add_parser("approve", help="사용자 확인 기록 (여러 파일 지정 가능)")
     p.add_argument("hwpx", nargs="+")
     p.add_argument("--note")
-    p.add_argument("--no-preview", action="store_true",
-                   help="사용자가 직접 열어 확인한 경우 렌더 없이 승인")
+    p.add_argument(
+        "--no-preview",
+        action="store_true",
+        help="사용자가 직접 열어 확인한 경우 렌더 없이 승인",
+    )
     p.add_argument("--pages", type=int, default=2)
 
     p = sub.add_parser("status", help="값 채우기 가능 여부 (exit 0/2)")
@@ -425,8 +470,10 @@ def main(argv: Optional[List[str]] = None) -> int:
         elif args.cmd == "make":
             data = make_template(args.source, args.output, args.table)
             print(f"템플릿 생성: {args.output}")
-            print(f"플레이스홀더 {len(data['placeholders'])}개: "
-                  f"{', '.join(data['placeholders'])}")
+            print(
+                f"플레이스홀더 {len(data['placeholders'])}개: "
+                f"{', '.join(data['placeholders'])}"
+            )
             print("다음: form_gate.py preview → 사용자 확인 → form_gate.py approve")
         elif args.cmd == "preview":
             paths = render_preview(args.hwpx, args.out, pages=args.pages)
@@ -434,8 +481,10 @@ def main(argv: Optional[List[str]] = None) -> int:
         elif args.cmd == "approve":
             for path in args.hwpx:
                 data = approve(path, args.note, args.no_preview, args.pages)
-                print(f"승인: {path} — 플레이스홀더 {len(data['placeholders'])}개 "
-                      f"({data['approved_at']})")
+                print(
+                    f"승인: {path} — 플레이스홀더 {len(data['placeholders'])}개 "
+                    f"({data['approved_at']})"
+                )
         elif args.cmd == "status":
             require_approved(args.hwpx)
             print("통과: 승인된 플레이스홀더 템플릿")
