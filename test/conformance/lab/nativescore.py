@@ -180,10 +180,15 @@ def main():
     }
     page_bad = []
     han_pages = {}
-    for line in open(HERE.parent / "out" / "oracle.jsonl", encoding="utf-8"):
-        rec = json.loads(line)
-        if rec.get("saved") and rec.get("pages"):
-            han_pages[rec["id"]] = rec["pages"]
+    if "--res" in args:
+        # 새 정답본(exp/make_fresh.py + measure.py)의 쪽수: {이름: {"pages": n, ...}}
+        res = json.load(open(args[args.index("--res") + 1], encoding="utf-8"))
+        han_pages = {k: v["pages"] for k, v in res.items() if v.get("pages")}
+    else:
+        for line in open(HERE.parent / "out" / "oracle.jsonl", encoding="utf-8"):
+            rec = json.loads(line)
+            if rec.get("saved") and rec.get("pages"):
+                han_pages[rec["id"]] = rec["pages"]
     bad = []
     with cf.ThreadPoolExecutor(8) as ex:
         for name, body, cells, rb, rc, (pages, para_pages, han_bp) in ex.map(
