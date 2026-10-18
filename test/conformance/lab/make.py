@@ -158,11 +158,17 @@ def make(v, out_dir):
     section = section.replace(
         "<hp:t>본문 한 문단.</hp:t>", f"<hp:t>{body(paras[0])}</hp:t>"
     )
-    extra = "".join(
-        f'<hp:p id="0" paraPrIDRef="0" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0">'
-        f'<hp:run charPrIDRef="0"><hp:t>{body(t)}</hp:t></hp:run></hp:p>'
-        for t in paras[1:]
-    )
+
+    # 둘째 문단부터 글 앞 표지: [[PB]] 쪽 나눔, [[CB]] 단 나누기(표지는 글에서 뺀다)
+    def para_xml(t):
+        pb, cb = t.startswith("[[PB]]"), t.startswith("[[CB]]")
+        t = t[6:] if pb or cb else t
+        return (
+            f'<hp:p id="0" paraPrIDRef="0" styleIDRef="0" pageBreak="{int(pb)}" columnBreak="{int(cb)}" merged="0">'
+            f'<hp:run charPrIDRef="0"><hp:t>{body(t)}</hp:t></hp:run></hp:p>'
+        )
+
+    extra = "".join(para_xml(t) for t in paras[1:])
     section = section.replace("</hs:sec>", extra + "</hs:sec>")
 
     out = os.path.join(out_dir, v["name"] + ".hwpx")

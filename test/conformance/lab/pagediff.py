@@ -59,8 +59,13 @@ def main():
                 else []
             )
             first_page = None
+            # 쪽 나눔 표시(pageBreak="1")가 있는 문단은 앞 문단이 vpos 0 에서 끝나도(한 줄짜리 표 문단 등) 새 쪽이다
+            forced = (
+                prev >= 0 and re.match(r'<hp:p\b[^>]*\bpageBreak="1"', p) is not None
+            )
             for v in vs:
-                if prev >= 0 and v < prev:
+                if prev >= 0 and (v < prev or forced):
+                    forced = False
                     page += 1
                 prev = v
                 if first_page is None:

@@ -72,6 +72,8 @@
 | e34, e35 | 빈칸 2개 이상 묶음 가운데서 줄을 꺾으면 앞줄에 빈칸을 적어도 둘 남긴다(남는 폭이 빈칸 하나보다 좁아도). 폭이 남으면 e19 규칙대로 더 남긴다. 정답본 약 150곳 중 한/글이 하나만 남긴 곳 0(`harvest_spacerun.py`). 정렬(양쪽, 왼쪽)과 상관없음 | `space-run-keep2-*` |
 | d113 | 동그라미 글자 겹치기(`hp:compose` SHAPE_CIRCLE)는 「◯」 글리프와 작게 줄인 안 글자로 그리고, 그 자리 글자 모양의 ◯ 폭(장평 반영, 자간 빼고)만큼 차지한다(9.24pt = 10pt x 0.95 x 함초롬바탕 0.97em). 엔진은 줄 나눔에서 폭 0 이었다. 사각형 등 다른 테두리는 실측 없음 | `char-overlap-width-*` |
 | 빌더 차트 | `c:title` 이 없어도 `autoTitleDeleted=0` 이고 이름 있는 계열이 하나면 그 이름을 제목으로 그린다(한/글 PDF). 여러 계열은 실측 없음 | `chart-auto-title-*` |
+| 정답본, d078 | 쪽 나눔(pageBreak=1) 문단 바로 앞 빈 문단이 현재 쪽에 안 들어가면 한/글 2024 는 다음 쪽 첫머리로 넘긴다(그래서 빈 쪽이 생긴다). 그런 빈 문단 11개 중 9개, 흡수 1개(`harvest_emptybreak.py`). 엔진의 흡수 분기(Task #967, HWP5 표본)는 HWP5 출처에만 | `empty-before-break-*` |
+| e36, e37 | 1단 구역의 단 나누기(columnBreak=1) 문단은 글이든 빈 문단이든 새 쪽을 연다(다음이 쪽 나눔이면 빈 쪽). 단 여러 쪽에 걸쳐 나뉜 표 바로 다음 문단이면 무시한다(d058 사본 변형 셋: 원본 무시, 표를 한 쪽으로 줄이면 지킴, 사이에 글 문단을 넣으면 지킴). e37 변형은 `apply_ops.mjs` 로 만들었다(표 T6 행 3~30 지우기, p11 뒤 글 문단 넣기) | `colbreak-after-split-table-*` |
 | d076, d133 | (남은 일) Word 호환 문서(`compatibleDocument targetProgram="MS_WORD"`, `adjustLineheightToFont`)는 줄 높이 = 글자 크기 x 글꼴 hhea 줄 높이 x 1.3(맑은 고딕 1.729, Pretendard 1.551), 줄 간격 = (비율 - 100)% x 그 줄 높이, 기준선 = ascent + (줄 높이 - hhea)/2. 엔진은 글자 크기를 줄 높이로 써서 쪽이 모자란다(d076 8 대 5). 정답본 2개뿐이라 아직 넣지 않음(`harvest_wordcompat.py`) | — |
 
 ## 남은 것 (2026-10-18)
