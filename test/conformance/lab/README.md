@@ -78,12 +78,12 @@
 | 정답본 | 글 없는 줄(글자처럼 취급 개체만 든 줄, 빈 문단)의 줄 높이와 간격은 그 줄에 걸친 run 가운데 가장 큰 글자 크기로 셈한다. 구역 정의만 든 첫 run 과 끝 빈 run 도 친다(`secpr_engine.py`: 첫 문단 일치 292 → 307, d001 1900, 1900, 2200 → 간격 1320. `harvest_emptyruns.py`: 빈 문단 11건 중 10건, 예외 d174). 문단 쪽 6887 → 6888 | `ctrl-line-max-charpr-*` |
 | 정답본, 회귀 | 글자처럼 취급 표만 든 한 줄 문단은 다음 문단까지 「줄 높이 + 줄 간격 전체」만큼 내려간다(`harvest_tacstep.py`: 1,700건 중 1,685건, 엔진 cap 「줄 높이 + 줄 간격/2 + 바깥 위 여백」은 0건). 엔진이 만든 줄(줄 배치 없는 문서, 편집 뒤)에서 cap 을 풀었다. 함께 드러난 쪽 끝 판정 둘: 한 줄짜리 글자처럼 취급 표(블록 표 경로 포함)와 글 없이 개체만 든 문단은 「위 간격 + 줄 높이」만 들어가면 된다(d292 p75, d034 p400). 쪽수 95.1 → 96.0%, 문단 쪽 98.7 → 99.2%, 줄바꿈 그대로. 회귀 코퍼스 바뀐 4개 문서를 한/글로 열어 보니 쪽수 모두 일치(전에는 2개 틀림) | `tac-cap-synth-*` |
 | 정답본 | 글 없는 문단에 문단 기준 위아래 배치 개체 하나만 있으면 다음 문단 vpos - 이 문단 vpos = 세로 오프셋 + 바깥 여백 위아래 + 개체 높이 - 이 문단 위 간격(`harvest_floatpic.py`: 그림 6건 모두, 표 241건). 개체 위치는 위 간격을 빼기 전 문단 시작 기준이고 다음 문단 위 간격은 겹쳐 사라진다. 엔진의 그림, 도형 경로는 빈 줄에 개체 높이 + 아래 여백을 더해 오프셋과 위 여백을 빼먹었다(d266 p7 +1700). 쪽수 96.0 → 96.3%(d114) | `empty-host-float-pic-*` |
-| d193 사본 실험 | 나눔 「나누지 않음」에 flowWithText=0 인 문단 기준 위아래 배치 표는 남은 자리에 안 들어가도 한/글이 다음 쪽으로 넘기지 않고 그 쪽에 넘쳐 둔다. 앞에 빈 문단을 넣어 용지 밖까지 밀어도 그대로이고, 가로 기준(PARA, COLUMN)과는 무관하다. flowWithText=1 이거나 나눔이 CELL, TABLE 이면 다음 쪽 맨 위로 넘긴다(`harvest_overflowtbl.py`, scratchpad 변형). 쪽수 96.3 → 96.6%(d193) | `unbounded-float-table-*` |
+| d193 사본 실험 | 나눔 「나누지 않음」에 flowWithText=0 인 문단 기준 위아래 배치 표는 남은 자리에 안 들어가도 한/글이 다음 쪽으로 넘기지 않고 그 쪽에 넘쳐 둔다. 앞에 빈 문단을 넣어 용지 밖까지 밀어도 그대로이고, 가로 기준(PARA, COLUMN)과는 무관하다. flowWithText=1 이거나 나눔이 CELL, TABLE 이면 다음 쪽 맨 위로 넘긴다(`harvest_overflowtbl.py`, `exp/make_push.py`, `exp/make_attr.py`, `exp/make_fwt.py`). 쪽수 96.3 → 96.6%(d193) | `unbounded-float-table-*` |
 | d087 | 칸 안 분할에서 마지막 가시 줄이 본문 아래로 넘칠 수 있는 양은 그 줄의 줄 간격까지다(한/글 마지막 줄 규칙). 엔진의 `visible_tail_fits_before_spacer` 는 단위 높이 전체를 허용해 171px 그림 줄을 135px 넘쳐 담았다(1x1 CELL 표, 한/글은 그 그림부터 다음 쪽). 쪽수 96.6 → 96.9% | `tail-overfill-spacing-*` |
 | d309, 회귀 HWP5 셋 | 중첩 표가 든 칸의 높이에도 위아래 배치(문단 기준) 그림, 도형의 바닥을 넣는다(d309 행 3: 한/글 PDF 괘선 593.0px = 줄 끝 27569 + 그림 16672 + 여백 282, 엔진 384.7px). 줄 배치 없는 칸(합산 분기)은 개체 흐름 높이를 더하고 빈 앵커 문단 줄과의 겹침을 뺀다. 쪽수 96.9 → 97.2%. 회귀 코퍼스에서 바뀐 HWP5 셋을 한/글로 열어 보니 쪽수, 쪽 첫 글 모두 같다(전에는 하나 6 대 7) | `nested-cell-flow-pic-*` |
 | d159, d201, d331 | 빈칸만 든 문단에 글자처럼 취급 표가 둘 이상이면 한/글은 글 없는 문단처럼 표 폭으로 줄을 나눈다(d159 p0: 줄 폭에 가까운 표 둘이 두 줄, 둘째 줄은 표 2 의 원래 위치 34 에서 시작). 엔진 줄 나눔은 표 폭을 세지 않아 한 줄에 겹쳤다. 줄바꿈 불일치 272 → 269, 쪽수 97.2 → 97.6% | `ws-multi-tac-*` |
 | 정답본 | 100% 미만 비율 줄 간격 = round(줄 높이 x (비율 - 100)% / 4) x 4(0 에서 먼 쪽 반올림, 수백 줄 모두). 0% 는 간격 = -줄 높이(24줄). HWPX 문단 모양 32,618개에 줄 간격 요소 없는 것이 0개라 HWPX 의 0 은 명시값으로 본다. d201 p74(0%)가 1100 내려가던 것을 고쳐 쪽수 97.6 → 97.9% | `percent-below-100-*` |
-| d194, 쪽번호시험 사본 실험 | CELL 표의 한 줄짜리(분할 불가) 행도 「위 여백 + 줄들(마지막 줄 간격 빼고) + 아래 여백」이 쪽 끝 남은 자리에 들어가면 한/글은 그 행을 이 쪽에 본문 바닥까지 잘라 담고 다음 행부터 넘긴다. 32px 행(여백 142, 줄 1000)이 남은 17.42px 에서 담기고 17.1px 에서 넘어간다(= 1284 HWPUNIT, 세로 정렬과 선언 행 높이 무관, scratchpad make_rowfit2.py, make_rowfit3.py). 쪽수 97.9 → 98.2%. 회귀 코퍼스에서 바뀐 6개 가운데 스킬이 만든 더미 줄 배치 문서는 저장 줄로 그리면 원래 위치가 틀려 줄 배치를 지우고 대조했다(넷 모두 같거나 나음, 나머지 둘은 전후 같음) | `row-visible-fit-*` |
+| d194, 쪽번호시험 사본 실험 | CELL 표의 한 줄짜리(분할 불가) 행도 「위 여백 + 줄들(마지막 줄 간격 빼고) + 아래 여백」이 쪽 끝 남은 자리에 들어가면 한/글은 그 행을 이 쪽에 본문 바닥까지 잘라 담고 다음 행부터 넘긴다. 32px 행(여백 142, 줄 1000)이 남은 17.42px 에서 담기고 17.1px 에서 넘어간다(= 1284 HWPUNIT, 세로 정렬과 선언 행 높이 무관, `exp/make_rowfit2.py`, `exp/make_rowfit3.py`). 쪽수 97.9 → 98.2%. 회귀 코퍼스에서 바뀐 6개 가운데 스킬이 만든 더미 줄 배치 문서는 저장 줄로 그리면 원래 위치가 틀려 줄 배치를 지우고 대조했다(넷 모두 같거나 나음, 나머지 둘은 전후 같음) | `row-visible-fit-*` |
 
 ## 남은 것 (2026-10-18)
 
@@ -137,7 +137,8 @@
 - `harvest_tblnext.py`: 표만 담은 문단에서 한/글이 문단 아래 간격을 더하는지 정답본으로 센다
 - `secpr_engine.py`: 구역 정의 run 으로 시작하는 첫 문단 셋의 첫 줄 높이/간격을 엔진과 한/글로 맞대고 어긋난 문단의 run 구성을 찍는다
 - `harvest_tacstep.py`, `harvest_emptyruns.py`: 표만 든 문단의 한/글 전진량, 빈 문단의 줄 높이 기준 run
-- 엔진 임시 진단(넣고 빼기, scratchpad): 쪽 넘김 호출 스택(`advance_column_or_new_page` 에 Backtrace), 누적 높이 대입마다 출력, 칸 단위 높이(`advance_row_cut_inner` 의 units). 진단 출력 `RHWP_DIAG_SCAN`, `RHWP_DIAG_SPLITSCAN`, `RHWP_TABLE_DRIFT`, `RHWP_DIAG_TAC`, `RHWP_FLOW_DBG`
+- 엔진 임시 진단(넣고 빼기, `exp/instr_adv.py`, `exp/instr_ch.py`, `exp/instr_units.py`: `<백업 경로>` 로 넣고 `<백업 경로> restore` 로 되돌린다): 쪽 넘김 호출 스택(`advance_column_or_new_page` 에 Backtrace), 누적 높이 대입마다 출력, 칸 단위 높이(`advance_row_cut_inner` 의 units). 진단 출력 `RHWP_DIAG_SCAN`, `RHWP_DIAG_SPLITSCAN`, `RHWP_TABLE_DRIFT`, `RHWP_DIAG_TAC`, `RHWP_FLOW_DBG`
+- `exp/`: 한/글 실험 변형 생성기(오라클이나 회귀 사본을 고쳐 `in/` 에 둔다) → `REA/hwp2024/hwpx_lab/measure.py`(HWP5 는 `exp/measure_hwp.py`)를 `~/.claude/references/hidden_desktop.py` 로 돌려 PDF 를 얻는다. `exp/copy_reg.py`(회귀 코퍼스 사본과 줄 배치 지운 사본), `exp/svgpdf.mjs`(claude-linestarts `CLAUDE_SVG` 쪽 SVG 를 한/글 PDF 와 쪽 첫 글로 대조), `exp/pagecmp_hwp.mjs`(HWP5 판 pagecmp)
 - `nativescore.py` 에 `NATIVE_PP=1`: 문단 쪽이 어긋난 문서와 개수를 찍는다
 - `segcmp.py <id>`: 첫 구역 본문 문단 줄마다 한/글 줄 기록(높이/간격)과 엔진 값을 맞댄다
 - `pagecmp.mjs <id>`: 쪽마다 첫 글자를 한/글 PDF(`../out/lab/hanpdf/rt/<id>.pdf`)와 rhwp SVG 로 맞대 처음 갈리는 쪽을 찾는다
