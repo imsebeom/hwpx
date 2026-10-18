@@ -612,6 +612,12 @@ const RUST_PATCHES = [
     ['note-renumber-footnote-ops', 'src/document_core/commands/footnote_ops.rs'],
     ['note-renumber-clipboard', 'src/document_core/commands/clipboard.rs'],
     ['note-renumber-text-editing', 'src/document_core/commands/text_editing.rs'],
+    // 표 칸 안 각주, 미주를 각주 편집 함수로 다룬다(칸 위치 등록 + 가짜 컨트롤 번호, 사용자 보고 2026-10-19 「위쪽 각주가 안 눌림」)
+    ['fn-cell-target-mod', 'src/document_core/mod.rs'],
+    ['fn-cell-target-document', 'src/document_core/commands/document.rs'],
+    ['fn-cell-target-footnote-ops', 'src/document_core/commands/footnote_ops.rs'],
+    ['fn-cell-target-cursor-rect', 'src/document_core/queries/cursor_rect.rs'],
+    ['fn-cell-target-wasm-api', 'src/wasm_api.rs'],
     // 엔진이 만든 줄의 첫 vpos 0 은 저장 쪽 경계로 읽지 않는다(format_text 뒤 문단이 다음 쪽으로 넘어가던 문제)
     ['synth-no-reset-typeset', 'src/renderer/typeset.rs'],
     // 표 속성(캡션 등)을 바꾸면 표 높이를 다시 잰다(캡션 높이가 빠지던 문제)
@@ -823,7 +829,9 @@ for (const [id, rel] of [['wrap-text-labels', 'ui/picture-props-dialog.ts'], ['w
   // 각주 편집 중 Ctrl+C, X, V 와 Shift+방향키 고르기(사용자 보고 2026-10-18)
   ['footnote-clipboard', 'engine/input-handler-keyboard.ts'],
   // 각주 편집 중 고른 범위 위 타자와 조합 시작이 각주 범위를 지운다(Ctrl+A, 위아래 방향키, Backspace 범위는 footnote-clipboard)
-  ['footnote-edit-handler', 'engine/input-handler.ts'], ['footnote-edit-text', 'engine/input-handler-text.ts']]) {
+  ['footnote-edit-handler', 'engine/input-handler.ts'], ['footnote-edit-text', 'engine/input-handler-text.ts'],
+  // 표 칸 안 각주도 각주 영역을 눌러 편집한다(엔진 fn-cell-target-* 와 짝). 편집 중 다른 각주를 누르면 그 각주로 옮겨 탄다
+  ['fn-cell-target-bridge', 'core/wasm-bridge.ts'], ['fn-cell-target-mouse', 'engine/input-handler-mouse.ts']]) {
   const f = path.join(STUDIO, 'src', ...rel.split('/'));
   let src = fs.readFileSync(f, 'utf8');
   if (src.includes(`[claude-hwpx ${id}]`)) continue;
