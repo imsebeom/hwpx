@@ -228,7 +228,10 @@ def clone(
     sorted_keywords = _prepare_keywords(keywords) if keywords else []
 
     values = list(replacements.values()) + list((keywords or {}).values())
-    is_template = guard_write(src_path, values, "clone_form", skip_gate)
+    originals = "\n".join(list(replacements) + list(keywords or {}))
+    is_template = guard_write(
+        src_path, values, "clone_form", skip_gate, original=originals
+    )
 
     tmp_path = dst_path + ".tmp"
 

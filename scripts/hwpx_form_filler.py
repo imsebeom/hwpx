@@ -507,13 +507,23 @@ class HwpxFormFiller:
         Returns:
             채워진 셀 수
         """
-        if guard_write(
-            self.hwpx_path, cell_data.values(), "fill_cells_directly", skip_gate
-        ):
-            self._placeholder_write = True
-
         # 좌표는 cellAddr 격자 기준 — tc 순번과 다르다 (병합 셀)
         grid = self.build_cell_grid(table_index)
+
+        # 채울 칸의 지금 글을 원문으로 넘겨, 원문 사이에 자리를 끼운 값(체크칸)도 템플릿 제작으로 본다
+        original = "\n".join(
+            "".join(t.text or "" for t in grid[k].iter("{*}t"))
+            for k in cell_data
+            if grid.get(k) is not None
+        )
+        if guard_write(
+            self.hwpx_path,
+            cell_data.values(),
+            "fill_cells_directly",
+            skip_gate,
+            original=original,
+        ):
+            self._placeholder_write = True
 
         filled = 0
         for (row_idx, col_idx), content in cell_data.items():

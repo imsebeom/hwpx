@@ -125,8 +125,13 @@ def zip_replace_all(
         lineseg_injected/print_method_reset/is_template)
     """
 
+    # 원문(치환 키)을 함께 넘겨 원문 사이에 자리를 끼운 값(체크칸)도 템플릿으로 본다
     is_template = guard_write(
-        str(in_hwpx), replacements.values(), "zip_replace_all", skip_gate
+        str(in_hwpx),
+        replacements.values(),
+        "zip_replace_all",
+        skip_gate,
+        original="\n".join(replacements.keys()),
     )
 
     stats = {

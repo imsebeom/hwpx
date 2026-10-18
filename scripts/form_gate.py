@@ -63,12 +63,34 @@ def is_placeholder(value: Any) -> bool:
     return m is not None
 
 
-def is_template_write(values: Iterable[Any]) -> bool:
-    """쓰려는 값이 전부 플레이스홀더면 템플릿 제작으로 본다 (빈 값은 무시)"""
+def _is_template_value(value: str, original: Optional[str]) -> bool:
+    """값 하나가 템플릿 제작인가. 줄마다 따로 본다.
+
+    줄 전체가 플레이스홀더면 템플릿이다(「{{저서1}}\\n{{저서2}}」 여러 줄 칸). 원문 사이에 자리를 끼운 줄
+    (「 □ 24호봉 이상」 → 「{{호봉24}} 24호봉 이상」)은 플레이스홀더를 걷어 낸 나머지 낱말이 모두 원문에 이미
+    있으면 템플릿이다. 원문을 모르면 끼운 줄은 실제 값으로 본다(2026-10-18 보고: 두 경우 모두 게이트에 막혀
+    --skip-template-gate 로 우회했다).
+    """
+    for line in value.split("\n"):
+        s = line.strip()
+        if not s or PLACEHOLDER_RE.fullmatch(s):
+            continue
+        if original is None or not PLACEHOLDER_RE.search(s):
+            return False
+        if not all(tok in original for tok in PLACEHOLDER_RE.sub(" ", s).split()):
+            return False
+    return True
+
+
+def is_template_write(values: Iterable[Any], original: Optional[str] = None) -> bool:
+    """쓰려는 값이 전부 플레이스홀더(줄 단위, 원문 낱말은 허용)면 템플릿 제작으로 본다 (빈 값은 무시).
+
+    original: 바뀔 원문(치환 키, 채울 칸의 지금 글). 주면 원문 사이에 자리를 끼운 값도 템플릿으로 본다.
+    """
     meaningful = [v for v in values if isinstance(v, str) and v.strip()]
     if not meaningful:
         return True
-    return all(is_placeholder(v) for v in meaningful)
+    return all(_is_template_value(v, original) for v in meaningful)
 
 
 def scan_placeholders(hwpx_path: str) -> Dict[str, List[str]]:
@@ -256,14 +278,20 @@ def require_approved(
 
 
 def guard_write(
-    target_path: str, values: Iterable[Any], action: str, skip: bool = False
+    target_path: str,
+    values: Iterable[Any],
+    action: str,
+    skip: bool = False,
+    original: Optional[str] = None,
 ) -> bool:
     """쓰기 작업 진입점. 템플릿 제작이면 통과, 값 채우기면 승인 검사.
+
+    original: 바뀔 원문(치환 키, 칸의 지금 글). is_template_write 참고.
 
     Returns:
         True 면 템플릿 제작(플레이스홀더 쓰기), False 면 값 채우기
     """
-    if is_template_write(values):
+    if is_template_write(values, original):
         return True
     require_approved(target_path, action=action, skip=skip)
     return False
