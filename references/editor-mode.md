@@ -77,6 +77,7 @@ op 는 네 가지다. **먼저 `tool` 을 쓰고, 도구에 없는 일만 `doc` 
   - ⚠ **`format_paragraph`의 `left_margin_pt`, `indent_pt`, `space_before_pt`, `space_after_pt`는 이름과 달리 pt가 아니다 — 값 X가 X/200 pt가 된다**(2026-10-06 실측, `doc-tools.js` `paraProps()`가 환산 없이 넘긴다. 15를 주면 0.075pt라 여백이 안 보인다). 고치기 전까지는 **pt × 200**을 넘긴다(15pt → 3000, 내어쓰기 16.9pt → -3380). 저장본의 `<hp:case>` 쪽 값이 X/2(HWPUNIT), `<hp:default>` 쪽이 X다. 코드 수정은 `setup.mjs --build`와 `release.mjs`가 따라야 한다
 - ⚠ **`{"run": "Undo"}`는 `null`만 돌려주고 되돌리지 않는다**(2026-10-07 실측, `format_text` 30pt 뒤). 되돌릴 때는 원래 값을 원본 hwpx의 `charPr height`(또는 `getCharPropertiesAt`)로 읽어 같은 도구로 다시 넣고, `getCharPropertiesAt`로 확인한다
 - 문서 요소: `set_header_footer`(글만), `add_footnote`, `set_field`(누름틀)
+  - `add_footnote` 는 표 칸 안에도 단다(2026-10-19): `para` 대신 `table`(T1 형식), `row`, `col` 을 주고, `after` 를 생략하면 칸 끝. 새 각주는 문서에 각주가 있으면 그 모양을, 없으면 「각주」 스타일(보통 9pt)을 따른다(종전에는 커서 글자모양 10pt). 엔진 패치 `fn-insert-*`, wasm `insertFootnoteInCell` 이 돌려주는 `noteControlIdx` 는 각주 글 함수에 표를 담은 문단 번호와 함께 넘기는 가짜 컨트롤 번호다
 - **플러그인이 더한 것**(2026-10-02, 가이드북 세션 수정 요청):
   - `clone_table`(model, after_para, rows) — 문서에 있는 표(그림 상자, 예시 프롬프트 상자)를 본보기로 복제하고 칸 글만 바꾼다. 테두리, 칸 크기, 글자 모양이 본보기와 같다. `rows` 의 `null` 칸은 본보기 글 그대로, 칸 안 그림도 복제된다(바꾸려면 `image … --replace`). `create_table` 로 만들면 글자 크기가 문서와 달라진다
   - **표 속 표 좌표** `T15r0c0/T1r0c0`(바깥 칸 안 첫째 표의 0행 0열, `/` 로 더 깊이) — `format_text` 의 at, `set_cell` 은 `table:"T15r0c0/T1"` + row, col. `search_text` 가 이 좌표와 문맥을 돌려준다(종전에는 문단 번호와 빈 문맥). 칸 서식은 유지된다
@@ -110,11 +111,12 @@ $E builder add_equation.py {in} --output {out} --script "{a} over {b}" --table 2
 
 에디터에만 있는 것(도구 36종의 표 칸 병합, 열 너비, 캡션, 각주, 행 복제, 정규식 바꾸기 등)은 `apply_ops.mjs` 로 빌더 흐름에서 쓴다. 빌더에만 있는 것 중 양식 복제(F/H)와 시험지(J)는 문서를 새로 짜는 일이라 다리에 넣지 않았다.
 
-### 그림 넣기 `$E image <그림 파일> [좌표] [--end] [--replace] [--width mm] [--desc 설명]`
+### 그림 넣기 `$E image <그림 파일> [좌표] [--end] [--replace] [--width mm] [--desc 설명] [--wrap 배치 [--align 정렬] [--x mm] [--y mm] [--page]]`
 **칸 그림 바꾸기는 `--replace`**(2026-10-02): 그 칸의 그림을 모두 지우고 그림이 남긴 빈 문단을 걷은 뒤 넣는다. 글이 없는 칸(그림 상자)은 빈 문단을 모두, 글이 있으면 그림이 있던 문단만 걷는다. 결과의 `replaced` 가 지운 그림 수다
 에디터를 닫지 않고 그림을 넣는다(2026-09-27 추가, 되돌리기 한 번). 좌표(`p12`, `T2r0c0`)를 주면 그 문단이나 칸의 앞, `--end` 면 끝에 넣고, 없으면 사용자 커서 자리에 넣는다. PNG, JPEG, GIF, BMP.
 폭을 안 주면 원본 픽셀 크기를 쓰되 본문 150mm, 칸은 칸 폭을 넘지 않게 줄인다. 본문 그림은 글자처럼 취급으로 들어간다.
 칸 좌표(`T2r0c0`)에 넣으면 칸 문단 안에 글자처럼 취급 그림으로 들어가고 표 높이가 함께 맞춰진다(엔진 패치 `cell-pic-inline-*`, 약속값 `paperOffsetXHu = -2147483648`). 스튜디오의 끌어 놓기는 여전히 칸 위에 뜬 그림으로 넣는다. `run` 의 `insertPicture` 는 그림 바이트를 넘길 수 없어 쓰지 않는다.
+**글자처럼 취급하지 않는 그림은 `--wrap`**(2026-10-19, 본문만): `--wrap square`(어울림, 글이 그림 둘레로 흐름), `topbottom`(자리 차지), `behind`(글 뒤로), `front`(글 앞으로). `--align left|center|right` 로 단 안 가로 정렬, `--x`, `--y`(mm)로 기준에서 떨어진 거리를 준다. 기준은 기본이 문단(세로)과 단(가로)이고 그림이 쪽 안에 머문다. `--page` 를 주면 세로, 가로 모두 **쪽(본문 영역)** 기준으로 놓고 겹침을 허용한다(워터마크, 도장 자리). 문단을 나누지 않고 좌표 문단의 앞(`--end` 면 끝)에 붙인다. 칸 좌표에 주면 거부한다. 예: `$E image 사진.png p12 --wrap square --align right --width 40`, `$E image 바탕.png p0 --wrap behind --page --x 150 --y 20`. 한/글에서 열어 어울림 그림 옆으로 글이 흐르고 글 뒤 그림이 그 자리에 놓이는 것을 확인했다.
 
 ### WASM 직접 호출과 HwpCtrl
 

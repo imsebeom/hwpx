@@ -598,8 +598,8 @@ export const TOOLS = [
   },
   {
     name: 'add_footnote',
-    description: '문단 para 의 after 글자 바로 뒤(생략하면 문단 끝)에 각주 번호를 달고 쪽 아래에 각주 글을 넣는다. 출처나 근거를 밝힐 때 쓴다.',
-    parameters: { type: 'object', properties: { ...S, para: { type: 'integer' }, after: { type: 'string' }, text: { type: 'string' } }, required: ['para', 'text'] },
+    description: '문단 para 의 after 글자 바로 뒤(생략하면 문단 끝)에 각주 번호를 달고 쪽 아래에 각주 글을 넣는다. 출처나 근거를 밝힐 때 쓴다. 표 칸 안에 달려면 para 대신 table, row, col 을 준다(after 를 생략하면 칸 끝). 각주 글은 문서의 「각주」 스타일(보통 9pt)을 따른다.',
+    parameters: { type: 'object', properties: { ...S, para: { type: 'integer' }, table: { type: 'string', description: '칸 안에 달 때 T1 형식' }, row: { type: 'integer' }, col: { type: 'integer' }, after: { type: 'string' }, text: { type: 'string' } }, required: ['text'] },
   },
   {
     name: 'add_endnote',
@@ -1319,6 +1319,26 @@ function exec(doc, name, a) {
     }
 
     case 'add_footnote': {
+      if (a.table) {
+        const t = findTable(doc, a.table);
+        const c = findCell(doc, t, a.row, a.col);
+        const n = doc.getCellParagraphCount(t.section, t.para, t.ctrl, c);
+        let cp = n - 1;
+        let offset = cellParaText(doc, t, c, cp).length;
+        if (a.after) {
+          cp = -1;
+          for (let i = 0; i < n && cp < 0; i++) {
+            const k = cellParaText(doc, t, c, i).indexOf(a.after);
+            if (k >= 0) [cp, offset] = [i, k + a.after.length];
+          }
+          if (cp < 0) throw new Error(`${t.id} r${a.row}c${a.col} 에서 「${a.after}」를 찾지 못했습니다.`);
+        }
+        const r = J(doc.insertFootnoteInCell(t.section, t.para, t.ctrl, c, cp, offset));
+        if (!r.ok) throw new Error(`각주를 넣지 못했습니다: ${JSON.stringify(r)}`);
+        const info = J(doc.getFootnoteInfo(t.section, t.para, r.noteControlIdx));
+        doc.insertTextInFootnote(t.section, t.para, r.noteControlIdx, 0, info.totalTextLen ?? 0, clean(a.text));
+        return { result: { ok: true, number: r.footnoteNumber }, mark: { kind: 'insert', where: `${t.id} r${a.row}c${a.col} 각주 ${r.footnoteNumber}`, after: clean(a.text) } };
+      }
       checkPara(doc, s, a.para);
       const text = paraText(doc, s, a.para);
       let offset = text.length;

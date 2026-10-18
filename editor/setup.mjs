@@ -618,6 +618,9 @@ const RUST_PATCHES = [
     ['fn-cell-target-footnote-ops', 'src/document_core/commands/footnote_ops.rs'],
     ['fn-cell-target-cursor-rect', 'src/document_core/queries/cursor_rect.rs'],
     ['fn-cell-target-wasm-api', 'src/wasm_api.rs'],
+    // 새 각주를 「각주」 스타일(9pt)로 만들고 표 칸 안에도 넣는다(insertFootnoteInCell, 사용자 요청 2026-10-19)
+    ['fn-insert-note', 'src/document_core/commands/object_ops/note.rs'],
+    ['fn-insert-wasm-api', 'src/wasm_api.rs'],
     // 엔진이 만든 줄의 첫 vpos 0 은 저장 쪽 경계로 읽지 않는다(format_text 뒤 문단이 다음 쪽으로 넘어가던 문제)
     ['synth-no-reset-typeset', 'src/renderer/typeset.rs'],
     // 표 속성(캡션 등)을 바꾸면 표 높이를 다시 잰다(캡션 높이가 빠지던 문제)

@@ -277,6 +277,18 @@
   }
  },
  {
+  "label": "add_footnote(칸)",
+  "op": {
+   "tool": "add_footnote",
+   "args": {
+    "table": "T8",
+    "row": 0,
+    "col": 0,
+    "text": "칸 안 각주입니다. 칸 안 각주입니다."
+   }
+  }
+ },
+ {
   "label": "add_endnote",
   "op": {
    "tool": "add_endnote",
