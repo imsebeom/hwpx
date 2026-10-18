@@ -34,6 +34,9 @@ import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from hwpx_helpers import image_pixel_size  # noqa: E402
+
 HU_PER_MM = 7200 / 25.4
 
 MIME = {
@@ -381,9 +384,17 @@ def body_height_mm(xml: str) -> float:
 
 
 def build_float_pic(
-    item_id: str, size_hu: int, x_hu: int, y_hu: int, pid: int, instid: int
+    item_id: str,
+    size_hu: int,
+    x_hu: int,
+    y_hu: int,
+    pid: int,
+    instid: int,
+    pixel_size: tuple[int, int] | None = None,
 ) -> str:
     w = h = size_hu
+    # 원본 크기(imgDim)와 보일 범위(imgClip)는 그림 픽셀 수 x 75(한/글 규칙, hwpx_helpers.HU_PER_PX). 표시 크기를 넣으면 한/글 2022 가 그림을 못 그렸다
+    dw, dh = (pixel_size[0] * 75, pixel_size[1] * 75) if pixel_size else (w, h)
     return (
         f'<hp:pic xmlns:hc="http://www.hancom.co.kr/hwpml/2011/core" id="{pid}" zOrder="0" '
         f'numberingType="PICTURE" textWrap="IN_FRONT_OF_TEXT" textFlow="BOTH_SIDES" lock="0" '
@@ -396,9 +407,9 @@ def build_float_pic(
         f'<hc:rotMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/></hp:renderingInfo>'
         f'<hp:imgRect><hc:pt0 x="0" y="0"/><hc:pt1 x="{w}" y="0"/><hc:pt2 x="{w}" y="{h}"/>'
         f'<hc:pt3 x="0" y="{h}"/></hp:imgRect>'
-        f'<hp:imgClip left="0" right="{w}" top="0" bottom="{h}"/>'
+        f'<hp:imgClip left="0" right="{dw}" top="0" bottom="{dh}"/>'
         f'<hp:inMargin left="0" right="0" top="0" bottom="0"/>'
-        f'<hp:imgDim dimwidth="{w}" dimheight="{h}"/>'
+        f'<hp:imgDim dimwidth="{dw}" dimheight="{dh}"/>'
         f'<hc:img binaryItemIDRef="{item_id}" bright="0" contrast="0" effect="REAL_PIC" alpha="0"/>'
         f"<hp:effects/>"
         f'<hp:sz width="{w}" widthRelTo="ABSOLUTE" height="{h}" heightRelTo="ABSOLUTE" protect="0"/>'
@@ -607,6 +618,7 @@ def place_seals(
                 round(pos_y * HU_PER_MM),
                 max_id - 1,
                 max_id,
+                pixel_size=image_pixel_size(image),
             )
             splices[si].append(
                 (

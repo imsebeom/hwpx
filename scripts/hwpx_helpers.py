@@ -16,9 +16,105 @@ import re
 import zipfile
 
 MIME_MAP = {
-    "jpg": "image/jpeg", "jpeg": "image/jpeg",
-    "png": "image/png", "bmp": "image/bmp", "gif": "image/gif",
+    "jpg": "image/jpeg",
+    "jpeg": "image/jpeg",
+    "png": "image/png",
+    "bmp": "image/bmp",
+    "gif": "image/gif",
 }
+
+# 그림 원본 크기(<hp:imgDim>)와 보일 범위(<hp:imgClip>)는 표시 크기가 아니라 그림 픽셀 수 x 75 다.
+# 한/글 저장본 실측(정답본 그림 24개): 그림 DPI(96, 150, 300)와 상관없이 dimwidth = 픽셀 폭 x 75, 잘라 내지 않았으면
+# imgClip = 0 ~ 그 값. 표시 크기를 넣으면 한/글 2022 가 1600x760px 그림을 499x237px 로 알고 열어 보이지 않았다(2026-10-18 KTX 문항).
+HU_PER_PX = 75
+
+
+def image_pixel_size(data: bytes):
+    """그림 바이트의 픽셀 크기 (폭, 높이). 읽지 못하면 None."""
+    try:
+        import io
+
+        from PIL import Image
+
+        with Image.open(io.BytesIO(data)) as im:
+            # 벡터 그림(WMF, EMF)은 픽셀 크기가 원본 크기가 아니다
+            return None if im.format in ("WMF", "EMF") else im.size
+    except Exception:
+        return None
+
+
+def image_pixel_sizes(zf) -> dict:
+    """열린 HWPX zip 의 content.hpf 그림 항목 id → 픽셀 크기."""
+    try:
+        hpf = zf.read("Contents/content.hpf").decode("utf-8")
+    except KeyError:
+        return {}
+    sizes = {}
+    for m in re.finditer(r"<opf:item\b[^>]*>", hpf):
+        item_id = re.search(r'\bid="([^"]+)"', m.group(0))
+        href = re.search(r'\bhref="([^"]+)"', m.group(0))
+        if not item_id or not href or not href.group(1).startswith("BinData/"):
+            continue
+        try:
+            size = image_pixel_size(zf.read(href.group(1)))
+        except KeyError:
+            size = None
+        if size:
+            sizes[item_id.group(1)] = size
+    return sizes
+
+
+def fix_image_dims(section_xml: str, pixel_sizes: dict) -> tuple[str, int]:
+    """그림마다 imgDim 이 픽셀 x 75 와 1% 넘게 다르면 바로잡고, imgClip 도 같은 비율로 옮긴다.
+
+    imgClip 이 옛 imgDim 전체(0 ~ 옛 값)였으면 새 전체가 되고, 잘라 낸 범위면 같은 자리를 가리키게 된다.
+    고치는 것은 결함의 표지가 있는 그림뿐이다: imgDim 이 표시 크기(hp:sz)와 같고 픽셀 x 75 와는 1% 넘게 다를 때.
+    한/글 저장본(정답본 327개)에는 이 표지 없이 픽셀 x 75 가 아닌 값(22px 아이콘 1680, 0 등)도 있어 건드리지 않는다.
+    고친 그림 수를 함께 돌려준다.
+    """
+    count = 0
+
+    def fix_pic(m):
+        nonlocal count
+        pic = m.group(0)
+        ref = re.search(r'binaryItemIDRef="([^"]+)"', pic)
+        px = pixel_sizes.get(ref.group(1)) if ref else None
+        dim = re.search(r'<hp:imgDim dimwidth="(\d+)" dimheight="(\d+)"\s*/>', pic)
+        if not px or not dim:
+            return pic
+        want = (px[0] * HU_PER_PX, px[1] * HU_PER_PX)
+        old = (int(dim.group(1)), int(dim.group(2)))
+        if all(abs(o - w) <= max(1, w * 0.01) for o, w in zip(old, want)):
+            return pic
+        sz = re.search(r'<hp:sz width="(\d+)"[^>]*height="(\d+)"', pic)
+        if (
+            not sz
+            or abs(old[0] - int(sz.group(1))) > 2
+            or abs(old[1] - int(sz.group(2))) > 2
+        ):
+            return pic
+        pic = (
+            pic[: dim.start()]
+            + f'<hp:imgDim dimwidth="{want[0]}" dimheight="{want[1]}"/>'
+            + pic[dim.end() :]
+        )
+        clip = re.search(
+            r'<hp:imgClip left="(-?\d+)" right="(-?\d+)" top="(-?\d+)" bottom="(-?\d+)"\s*/>',
+            pic,
+        )
+        if clip and old[0] > 0 and old[1] > 0:
+            left, right, top, bottom = (int(v) for v in clip.groups())
+            sx, sy = want[0] / old[0], want[1] / old[1]
+            pic = (
+                pic[: clip.start()]
+                + f'<hp:imgClip left="{round(left * sx)}" right="{round(right * sx)}" top="{round(top * sy)}" bottom="{round(bottom * sy)}"/>'
+                + pic[clip.end() :]
+            )
+        count += 1
+        return pic
+
+    return re.sub(r"<hp:pic\b.*?</hp:pic>", fix_pic, section_xml, flags=re.S), count
+
 
 # 빈 lineSegArray 가 들어 있는 paragraph 는 polaris-dvc 가 JID 11004 ("paragraph
 # has text but empty lineSegArray") 로 잡는다. HwpOffice 는 알아서 보정해 열지만
@@ -50,9 +146,7 @@ def inject_dummy_linesegs(section_xml: str) -> tuple[str, int]:
         (변환된 XML, 삽입된 paragraph 수)
     """
     # innermost <hp:p>만 매치 — 외부(표 포함) paragraph에 잘못 적용되지 않도록 보호
-    pattern = re.compile(
-        r"(<hp:p [^>]*>)((?:(?!<hp:p\b).)*?)(</hp:p>)", re.DOTALL
-    )
+    pattern = re.compile(r"(<hp:p [^>]*>)((?:(?!<hp:p\b).)*?)(</hp:p>)", re.DOTALL)
     count = 0
 
     def repl(m: "re.Match[str]") -> str:
@@ -190,9 +284,7 @@ def replace_placeholder_multiline(section_xml: str, key: str, value: str) -> str
     escaped_key = re.escape(key)
     # innermost hp:p만 매치 (nested paragraph 폭발 방지)
     pattern = re.compile(
-        r"<hp:p\b[^>]*>(?:(?!<hp:p\b).)*?"
-        + escaped_key
-        + r"(?:(?!<hp:p\b).)*?</hp:p>",
+        r"<hp:p\b[^>]*>(?:(?!<hp:p\b).)*?" + escaped_key + r"(?:(?!<hp:p\b).)*?</hp:p>",
         re.DOTALL,
     )
 
@@ -204,6 +296,7 @@ def replace_placeholder_multiline(section_xml: str, key: str, value: str) -> str
     if n == 0:
         # paragraph 매치 안 됨 — 줄바꿈을 공백으로 합쳐 fallback (silent data loss 경고)
         import warnings
+
         warnings.warn(
             f"replace_placeholder_multiline: '{key}' not found inside any innermost <hp:p>; "
             "falling back to inline replace (newlines lost).",
@@ -233,18 +326,22 @@ def ensure_dummy_linesegs_etree(section_tree) -> int:
         etree.SubElement(
             seg_arr,
             f"{ns}lineseg",
-            textpos="0", vertpos="0", vertsize="900",
-            textheight="900", baseline="765", spacing="360",
-            horzpos="0", horzsize="22960", flags="393216",
+            textpos="0",
+            vertpos="0",
+            vertsize="900",
+            textheight="900",
+            baseline="765",
+            spacing="360",
+            horzpos="0",
+            horzsize="22960",
+            flags="393216",
         )
         count += 1
     return count
 
 
 # nested 안전 정규식 — innermost <hp:p> 만 매치 (inject_dummy_linesegs 와 동일 패턴)
-_INNER_P_PATTERN = re.compile(
-    r"<hp:p [^>]*>(?:(?!<hp:p\b).)*?</hp:p>", re.DOTALL
-)
+_INNER_P_PATTERN = re.compile(r"<hp:p [^>]*>(?:(?!<hp:p\b).)*?</hp:p>", re.DOTALL)
 _LINESEG_PATTERN = re.compile(
     r"<hp:linesegarray\b[^>]*>.*?</hp:linesegarray>", re.DOTALL
 )
@@ -289,6 +386,7 @@ def remove_linesegarray_in_paragraphs_matching(section_xml, predicate):
 
     new_xml = _INNER_P_PATTERN.sub(repl, section_xml)
     return new_xml, count
+
 
 # --- 네임스페이스 선언 (section0.xml 루트에 사용) ---
 NS_DECL = (
@@ -345,6 +443,7 @@ def validate_header_for_government(header_path):
     기본 header (60KB, 11 charPr)를 쓰면 서식이 깨진다.
     """
     import os
+
     size = os.path.getsize(header_path)
     if size < 100000:  # government header는 335KB
         raise ValueError(
@@ -374,7 +473,7 @@ def extract_secpr_and_colpr(hwpx_path):
     m = re.search(r"<hp:secPr.*?</hp:secPr>", data, re.DOTALL)
     secpr = m.group() if m else ""
     end = m.end() if m else 0
-    ctrl_m = re.search(r"<hp:ctrl>.*?</hp:ctrl>", data[end:end + 500], re.DOTALL)
+    ctrl_m = re.search(r"<hp:ctrl>.*?</hp:ctrl>", data[end : end + 500], re.DOTALL)
     colpr = ctrl_m.group() if ctrl_m else ""
     return secpr, colpr
 
@@ -387,8 +486,8 @@ def make_first_para(secpr, colpr, charpr="25", parapr="40"):
         f'<hp:p id="{p_id}" paraPrIDRef="{parapr}" styleIDRef="0" '
         f'pageBreak="0" columnBreak="0" merged="0">'
         f'<hp:run charPrIDRef="{charpr}">'
-        f'{secpr}{colpr}'
-        f'</hp:run></hp:p>'
+        f"{secpr}{colpr}"
+        f"</hp:run></hp:p>"
     )
 
 
@@ -434,8 +533,14 @@ def make_body_para(marker, text, marker_charpr="18", text_charpr="38", parapr="4
 
 
 # --- 표지 배너 (3×2 컬러 테이블) ---
-def make_cover_banner(title_text, title_charpr="144", title_parapr="20",
-                      bf_top=("10", "8"), bf_bottom=("9", "11"), bf_title="15"):
+def make_cover_banner(
+    title_text,
+    title_charpr="144",
+    title_parapr="20",
+    bf_top=("10", "8"),
+    bf_bottom=("9", "11"),
+    bf_title="15",
+):
     """
     표지 배너: 3행 2열 테이블.
     1행: 컬러 바 (좌: bf_top[0], 우: bf_top[1])
@@ -459,7 +564,7 @@ def make_cover_banner(title_text, title_charpr="144", title_parapr="20",
             f'linkListIDRef="0" linkListNextIDRef="0" textWidth="0" textHeight="0" hasTextRef="0" hasNumRef="0">'
             f'<hp:p paraPrIDRef="2" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0" id="{cid}">'
             f'<hp:run charPrIDRef="42"><hp:t/></hp:run></hp:p>'
-            f'</hp:subList>'
+            f"</hp:subList>"
             f'<hp:cellAddr colAddr="{col}" rowAddr="{row}"/>'
             f'<hp:cellSpan colSpan="1" rowSpan="1"/>'
             f'<hp:cellSz width="{w}" height="{thin_h}"/>'
@@ -473,7 +578,7 @@ def make_cover_banner(title_text, title_charpr="144", title_parapr="20",
         f'linkListIDRef="0" linkListNextIDRef="0" textWidth="0" textHeight="0" hasTextRef="0" hasNumRef="0">'
         f'<hp:p paraPrIDRef="{title_parapr}" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0" id="{title_cid}">'
         f'<hp:run charPrIDRef="{title_charpr}"><hp:t>{xml_escape(title_text)}</hp:t></hp:run></hp:p>'
-        f'</hp:subList>'
+        f"</hp:subList>"
         f'<hp:cellAddr colAddr="0" rowAddr="1"/>'
         f'<hp:cellSpan colSpan="2" rowSpan="1"/>'
         f'<hp:cellSz width="{table_width}" height="{title_h}"/>'
@@ -492,16 +597,24 @@ def make_cover_banner(title_text, title_charpr="144", title_parapr="20",
         f'vertOffset="0" horzOffset="0"/>'
         f'<hp:outMargin left="0" right="0" top="0" bottom="0"/>'
         f'<hp:inMargin left="0" right="0" top="0" bottom="0"/>'
-        f'<hp:tr>{thin_cell(0, 0, bf_top[0], half_width)}{thin_cell(1, 0, bf_top[1], half_width)}</hp:tr>'
-        f'<hp:tr>{title_cell}</hp:tr>'
-        f'<hp:tr>{thin_cell(0, 2, bf_bottom[0], half_width)}{thin_cell(1, 2, bf_bottom[1], half_width)}</hp:tr>'
-        f'</hp:tbl></hp:run></hp:p>'
+        f"<hp:tr>{thin_cell(0, 0, bf_top[0], half_width)}{thin_cell(1, 0, bf_top[1], half_width)}</hp:tr>"
+        f"<hp:tr>{title_cell}</hp:tr>"
+        f"<hp:tr>{thin_cell(0, 2, bf_bottom[0], half_width)}{thin_cell(1, 2, bf_bottom[1], half_width)}</hp:tr>"
+        f"</hp:tbl></hp:run></hp:p>"
     )
 
 
 # --- 섹션 바 (1×3 컬러 테이블) ---
-def make_section_bar(number, title, num_charpr="81", gap_charpr="82", title_charpr="83",
-                     bf_num="14", bf_gap="13", bf_title="12"):
+def make_section_bar(
+    number,
+    title,
+    num_charpr="81",
+    gap_charpr="82",
+    title_charpr="83",
+    bf_num="14",
+    bf_gap="13",
+    bf_title="12",
+):
     """
     섹션 바: 1행 3열.
     Cell 0: 번호 (파랑), Cell 1: 간격 (회색), Cell 2: 제목 (하늘색)
@@ -533,14 +646,14 @@ def make_section_bar(number, title, num_charpr="81", gap_charpr="82", title_char
         f'horzAlign="LEFT" vertOffset="0" horzOffset="0"/>'
         f'<hp:outMargin left="0" right="0" top="0" bottom="0"/>'
         f'<hp:inMargin left="0" right="0" top="0" bottom="0"/>'
-        f'<hp:tr>'
+        f"<hp:tr>"
         # Cell 0: 번호
         f'<hp:tc name="" header="0" hasMargin="0" protect="0" editable="0" dirty="1" borderFillIDRef="{bf_num}">'
         f'<hp:subList id="" textDirection="HORIZONTAL" lineWrap="BREAK" vertAlign="CENTER" '
         f'linkListIDRef="0" linkListNextIDRef="0" textWidth="0" textHeight="0" hasTextRef="0" hasNumRef="0">'
         f'<hp:p paraPrIDRef="21" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0" id="{p0_id}">'
         f'<hp:run charPrIDRef="{num_charpr}"><hp:t>{xml_escape(number)}</hp:t></hp:run></hp:p>'
-        f'</hp:subList>'
+        f"</hp:subList>"
         f'<hp:cellAddr colAddr="0" rowAddr="0"/><hp:cellSpan colSpan="1" rowSpan="1"/>'
         f'<hp:cellSz width="{cell0_width}" height="3027"/>'
         f'<hp:cellMargin left="141" right="141" top="141" bottom="141"/></hp:tc>'
@@ -550,7 +663,7 @@ def make_section_bar(number, title, num_charpr="81", gap_charpr="82", title_char
         f'linkListIDRef="0" linkListNextIDRef="0" textWidth="0" textHeight="0" hasTextRef="0" hasNumRef="0">'
         f'<hp:p paraPrIDRef="2" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0" id="{p1_id}">'
         f'<hp:run charPrIDRef="{gap_charpr}"><hp:t/></hp:run></hp:p>'
-        f'</hp:subList>'
+        f"</hp:subList>"
         f'<hp:cellAddr colAddr="1" rowAddr="0"/><hp:cellSpan colSpan="1" rowSpan="1"/>'
         f'<hp:cellSz width="{cell1_width}" height="3027"/>'
         f'<hp:cellMargin left="141" right="141" top="141" bottom="141"/></hp:tc>'
@@ -560,24 +673,33 @@ def make_section_bar(number, title, num_charpr="81", gap_charpr="82", title_char
         f'linkListIDRef="0" linkListNextIDRef="0" textWidth="0" textHeight="0" hasTextRef="0" hasNumRef="0">'
         f'<hp:p paraPrIDRef="2" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0" id="{p2_id}">'
         f'<hp:run charPrIDRef="{title_charpr}"><hp:t> {xml_escape(title)}</hp:t></hp:run></hp:p>'
-        f'</hp:subList>'
+        f"</hp:subList>"
         f'<hp:cellAddr colAddr="2" rowAddr="0"/><hp:cellSpan colSpan="1" rowSpan="1"/>'
         f'<hp:cellSz width="{cell2_width}" height="3027"/>'
         f'<hp:cellMargin left="141" right="141" top="141" bottom="141"/></hp:tc>'
-        f'</hp:tr></hp:tbl></hp:run></hp:p>'
+        f"</hp:tr></hp:tbl></hp:run></hp:p>"
     )
 
 
 # --- 이미지 문단 ---
-def make_image_para(binary_item_id, width=40000, height=22500, parapr="19"):
+def make_image_para(
+    binary_item_id, width=40000, height=22500, parapr="19", pixel_size=None
+):
     """
     이미지 문단. 전체 hp:pic 필수 구조 포함.
-    width, height: HWPUNIT 단위 (기본 16:9 = 40000×22500).
+    width, height: 표시 크기, HWPUNIT 단위 (기본 16:9 = 40000×22500).
+    pixel_size: 그림 파일의 (픽셀 폭, 픽셀 높이). 원본 크기(imgDim)와 보일 범위(imgClip)는 이 값 x 75 로 적는다
+    (한/글 규칙, 위 HU_PER_PX). 주지 않으면 표시 크기를 적으므로 저장 전에 fix_namespaces 가 바로잡는다.
     """
     p_id = next_id()
     pic_id = next_id()
     inst_id = next_id()
     cx, cy = width // 2, height // 2
+    dim_w, dim_h = (
+        (pixel_size[0] * HU_PER_PX, pixel_size[1] * HU_PER_PX)
+        if pixel_size
+        else (width, height)
+    )
     return (
         f'<hp:p id="{p_id}" paraPrIDRef="{parapr}" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0">'
         f'<hp:run charPrIDRef="0">'
@@ -589,32 +711,39 @@ def make_image_para(binary_item_id, width=40000, height=22500, parapr="19"):
         f'<hp:curSz width="{width}" height="{height}"/>'
         f'<hp:flip horizontal="0" vertical="0"/>'
         f'<hp:rotationInfo angle="0" centerX="{cx}" centerY="{cy}" rotateimage="0"/>'
-        f'<hp:renderingInfo>'
+        f"<hp:renderingInfo>"
         f'<hc:transMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/>'
         f'<hc:scaMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/>'
         f'<hc:rotMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/>'
-        f'</hp:renderingInfo>'
+        f"</hp:renderingInfo>"
         f'<hc:img binaryItemIDRef="{binary_item_id}" bright="0" contrast="0" effect="REAL_PIC" alpha="0"/>'
-        f'<hp:imgRect>'
+        f"<hp:imgRect>"
         f'<hc:pt0 x="0" y="0"/><hc:pt1 x="{width}" y="0"/>'
         f'<hc:pt2 x="{width}" y="{height}"/><hc:pt3 x="0" y="{height}"/>'
-        f'</hp:imgRect>'
-        f'<hp:imgClip left="0" right="{width}" top="0" bottom="{height}"/>'
+        f"</hp:imgRect>"
+        f'<hp:imgClip left="0" right="{dim_w}" top="0" bottom="{dim_h}"/>'
         f'<hp:inMargin left="0" right="0" top="0" bottom="0"/>'
-        f'<hp:imgDim dimwidth="{width}" dimheight="{height}"/>'
-        f'<hp:effects/>'
+        f'<hp:imgDim dimwidth="{dim_w}" dimheight="{dim_h}"/>'
+        f"<hp:effects/>"
         f'<hp:sz width="{width}" widthRelTo="ABSOLUTE" height="{height}" heightRelTo="ABSOLUTE" protect="0"/>'
         f'<hp:pos treatAsChar="1" affectLSpacing="0" flowWithText="1" allowOverlap="0" '
         f'holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="COLUMN" vertAlign="TOP" horzAlign="CENTER" '
         f'vertOffset="0" horzOffset="0"/>'
         f'<hp:outMargin left="0" right="0" top="0" bottom="0"/>'
-        f'</hp:pic><hp:t/></hp:run></hp:p>'
+        f"</hp:pic><hp:t/></hp:run></hp:p>"
     )
 
 
 # --- 표지 페이지 어셈블리 ---
-def make_cover_page(title, subtitle="", date="", subtitle_charpr="62", subtitle_parapr="52",
-                    date_charpr="60", date_parapr="1"):
+def make_cover_page(
+    title,
+    subtitle="",
+    date="",
+    subtitle_charpr="62",
+    subtitle_parapr="52",
+    date_charpr="60",
+    date_parapr="1",
+):
     """표지 페이지 전체 생성: 빈줄 + 배너 + 부제 + 날짜 + pageBreak."""
     parts = []
     for _ in range(6):
@@ -622,7 +751,9 @@ def make_cover_page(title, subtitle="", date="", subtitle_charpr="62", subtitle_
     parts.append(make_cover_banner(title))
     if subtitle:
         parts.append(make_empty_line())
-        parts.append(make_text_para(subtitle, charpr=subtitle_charpr, parapr=subtitle_parapr))
+        parts.append(
+            make_text_para(subtitle, charpr=subtitle_charpr, parapr=subtitle_parapr)
+        )
     for _ in range(8):
         parts.append(make_empty_line())
     if date:
@@ -663,9 +794,11 @@ def update_content_hpf(hwpx_path, images):
                     for img in images:
                         ext = img["file"].rsplit(".", 1)[-1].lower()
                         mime = MIME_MAP.get(ext, "image/png")
-                        items += (f'<opf:item id="{img["id"]}" '
-                                  f'href="BinData/{img["file"]}" '
-                                  f'media-type="{mime}" isEmbeded="1"/>')
+                        items += (
+                            f'<opf:item id="{img["id"]}" '
+                            f'href="BinData/{img["file"]}" '
+                            f'media-type="{mime}" isEmbeded="1"/>'
+                        )
                     text = text.replace("</opf:manifest>", items + "</opf:manifest>")
                     data = text.encode("utf-8")
                 if item.filename == "mimetype":
@@ -675,8 +808,15 @@ def update_content_hpf(hwpx_path, images):
     os.replace(tmp, str(hwpx_path))
 
 
-def insert_image_at(hwpx_path, img_path, anchor_text, width_mm=120,
-                    position="before", parapr="0", output_path=None):
+def insert_image_at(
+    hwpx_path,
+    img_path,
+    anchor_text,
+    width_mm=120,
+    position="before",
+    parapr="0",
+    output_path=None,
+):
     """
     이미지를 anchor_text가 포함된 문단 앞/뒤에 인라인 삽입한다.
     4단계(ZIP추가+hpf등록+pic생성+재패킹)를 단일 호출로 처리.
@@ -709,7 +849,9 @@ def insert_image_at(hwpx_path, img_path, anchor_text, width_mm=120,
         section = zin.read("Contents/section0.xml").decode("utf-8")
         hpf = zin.read("Contents/content.hpf").decode("utf-8")
 
-        pic_xml = make_image_para(img_id, width=w_hu, height=h_hu, parapr=parapr)
+        pic_xml = make_image_para(
+            img_id, width=w_hu, height=h_hu, parapr=parapr, pixel_size=(w_px, h_px)
+        )
 
         match = re.search(re.escape(anchor_text), section)
         if not match:
@@ -724,8 +866,10 @@ def insert_image_at(hwpx_path, img_path, anchor_text, width_mm=120,
 
         ext = fname.rsplit(".", 1)[-1].lower()
         mime = MIME_MAP.get(ext, "image/png")
-        hpf_item = (f'<opf:item id="{img_id}" href="BinData/{fname}" '
-                    f'media-type="{mime}" isEmbeded="1"/>')
+        hpf_item = (
+            f'<opf:item id="{img_id}" href="BinData/{fname}" '
+            f'media-type="{mime}" isEmbeded="1"/>'
+        )
         hpf = hpf.replace("</opf:manifest>", hpf_item + "</opf:manifest>")
 
         tmp = out + ".tmp"
@@ -736,8 +880,9 @@ def insert_image_at(hwpx_path, img_path, anchor_text, width_mm=120,
                 elif item.filename == "Contents/content.hpf":
                     zout.writestr(item, hpf.encode("utf-8"))
                 elif item.filename == "mimetype":
-                    zout.writestr(item, zin.read(item.filename),
-                                  compress_type=zipfile.ZIP_STORED)
+                    zout.writestr(
+                        item, zin.read(item.filename), compress_type=zipfile.ZIP_STORED
+                    )
                 else:
                     zout.writestr(item, zin.read(item.filename))
             zout.write(img_path, f"BinData/{fname}")
@@ -748,6 +893,7 @@ def insert_image_at(hwpx_path, img_path, anchor_text, width_mm=120,
 # =============================================================================
 # rhwp 기반 헬퍼 (edwardkim/rhwp, MIT License 참조)
 # =============================================================================
+
 
 def local_name(tag):
     """lxml 태그에서 네임스페이스 접두사를 제거한 로컬 이름을 반환한다.
@@ -767,7 +913,7 @@ def local_name(tag):
     if tag.startswith("{"):
         # Clark notation: {uri}localname
         end = tag.find("}")
-        return tag[end + 1:] if end >= 0 else tag
+        return tag[end + 1 :] if end >= 0 else tag
     if ":" in tag:
         return tag.split(":", 1)[1]
     return tag
@@ -821,7 +967,7 @@ def utf16_len(s):
 
         utf16_len("가")      # 1  (BMP)
         utf16_len("a")       # 1
-        utf16_len("\U0001F600")  # 2  (U+1F600, surrogate pair)
+        utf16_len("\U0001f600")  # 2  (U+1F600, surrogate pair)
     """
     return len(s.encode("utf-16-le")) // 2
 
@@ -855,8 +1001,8 @@ def tab_aware_offset(s, tab_width=8):
 
 
 # zip bomb 방어 상한 (rhwp src/parser/hwpx/reader.rs:19-26)
-HWPX_MAX_XML_SIZE = 32 * 1024 * 1024       # 32 MB — content.hpf, section*.xml, header.xml 등
-HWPX_MAX_BINDATA_SIZE = 64 * 1024 * 1024   # 64 MB — BinData/*.png, .jpg 등
+HWPX_MAX_XML_SIZE = 32 * 1024 * 1024  # 32 MB — content.hpf, section*.xml, header.xml 등
+HWPX_MAX_BINDATA_SIZE = 64 * 1024 * 1024  # 64 MB — BinData/*.png, .jpg 등
 
 
 def read_zip_entry_limited(zf, name, *, limit=None):
@@ -878,7 +1024,9 @@ def read_zip_entry_limited(zf, name, *, limit=None):
     """
     info = zf.getinfo(name)
     if limit is None:
-        limit = HWPX_MAX_BINDATA_SIZE if name.startswith("BinData/") else HWPX_MAX_XML_SIZE
+        limit = (
+            HWPX_MAX_BINDATA_SIZE if name.startswith("BinData/") else HWPX_MAX_XML_SIZE
+        )
     if info.file_size > limit:
         raise ValueError(
             f"zip 엔트리 크기 초과 ({name}: {info.file_size} > {limit}). zip bomb 가능성."
@@ -923,13 +1071,18 @@ def read_zip_entry_limited(zf, name, *, limit=None):
 # 검증: HwpOffice에서 SUM/AVERAGE/MAX/MIN 정상 렌더·재계산 확인 (2026-04-18).
 
 
-FORMULA_DEFAULT_FIELDID = 627469685   # 문서 내 FORMULA 필드 그룹 ID (HwpOffice 기본값)
-FORMULA_DEFAULT_FORMAT = "%g,"        # 결과 포맷 (천 단위 콤마)
+FORMULA_DEFAULT_FIELDID = 627469685  # 문서 내 FORMULA 필드 그룹 ID (HwpOffice 기본값)
+FORMULA_DEFAULT_FORMAT = "%g,"  # 결과 포맷 (천 단위 콤마)
 
 
-def build_formula_run_inner_xml(field_id, formula, result_str, *,
-                                 fieldid=FORMULA_DEFAULT_FIELDID,
-                                 result_format=FORMULA_DEFAULT_FORMAT):
+def build_formula_run_inner_xml(
+    field_id,
+    formula,
+    result_str,
+    *,
+    fieldid=FORMULA_DEFAULT_FIELDID,
+    result_format=FORMULA_DEFAULT_FORMAT,
+):
     """FORMULA 필드 한 셀에 들어갈 <hp:run> 내부 XML 문자열을 생성한다.
 
     이 문자열을 기존 run 의 자식으로 이식하면 HwpOffice 호환 FORMULA 필드가 된다.
@@ -946,7 +1099,7 @@ def build_formula_run_inner_xml(field_id, formula, result_str, *,
     """
     command = f"{formula}??{result_format};;{result_str}"
     return (
-        '<hp:ctrl>'
+        "<hp:ctrl>"
         f'<hp:fieldBegin id="{field_id}" type="FORMULA" name="" '
         f'editable="0" dirty="0" zorder="-1" fieldid="{fieldid}" metaTag="">'
         '<hp:parameters cnt="5" name="">'
@@ -955,20 +1108,26 @@ def build_formula_run_inner_xml(field_id, formula, result_str, *,
         f'<hp:stringParam name="Formula">{formula}</hp:stringParam>'
         f'<hp:stringParam name="ResultFormat">{result_format}</hp:stringParam>'
         f'<hp:stringParam name="LastResult">{result_str}</hp:stringParam>'
-        '</hp:parameters>'
-        '</hp:fieldBegin>'
-        '</hp:ctrl>'
-        f'<hp:t>{result_str}</hp:t>'
-        '<hp:ctrl>'
+        "</hp:parameters>"
+        "</hp:fieldBegin>"
+        "</hp:ctrl>"
+        f"<hp:t>{result_str}</hp:t>"
+        "<hp:ctrl>"
         f'<hp:fieldEnd beginIDRef="{field_id}" fieldid="{fieldid}"/>'
-        '</hp:ctrl>'
-        '<hp:t/>'
+        "</hp:ctrl>"
+        "<hp:t/>"
     )
 
 
-def apply_formula_to_cell(tc, field_id, formula, result_str, *,
-                           fieldid=FORMULA_DEFAULT_FIELDID,
-                           result_format=FORMULA_DEFAULT_FORMAT):
+def apply_formula_to_cell(
+    tc,
+    field_id,
+    formula,
+    result_str,
+    *,
+    fieldid=FORMULA_DEFAULT_FIELDID,
+    result_format=FORMULA_DEFAULT_FORMAT,
+):
     """lxml ``<hp:tc>`` 셀에 FORMULA 필드를 주입한다.
 
     셀의 첫 run 자식들을 제거하고 새 FORMULA 필드 구조로 교체한다.
@@ -1006,8 +1165,11 @@ def apply_formula_to_cell(tc, field_id, formula, result_str, *,
         run.remove(child)
 
     inner = build_formula_run_inner_xml(
-        field_id, formula, result_str,
-        fieldid=fieldid, result_format=result_format,
+        field_id,
+        formula,
+        result_str,
+        fieldid=fieldid,
+        result_format=result_format,
     )
     new_run = _et.fromstring(
         f'<hp:run xmlns:hp="{HP_NS}" charPrIDRef="{charPr}">{inner}</hp:run>'
@@ -1053,12 +1215,12 @@ def rgb_to_hex(r: int, g: int, b: int) -> str:
 # id 부여는 :class:`HwpxModifier` 의 ``_register_border_fill`` 이 담당한다.
 
 # 표준 테두리 변형. (type, width) 튜플.
-BORDER_NONE     = ("NONE",        "0.1 mm")
-BORDER_SOLID    = ("SOLID",       "0.12 mm")
-BORDER_THICK    = ("SOLID",       "0.4 mm")    # 굵은 실선
-BORDER_DOTTED   = ("DOT",         "0.12 mm")
-BORDER_DASHED   = ("DASH",        "0.12 mm")
-BORDER_DOUBLE   = ("DOUBLE_SLIM", "0.4 mm")    # sample.hwpx 에서 실측
+BORDER_NONE = ("NONE", "0.1 mm")
+BORDER_SOLID = ("SOLID", "0.12 mm")
+BORDER_THICK = ("SOLID", "0.4 mm")  # 굵은 실선
+BORDER_DOTTED = ("DOT", "0.12 mm")
+BORDER_DASHED = ("DASH", "0.12 mm")
+BORDER_DOUBLE = ("DOUBLE_SLIM", "0.4 mm")  # sample.hwpx 에서 실측
 
 DEFAULT_BORDER_COLOR = "#000000"
 
@@ -1077,12 +1239,12 @@ def _border_spec(side_spec):
     if isinstance(side_spec, str):
         key = side_spec.lower()
         return {
-            "none":    BORDER_NONE,
-            "solid":   BORDER_SOLID,
-            "thick":   BORDER_THICK,
-            "dotted":  BORDER_DOTTED,
-            "dashed":  BORDER_DASHED,
-            "double":  BORDER_DOUBLE,
+            "none": BORDER_NONE,
+            "solid": BORDER_SOLID,
+            "thick": BORDER_THICK,
+            "dotted": BORDER_DOTTED,
+            "dashed": BORDER_DASHED,
+            "double": BORDER_DOUBLE,
         }[key] + (DEFAULT_BORDER_COLOR,)
     if isinstance(side_spec, tuple):
         if len(side_spec) == 2:
@@ -1095,7 +1257,10 @@ def _border_spec(side_spec):
 def build_border_fill_xml(
     border_id,
     *,
-    left=None, right=None, top=None, bottom=None,
+    left=None,
+    right=None,
+    top=None,
+    bottom=None,
     border_color=None,
     bg_rgb=None,
 ):
@@ -1117,8 +1282,12 @@ def build_border_fill_xml(
         border_color = DEFAULT_BORDER_COLOR
 
     sides = {}
-    for name, raw in (("left", left), ("right", right),
-                      ("top", top), ("bottom", bottom)):
+    for name, raw in (
+        ("left", left),
+        ("right", right),
+        ("top", top),
+        ("bottom", bottom),
+    ):
         btype, bwidth, bcolor = _border_spec(raw)
         if isinstance(raw, tuple) and len(raw) == 3:
             color = bcolor
@@ -1145,11 +1314,11 @@ def build_border_fill_xml(
         else:
             bg_hex = bg_rgb
         parts.append(
-            '<hc:fillBrush>'
+            "<hc:fillBrush>"
             f'<hc:winBrush faceColor="{bg_hex}" hatchColor="#000000" alpha="0"/>'
-            '</hc:fillBrush>'
+            "</hc:fillBrush>"
         )
-    parts.append('</hh:borderFill>')
+    parts.append("</hh:borderFill>")
     return "".join(parts)
 
 
@@ -1167,17 +1336,32 @@ def build_border_fill_xml(
 # 같은 base_id 에서 동일 변형이면 같은 새 id 를 재사용한다 (dedup).
 
 
-def charpr_variant_signature(base_id, *, width=None, letter_spacing=None,
-                             bold=None, italic=None, underline=None,
-                             text_color=None):
+def charpr_variant_signature(
+    base_id,
+    *,
+    width=None,
+    letter_spacing=None,
+    bold=None,
+    italic=None,
+    underline=None,
+    text_color=None,
+):
     """charPr 변형 dedup 키. ``HwpxModifier._register_charpr_variant`` 가 사용."""
     if isinstance(text_color, tuple):
         text_color = rgb_to_hex(*text_color)
     return (str(base_id), width, letter_spacing, bold, italic, underline, text_color)
 
 
-def apply_charpr_variant(charpr_elem, *, width=None, letter_spacing=None,
-                         bold=None, italic=None, underline=None, text_color=None):
+def apply_charpr_variant(
+    charpr_elem,
+    *,
+    width=None,
+    letter_spacing=None,
+    bold=None,
+    italic=None,
+    underline=None,
+    text_color=None,
+):
     """주어진 ``<hh:charPr>`` 요소(deepcopy 본)에 변형을 in-place 적용한다.
 
     None 으로 둔 인자는 원본 값을 유지한다.
@@ -1213,6 +1397,7 @@ def apply_charpr_variant(charpr_elem, *, width=None, letter_spacing=None,
         bold_el = charpr_elem.find(f"{HH}bold")
         if bold and bold_el is None:
             from lxml import etree as _et
+
             _et.SubElement(charpr_elem, f"{HH}bold")
         elif (not bold) and bold_el is not None:
             charpr_elem.remove(bold_el)
@@ -1221,6 +1406,7 @@ def apply_charpr_variant(charpr_elem, *, width=None, letter_spacing=None,
         italic_el = charpr_elem.find(f"{HH}italic")
         if italic and italic_el is None:
             from lxml import etree as _et
+
             _et.SubElement(charpr_elem, f"{HH}italic")
         elif (not italic) and italic_el is not None:
             charpr_elem.remove(italic_el)
@@ -1230,10 +1416,14 @@ def apply_charpr_variant(charpr_elem, *, width=None, letter_spacing=None,
         if un_el is None and underline:
             # underline 요소가 없는 charPr — 스키마 순서상 strikeout 앞에 둔다
             from lxml import etree as _et
+
             un_el = _et.Element(f"{HH}underline")
             so = charpr_elem.find(f"{HH}strikeout")
-            (charpr_elem.insert(list(charpr_elem).index(so), un_el)
-             if so is not None else charpr_elem.append(un_el))
+            (
+                charpr_elem.insert(list(charpr_elem).index(so), un_el)
+                if so is not None
+                else charpr_elem.append(un_el)
+            )
         if un_el is not None:
             # ⚠ type 은 밑줄의 위치, shape 가 선 모양이다. type="SOLID" 는 그려지지 않는다
             un_el.set("type", "BOTTOM" if underline else "NONE")
@@ -1250,7 +1440,10 @@ def apply_charpr_variant(charpr_elem, *, width=None, letter_spacing=None,
 
 def border_fill_signature(
     *,
-    left=None, right=None, top=None, bottom=None,
+    left=None,
+    right=None,
+    top=None,
+    bottom=None,
     border_color=None,
     bg_rgb=None,
 ):

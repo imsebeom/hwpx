@@ -32,6 +32,7 @@
 | `href=""`, `groupLevel="0"`, `instid`, `reverse="0"` 누락 | `<hp:pic>` 속성에 반드시 포함 |
 | `<hp:renderingInfo>` 미포함 | transMatrix, scaMatrix, rotMatrix 전부 포함 |
 | `<hp:imgClip>`, `<hp:imgDim>`, `<hp:effects/>` 누락 | 전부 포함 |
+| 한/글 2022 에서 그림 하나만 안 보임(2024 는 보임). `imgDim` 이 표시 크기(예 37422 × 17775)로 적힘 | `imgDim`, `imgClip` 은 그림 픽셀 수 x 75(한/글 규칙). `make_image_para(..., pixel_size=(px, py))`, 이미 만든 문서는 `python fix_namespaces.py <파일>`, 검사는 `verify_hwpx.py`(2026-10-18) |
 | `<hp:sz>`, `<hp:pos>` 순서 잘못 | `<hp:effects/>` 뒤에 배치 |
 | `</hp:pic>` 뒤 `<hp:t/>` 누락 | run 안에 빈 텍스트 노드 추가 |
 | content.hpf에 이미지 미등록 | `<opf:item>` 추가 (isEmbeded="1") |
@@ -78,7 +79,7 @@ with Image.open("/path/photo.png") as img:
     w_px, h_px = img.size
 w_hu = int(120 * 283.5)  # 120mm 폭
 h_hu = int(w_hu * h_px / w_px)
-pic_xml = make_image_para("photo", width=w_hu, height=h_hu)
+pic_xml = make_image_para("photo", width=w_hu, height=h_hu, pixel_size=(w_px, h_px))  # 픽셀 크기 필수(imgDim = 픽셀 x 75)
 
 # 3. section0.xml에서 원하는 위치에 삽입 (정규식으로 문단 찾기)
 import re

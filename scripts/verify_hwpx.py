@@ -29,8 +29,8 @@ import zipfile
 from pathlib import Path
 
 # rhwp (edwardkim/rhwp, src/parser/hwpx/reader.rs:19-26) 기반 zip bomb 상한
-ZIP_MAX_XML_SIZE = 32 * 1024 * 1024       # 32 MB — XML/HPF 엔트리
-ZIP_MAX_BINDATA_SIZE = 64 * 1024 * 1024   # 64 MB — BinData/* 이미지/폰트
+ZIP_MAX_XML_SIZE = 32 * 1024 * 1024  # 32 MB — XML/HPF 엔트리
+ZIP_MAX_BINDATA_SIZE = 64 * 1024 * 1024  # 64 MB — BinData/* 이미지/폰트
 
 # polaris-dvc (PolarisOffice/polaris_dvc) — 외부 바이너리, 선택적 의존성
 _SKILL_BIN = Path(__file__).parent.parent / "bin" / "polaris-dvc.exe"
@@ -54,7 +54,9 @@ def _check_zip_bomb(zf, names):
             info = zf.getinfo(name)
         except KeyError:
             continue
-        limit = ZIP_MAX_BINDATA_SIZE if name.startswith("BinData/") else ZIP_MAX_XML_SIZE
+        limit = (
+            ZIP_MAX_BINDATA_SIZE if name.startswith("BinData/") else ZIP_MAX_XML_SIZE
+        )
         if info.file_size > limit:
             violations.append({"entry": name, "size": info.file_size, "limit": limit})
     return violations
@@ -84,8 +86,12 @@ def _count_structure(hwpx_path):
             result["mimetype_stored"] = False
 
         # 필수 파일
-        required = ["mimetype", "Contents/content.hpf",
-                     "Contents/header.xml", "Contents/section0.xml"]
+        required = [
+            "mimetype",
+            "Contents/content.hpf",
+            "Contents/header.xml",
+            "Contents/section0.xml",
+        ]
         result["required_files"] = {r: r in names for r in required}
 
         # section0.xml 분석
@@ -101,6 +107,7 @@ def _count_structure(hwpx_path):
         xml_ok, xml_fail, xml_errors = 0, 0, []
         try:
             from lxml import etree
+
             for name in names:
                 if name.endswith(".xml") or name.endswith(".hpf"):
                     try:
@@ -112,6 +119,7 @@ def _count_structure(hwpx_path):
         except ImportError:
             # lxml 없으면 기본 XML 파서 사용
             import xml.etree.ElementTree as ET
+
             for name in names:
                 if name.endswith(".xml") or name.endswith(".hpf"):
                     try:
@@ -145,8 +153,11 @@ def _run_polaris_dvc(hwpx_path, spec_path=None):
 
     try:
         proc = subprocess.run(
-            cmd, capture_output=True, timeout=30,
-            encoding="utf-8", errors="replace",
+            cmd,
+            capture_output=True,
+            timeout=30,
+            encoding="utf-8",
+            errors="replace",
         )
     except (subprocess.TimeoutExpired, OSError) as e:
         return {"error": f"polaris-dvc 실행 실패: {e}"}
@@ -186,7 +197,8 @@ _BORDERREF_RE = re.compile(r'\s*borderFillIDRef="\d+"')
 _CHARPR_REF_RE = re.compile(r'<(?:\w+:)?charPr\b[^>]*?borderFillIDRef="(\d+)"')
 _BORDER_SOLID_RE = re.compile(
     r'(?:left|right|top|bottom)Border type="'
-    r'(?:SOLID|DASH|DOT|THICK|DOUBLE|WAVE)"')
+    r'(?:SOLID|DASH|DOT|THICK|DOUBLE|WAVE)"'
+)
 
 
 def _borderfill_is_solid(header_xml, bid):
@@ -194,9 +206,12 @@ def _borderfill_is_solid(header_xml, bid):
     m = re.search(rf'<(?:\w+:)?borderFill\b[^>]*\bid="{bid}"', header_xml)
     if not m:
         return False
-    close = re.search(r"</(?:\w+:)?borderFill>", header_xml[m.start():])
-    block = (header_xml[m.start():m.start() + close.end()]
-             if close else header_xml[m.start():m.start() + 600])
+    close = re.search(r"</(?:\w+:)?borderFill>", header_xml[m.start() :])
+    block = (
+        header_xml[m.start() : m.start() + close.end()]
+        if close
+        else header_xml[m.start() : m.start() + 600]
+    )
     return bool(_BORDER_SOLID_RE.search(block))
 
 
@@ -237,13 +252,15 @@ def strip_char_borders(hwpx_path, output_path=None):
     dst = Path(output_path) if output_path else src
 
     with zipfile.ZipFile(src, "r") as zf:
-        headers = {n: zf.read(n).decode("utf-8")
-                    for n in zf.namelist() if n.endswith("header.xml")}
+        headers = {
+            n: zf.read(n).decode("utf-8")
+            for n in zf.namelist()
+            if n.endswith("header.xml")
+        }
 
     patched, total = {}, 0
     for name, h in headers.items():
-        h2 = _CHARPR_OPEN_RE.sub(
-            lambda m: _BORDERREF_RE.sub("", m.group(0)), h)
+        h2 = _CHARPR_OPEN_RE.sub(lambda m: _BORDERREF_RE.sub("", m.group(0)), h)
         removed = h.count("borderFillIDRef") - h2.count("borderFillIDRef")
         if removed:
             patched[name] = h2.encode("utf-8")
@@ -272,8 +289,13 @@ def strip_char_borders(hwpx_path, output_path=None):
 # (pagePr/margin) 누락 및 LLM이 손수 만든 가짜 secPr를 검출 → 한컴 '손상된
 # 문서' 복구 대화상자 사고 방지.
 _SECPR_REQUIRED = ("pagePr", "margin")
-_SECPR_BOGUS_ATTRS = ("pageWidth", "pageHeight", "leftMargin",
-                       "rightMargin", "topMargin")
+_SECPR_BOGUS_ATTRS = (
+    "pageWidth",
+    "pageHeight",
+    "leftMargin",
+    "rightMargin",
+    "topMargin",
+)
 
 
 def check_secpr_openable(hwpx_path):
@@ -288,8 +310,11 @@ def check_secpr_openable(hwpx_path):
         return {"errors": [], "warnings": ["lxml 미설치 — secPr 점검 건너뜀"]}
 
     with zipfile.ZipFile(hwpx_path, "r") as zf:
-        secs = sorted(n for n in zf.namelist()
-                       if n.startswith("Contents/section") and n.endswith(".xml"))
+        secs = sorted(
+            n
+            for n in zf.namelist()
+            if n.startswith("Contents/section") and n.endswith(".xml")
+        )
         if not secs:
             return {"errors": ["섹션 파일 없음"], "warnings": []}
         data = zf.read(secs[0])
@@ -310,20 +335,51 @@ def check_secpr_openable(hwpx_path):
     for req in _SECPR_REQUIRED:
         if req not in child_tags:
             label = "용지 크기" if req == "pagePr" else "여백"
-            errors.append(
-                f"secPr에 <hp:{req}> 없음 — {label} 미정의로 한컴 열기 실패")
+            errors.append(f"secPr에 <hp:{req}> 없음 — {label} 미정의로 한컴 열기 실패")
 
     bogus = [a for a in _SECPR_BOGUS_ATTRS if a in secpr.attrib]
     if bogus:
         errors.append(
             f"secPr에 비표준 속성 {bogus} — LLM이 손수 작성한 가짜 secPr로 보임. "
-            "정상 HWPX의 secPr(pagePr/margin 자식 요소)로 교체 필요")
+            "정상 HWPX의 secPr(pagePr/margin 자식 요소)로 교체 필요"
+        )
 
     return {"errors": errors, "warnings": warnings}
 
 
 # 조판 부호(탭, 개체 등) 하나가 줄 배치 위치에서 차지할 수 있는 최대 칸. 상한으로만 쓴다.
 _CTRL_SPAN = 8
+
+
+def check_image_dims(hwpx_path):
+    """그림 원본 크기(<hp:imgDim>)가 그림 픽셀 수 x 75 와 다른 그림을 찾는다.
+
+    한/글은 imgDim 을 그림 DPI 와 상관없이 픽셀 x 75 로 적는다(한/글 저장본 실측). 표시 크기를 적으면 한/글 2022 가
+    1600x760px 그림을 499x237px 로 알고 열어 그림이 보이지 않았다(2026-10-18 KTX 문항). fix_namespaces.py 가 바로잡는다.
+
+    Returns: {"errors": [...], "warnings": []}
+    """
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from hwpx_helpers import fix_image_dims, image_pixel_sizes
+
+    bad = 0
+    with zipfile.ZipFile(hwpx_path) as zf:
+        sizes = image_pixel_sizes(zf)
+        if not sizes:
+            return {"errors": [], "warnings": []}
+        for name in zf.namelist():
+            if re.match(r"Contents/section\d+\.xml$", name):
+                _, n = fix_image_dims(zf.read(name).decode("utf-8", "replace"), sizes)
+                bad += n
+    if not bad:
+        return {"errors": [], "warnings": []}
+    return {
+        "errors": [
+            f"그림 {bad}개의 원본 크기(imgDim, imgClip)가 그림 픽셀 수 x 75 가 아니다(표시 크기로 적힘) — 한/글 2022 에서 그림이 "
+            "안 보일 수 있다. `python fix_namespaces.py <파일>` 로 바로잡는다(make_image_para 에는 pixel_size 를 넘긴다)"
+        ],
+        "warnings": [],
+    }
 
 
 def check_stale_lineseg(hwpx_path):
@@ -344,8 +400,11 @@ def check_stale_lineseg(hwpx_path):
     hp = "{http://www.hancom.co.kr/hwpml/2011/paragraph}"
     cell_bad, body_bad = [], []
     with zipfile.ZipFile(hwpx_path, "r") as zf:
-        secs = sorted(n for n in zf.namelist()
-                      if n.startswith("Contents/section") and n.endswith(".xml"))
+        secs = sorted(
+            n
+            for n in zf.namelist()
+            if n.startswith("Contents/section") and n.endswith(".xml")
+        )
         for name in secs:
             try:
                 root = etree.fromstring(zf.read(name))
@@ -372,15 +431,18 @@ def check_stale_lineseg(hwpx_path):
                     continue
                 in_cell = any(a.tag == f"{hp}tc" for a in p.iterancestors())
                 (cell_bad if in_cell else body_bad).append(
-                    f"{name} 문단 id={p.get('id')}: textpos {max(pos)} > 글 {text}")
+                    f"{name} 문단 id={p.get('id')}: textpos {max(pos)} > 글 {text}"
+                )
     if cell_bad:
         errors.append(
             f"표 칸 문단 {len(cell_bad)}개의 줄 배치 캐시가 글보다 뒤를 가리킨다 — 한컴이 열지 못한다"
-            f"(Open=False). 해당 섹션의 <hp:linesegarray>를 지울 것. 예: {cell_bad[0]}")
+            f"(Open=False). 해당 섹션의 <hp:linesegarray>를 지울 것. 예: {cell_bad[0]}"
+        )
     if body_bad:
         warnings.append(
             f"본문 문단 {len(body_bad)}개의 줄 배치 캐시가 낡았다(한컴은 다시 계산해 연다). "
-            f"지우는 편이 안전하다. 예: {body_bad[0]}")
+            f"지우는 편이 안전하다. 예: {body_bad[0]}"
+        )
     return {"errors": errors, "warnings": warnings}
 
 
@@ -403,8 +465,11 @@ def check_table_grid(hwpx_path):
     q = lambda name: f"{{{hp}}}{name}"
 
     with zipfile.ZipFile(hwpx_path, "r") as zf:
-        secs = sorted(n for n in zf.namelist()
-                      if n.startswith("Contents/section") and n.endswith(".xml"))
+        secs = sorted(
+            n
+            for n in zf.namelist()
+            if n.startswith("Contents/section") and n.endswith(".xml")
+        )
         blobs = [(n, zf.read(n)) for n in secs]
 
     for name, data in blobs:
@@ -420,13 +485,15 @@ def check_table_grid(hwpx_path):
             if tbl.get("rowCnt") is None or tbl.get("colCnt") is None:
                 errors.append(
                     f"{where}: <hp:tbl>에 rowCnt/colCnt 없음 — 한컴이 표 격자를 "
-                    f"만들지 못해 문서가 열리지 않는다 (실제 행 {len(rows)}개)")
+                    f"만들지 못해 문서가 열리지 않는다 (실제 행 {len(rows)}개)"
+                )
                 continue
 
             row_cnt, col_cnt = int(tbl.get("rowCnt")), int(tbl.get("colCnt"))
             if row_cnt != len(rows):
                 errors.append(
-                    f"{where}: rowCnt={row_cnt}인데 실제 <hp:tr>는 {len(rows)}개")
+                    f"{where}: rowCnt={row_cnt}인데 실제 <hp:tr>는 {len(rows)}개"
+                )
 
             filled = set()
             overlaps = []
@@ -455,16 +522,22 @@ def check_table_grid(hwpx_path):
                     if sub is None or not sub.findall(q("p")):
                         errors.append(
                             f"{where}: 셀({row},{col})의 subList에 <hp:p>가 없음 "
-                            "— KS X 6101 11.1.2는 빈 셀에도 문단 1개를 요구한다")
+                            "— KS X 6101 11.1.2는 빈 셀에도 문단 1개를 요구한다"
+                        )
 
             if overlaps:
                 errors.append(f"{where}: 셀 주소 중복 {sorted(set(overlaps))[:6]}")
-            holes = [(r, c) for r in range(row_cnt) for c in range(col_cnt)
-                     if (r, c) not in filled]
+            holes = [
+                (r, c)
+                for r in range(row_cnt)
+                for c in range(col_cnt)
+                if (r, c) not in filled
+            ]
             if holes:
                 errors.append(
                     f"{where}: 격자에 빈 칸 {holes[:6]}"
-                    f"{' 외' if len(holes) > 6 else ''} — rowCnt×colCnt와 불일치")
+                    f"{' 외' if len(holes) > 6 else ''} — rowCnt×colCnt와 불일치"
+                )
 
     return {"errors": errors, "warnings": warnings}
 
@@ -499,7 +572,7 @@ def check_para_spacing(hwpx_path):
     except (KeyError, zipfile.BadZipFile, ET.ParseError) as e:
         return {"errors": [], "warnings": [f"문단 간격 점검 건너뜀: {e}"]}
 
-    spacing = {}      # paraPr id -> [(prev, next), ...]  (case, default 순)
+    spacing = {}  # paraPr id -> [(prev, next), ...]  (case, default 순)
     for para_pr in header.iter():
         if ln(para_pr) != "paraPr" or para_pr.get("id") not in used:
             continue
@@ -516,7 +589,8 @@ def check_para_spacing(hwpx_path):
     distinct = {v[0] for v in spacing.values()}
     if nonzero and len(distinct) > 1:
         sample = ", ".join(
-            f"paraPr {pid}(위 {v[0][0]}/아래 {v[0][1]})" for pid, v in sorted(nonzero.items())[:4]
+            f"paraPr {pid}(위 {v[0][0]}/아래 {v[0][1]})"
+            for pid, v in sorted(nonzero.items())[:4]
         )
         warnings.append(
             f"문단 위/아래 간격이 문단마다 다름 — {sample}"
@@ -534,8 +608,14 @@ def check_para_spacing(hwpx_path):
     return {"errors": [], "warnings": warnings}
 
 
-def verify(source_path=None, result_path=None, json_output=None,
-            strict=False, spec_path=None, fix_borders=False):
+def verify(
+    source_path=None,
+    result_path=None,
+    json_output=None,
+    strict=False,
+    spec_path=None,
+    fix_borders=False,
+):
     """HWPX 검수를 실행한다.
 
     Args:
@@ -560,8 +640,11 @@ def verify(source_path=None, result_path=None, json_output=None,
     if fix_borders:
         removed = strip_char_borders(result_path)
         report["actions"] = [f"글자 테두리 borderFillIDRef {removed}개 제거"]
-        print(f"🔧 글자 테두리 borderFillIDRef {removed}개 제거됨"
-              if removed else "🔧 제거할 글자 테두리 없음")
+        print(
+            f"🔧 글자 테두리 borderFillIDRef {removed}개 제거됨"
+            if removed
+            else "🔧 제거할 글자 테두리 없음"
+        )
 
     # 1. 결과 파일 구조 분석
     result_info = _count_structure(result_path)
@@ -601,6 +684,10 @@ def verify(source_path=None, result_path=None, json_output=None,
     report["issues"].extend(lineseg_check["errors"])
     report["warnings"].extend(lineseg_check["warnings"])
 
+    # 1.36. 그림 원본 크기(imgDim)가 픽셀 x 75 인가 — 표시 크기로 적히면 한/글 2022 에서 그림이 안 보인다
+    image_check = check_image_dims(result_path)
+    report["issues"].extend(image_check["errors"])
+
     # 1.37. 문단 위/아래 간격 일관성 — '문단 모양' 값이 제각각인 문제 (경고)
     spacing_check = check_para_spacing(result_path)
     report["warnings"].extend(spacing_check["warnings"])
@@ -627,6 +714,7 @@ def verify(source_path=None, result_path=None, json_output=None,
             report["warnings"].append(f"polaris-dvc: {polaris['error']}")
         else:
             from collections import Counter
+
             v = polaris["violations"]
             jid_counts = Counter(item["ErrorCode"] for item in v)
             report["polaris"] = {
@@ -637,9 +725,7 @@ def verify(source_path=None, result_path=None, json_output=None,
             }
             if v:
                 top = ", ".join(f"JID {j}({c})" for j, c in jid_counts.most_common(3))
-                report["issues"].append(
-                    f"polaris-dvc 위반 {len(v)}건: {top}"
-                )
+                report["issues"].append(f"polaris-dvc 위반 {len(v)}건: {top}")
 
     # 2. 원본과 비교 (제공된 경우)
     if source_path and os.path.exists(source_path):
@@ -649,22 +735,17 @@ def verify(source_path=None, result_path=None, json_output=None,
         comparison = {}
 
         # 구조 보존 비교
-        for key in ["zip_entries", "bindata", "paragraphs", "runs",
-                     "tables", "images"]:
+        for key in ["zip_entries", "bindata", "paragraphs", "runs", "tables", "images"]:
             src_val = source_info.get(key, 0)
             res_val = result_info.get(key, 0)
             diff = res_val - src_val
-            comparison[key] = {
-                "source": src_val, "result": res_val, "diff": diff
-            }
+            comparison[key] = {"source": src_val, "result": res_val, "diff": diff}
             if key in ("runs", "tables", "images") and diff < 0:
                 report["issues"].append(
                     f"{key} 감소: {src_val} → {res_val} (차이: {diff})"
                 )
             elif key in ("runs",) and diff < 0:
-                report["warnings"].append(
-                    f"{key} 변경: {src_val} → {res_val}"
-                )
+                report["warnings"].append(f"{key} 변경: {src_val} → {res_val}")
 
         # section 크기 비율
         src_size = source_info.get("section_size", 1)
@@ -704,30 +785,33 @@ def verify(source_path=None, result_path=None, json_output=None,
 
 def _print_report(report):
     """검수 결과를 콘솔에 출력한다."""
-    status_icon = {"PASS": "✅", "WARN": "⚠️", "FAIL": "❌"}.get(
-        report["status"], "❓"
-    )
-    print(f"\n{'='*60}")
+    status_icon = {"PASS": "✅", "WARN": "⚠️", "FAIL": "❌"}.get(report["status"], "❓")
+    print(f"\n{'=' * 60}")
     print(f"  HWPX 검수 결과: {status_icon} {report['status']}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     # 결과 파일 정보
     if "result" in report:
         r = report["result"]
-        print(f"\n[결과 파일]")
-        print(f"  ZIP엔트리: {r.get('zip_entries', '?')}개, "
-              f"BinData: {r.get('bindata', '?')}개")
-        print(f"  문단: {r.get('paragraphs', '?')}, "
-              f"런: {r.get('runs', '?')}, "
-              f"테이블: {r.get('tables', '?')}, "
-              f"이미지: {r.get('images', '?')}")
-        print(f"  XML: 유효 {r.get('xml_valid', 0)}개, "
-              f"오류 {r.get('xml_invalid', 0)}개")
+        print("\n[결과 파일]")
+        print(
+            f"  ZIP엔트리: {r.get('zip_entries', '?')}개, "
+            f"BinData: {r.get('bindata', '?')}개"
+        )
+        print(
+            f"  문단: {r.get('paragraphs', '?')}, "
+            f"런: {r.get('runs', '?')}, "
+            f"테이블: {r.get('tables', '?')}, "
+            f"이미지: {r.get('images', '?')}"
+        )
+        print(
+            f"  XML: 유효 {r.get('xml_valid', 0)}개, 오류 {r.get('xml_invalid', 0)}개"
+        )
 
     # 비교 결과
     if "comparison" in report:
         c = report["comparison"]
-        print(f"\n[원본 대비 비교]")
+        print("\n[원본 대비 비교]")
         for key in ["paragraphs", "runs", "tables", "images", "bindata"]:
             if key in c:
                 d = c[key]
@@ -742,7 +826,7 @@ def _print_report(report):
     # polaris-dvc 결과
     if "polaris" in report:
         p = report["polaris"]
-        print(f"\n[polaris-dvc strict 검증]")
+        print("\n[polaris-dvc strict 검증]")
         print(f"  총 위반: {p['total_violations']}건")
         if p["by_jid"]:
             for jid, count in list(p["by_jid"].items())[:5]:
@@ -760,7 +844,7 @@ def _print_report(report):
             print(f"  ⚠️ {warn}")
 
     if not report["issues"] and not report["warnings"]:
-        print(f"\n  모든 검사 통과!")
+        print("\n  모든 검사 통과!")
 
 
 def main():
@@ -770,16 +854,25 @@ def main():
     parser.add_argument("--source", help="원본 HWPX 파일 (비교 검수)")
     parser.add_argument("--result", required=True, help="검수 대상 HWPX 파일")
     parser.add_argument("--json", help="JSON 리포트 출력 경로")
-    parser.add_argument("--strict", action="store_true",
-                          help="polaris-dvc로 JID 위반 검출 (선택)")
+    parser.add_argument(
+        "--strict", action="store_true", help="polaris-dvc로 JID 위반 검출 (선택)"
+    )
     parser.add_argument("--spec", help="polaris-dvc 규칙 spec JSON 경로 (선택)")
-    parser.add_argument("--fix-borders", action="store_true",
-                          help="검사 전 글자 테두리 버그를 자동 제거 (대상 파일 직접 수정)")
+    parser.add_argument(
+        "--fix-borders",
+        action="store_true",
+        help="검사 전 글자 테두리 버그를 자동 제거 (대상 파일 직접 수정)",
+    )
 
     args = parser.parse_args()
-    report = verify(args.source, args.result, args.json,
-                     strict=args.strict, spec_path=args.spec,
-                     fix_borders=args.fix_borders)
+    report = verify(
+        args.source,
+        args.result,
+        args.json,
+        strict=args.strict,
+        spec_path=args.spec,
+        fix_borders=args.fix_borders,
+    )
 
     sys.exit(0 if report["status"] in ("PASS", "WARN") else 1)
 

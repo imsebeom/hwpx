@@ -353,7 +353,7 @@ with Image.open("/abs/path/photo.png") as im:
     w_px, h_px = im.size
 w_hu = int(120 * 283.5)  # 목표 폭 120mm
 h_hu = int(w_hu * h_px / w_px)  # 비율 유지
-pic_xml = make_image_para("photo", width=w_hu, height=h_hu, parapr="0")
+pic_xml = make_image_para("photo", width=w_hu, height=h_hu, parapr="0", pixel_size=(w_px, h_px))  # 픽셀 크기 필수
 
 # 삽입할 위치 찾기 (특정 텍스트 앞에 삽입)
 match = re.search(r"삽입_위치_텍스트", section)
@@ -507,7 +507,7 @@ subprocess.run(["python3", str(SKILL_DIR/"scripts/validate.py"), str(OUTPUT)])
 | `make_cover_banner(title)` | 표지 배너 (3×2 컬러 테이블) |
 | `make_section_bar(number, title)` | 섹션 바 (1×3 컬러 테이블) |
 | `make_cover_page(title, subtitle, date)` | 표지 전체 + pageBreak |
-| `make_image_para(binary_item_id, w, h)` | 이미지 (전체 hp:pic 구조) |
+| `make_image_para(binary_item_id, w, h, pixel_size=(px, py))` | 이미지 (전체 hp:pic 구조). pixel_size 는 그림 파일 픽셀 크기 |
 | `add_images_to_hwpx(path, images)` | ZIP에 이미지 추가 |
 | `update_content_hpf(path, images)` | content.hpf에 이미지 등록 |
 | `NS_DECL` | 네임스페이스 선언 상수 |
@@ -1838,7 +1838,7 @@ subprocess.run(["python3", f"{SKILL_DIR}/scripts/fix_namespaces.py", "output.hwp
 17. **워크플로우 G/H 사용 후에도 linesegarray 자동 제거**: hwpx_modifier.py, hwpx_form_filler.py는 저장 시 linesegarray를 자동 제거하여 줄바꿈 캐시 무효화를 처리. 🔴 **lxml 로 section 을 직접 고치는 경로에서도 반드시 제거한다** — 문단 내용을 바꾸고 `<hp:linesegarray>` 를 그대로 두면 **한컴이 문서를 열지 못한다**(2026-09-22 실측, 삽화 삽입). run 을 통째로 지우든 `<hp:t>` 만 지우든 똑같이 깨졌고, 캐시를 지우니 둘 다 열렸다. **`validate.py` 는 VALID 를 내주므로 COM 으로 열어보기 전까지 드러나지 않는다** — 직접 조작한 hwpx 는 `hwp.Open()` 뒤 `hwp.Path` 가 빈 문자열인지로 확인한다. 깨지는 범위(2026-10-17 한글 2024 실측, 변형 23개): 본문 문단의 글만 늘리거나 줄인 경우는 한글이 줄 배치를 다시 계산해 정상으로 열렸다. **표 칸 안 문단을 줄인 경우**는 대화상자 없이 `Open()` 이 False 를 돌려주고 755자 중 692자만 읽혔다(칸 문단을 늘리거나 같은 길이로 바꾼 경우는 열렸다). 경우를 가리지 말고 캐시는 언제나 지운다. 🔴 **`Open()` 이 False 인 문서를 그대로 `SaveAs` 하면 저장은 성공하지만 결과 파일에서 표가 통째로 빠진다**(`hp:tbl` 1개 → 0개). 한글로 열어 다시 저장하는 정규화를 할 때는 `Open()` 반환값과 `hwp.Path` 를 먼저 확인한다. **한글 없이 미리 잡으려면 `verify_hwpx.py`** — 칸 문단의 캐시가 글보다 뒤를 가리키면 FAIL 이다(실제 문서 243개에서 FAIL 4개가 모두 한글에서 열리지 않았고, 캐시를 지우니 열렸다. `tests/test_stale_lineseg.py`). 정상으로 열린 문서라면 한글 왕복 저장은 낡은 캐시, 더미 캐시, 틀린 표 높이를 모두 새로 계산해 쓴다(깨끗한 원본의 왕복본과 XML 이 같아짐)
 18. **report 템플릿 borderFill 수정 완료 (2026-03-21)**: 원본 report 템플릿의 paraPr이 SOLID 테두리를 가진 borderFill을 참조하여 문단마다 가로선이 표시되던 문제를 수정. 모든 paraPr의 `borderFillIDRef`를 `"1"` (테두리 없음)으로 변경, diagonal도 `NONE`으로 수정
 19. **표 열 너비는 내용 비례 배분**: md2hwpx.py의 `add_table()`이 열별 최대 텍스트 길이(한글=2, ASCII=1)에 비례하여 열 너비를 자동 배분. 최소 열 너비 2800 HWPUNIT (~10mm)
-20. **이미지는 ZIP 추가 + section0.xml 인라인 삽입 2단계**: `add_images_to_hwpx()`로 BinData에 파일만 추가하면 안 보임. 반드시 `make_image_para()`로 `<hp:pic>` XML을 생성하여 section0.xml에 삽입해야 함
+20. **이미지는 ZIP 추가 + section0.xml 인라인 삽입 2단계**: `add_images_to_hwpx()`로 BinData에 파일만 추가하면 안 보임. 반드시 `make_image_para()`로 `<hp:pic>` XML을 생성하여 section0.xml에 삽입해야 함. 🔴 **`pixel_size=(픽셀 폭, 픽셀 높이)`를 꼭 넘긴다** — 그림 원본 크기(imgDim)와 보일 범위(imgClip)는 표시 크기가 아니라 픽셀 x 75 다(한/글 저장본 실측). 빠뜨리면 표시 크기가 적혀 한/글 2022 에서 그림이 안 보였다(2026-10-18 KTX 문항). 빠뜨려도 `fix_namespaces.py` 가 저장 전에 바로잡고 `verify_hwpx.py` 가 FAIL 로 잡는다
 21. **HWPX 병합 시 lxml 필수**: 정규식으로 `<hp:p>...</hp:p>`를 추출하면 표 내부의 `</hp:p>`와 매칭되어 태그 불일치 발생. 반드시 `etree.fromstring()` → `deepcopy()` → `root.append()`로 문단 단위 복사
 22. **병합 시 secPr 문단 처리**: secPr 문단 안에 제목 텍스트 run이 포함될 수 있음. 텍스트가 있는 run을 제거해야 의도치 않은 제목 표시 방지
 23. **다른 템플릿 병합 시 5가지 리맵 필수**: (1) charPr ID (2) paraPr ID (3) fontRef ID (폰트 이름 기반) (4) 표 borderFillIDRef (깨끗한 borderFill 직접 생성) (5) 이미지 파일명 접두어

@@ -27,7 +27,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from hwpx_helpers import force_default_print_method  # noqa: E402
+from hwpx_helpers import fix_image_dims, force_default_print_method, image_pixel_sizes  # noqa: E402
 
 
 def _fix_item_counts(header_xml):
@@ -69,13 +69,19 @@ def fix_hwpx_namespaces(hwpx_path):
     }
 
     tmp_path = hwpx_path + ".tmp"
+    fixed_images = 0
 
     with zipfile.ZipFile(hwpx_path, "r") as zin:
+        # 그림 원본 크기(imgDim)와 보일 범위(imgClip)를 그림 픽셀 수 x 75 로 바로잡는다(hwpx_helpers.fix_image_dims).
+        # make_image_para 에 픽셀 크기를 주지 않은 빌드 스크립트가 표시 크기를 적어 한/글 2022 에서 그림이 안 보였다(2026-10-18)
+        pixel_sizes = image_pixel_sizes(zin)
         with zipfile.ZipFile(tmp_path, "w", zipfile.ZIP_DEFLATED) as zout:
             for item in zin.infolist():
                 data = zin.read(item.filename)
 
-                if item.filename.startswith("Contents/") and item.filename.endswith(".xml"):
+                if item.filename.startswith("Contents/") and item.filename.endswith(
+                    ".xml"
+                ):
                     text = data.decode("utf-8")
 
                     ns_aliases = {}
@@ -85,13 +91,20 @@ def fix_hwpx_namespaces(hwpx_path):
                             ns_aliases[alias] = NS_MAP[uri]
 
                     for old_prefix, new_prefix in ns_aliases.items():
-                        text = text.replace(f"xmlns:{old_prefix}=", f"xmlns:{new_prefix}=")
+                        text = text.replace(
+                            f"xmlns:{old_prefix}=", f"xmlns:{new_prefix}="
+                        )
                         text = text.replace(f"<{old_prefix}:", f"<{new_prefix}:")
                         text = text.replace(f"</{old_prefix}:", f"</{new_prefix}:")
 
                     # header.xml의 itemCnt 보정 (charPr/borderFill 추가 시 필수)
                     if item.filename == "Contents/header.xml":
                         text = _fix_item_counts(text)
+                    elif pixel_sizes and re.match(
+                        r"Contents/section\d+\.xml$", item.filename
+                    ):
+                        text, n = fix_image_dims(text, pixel_sizes)
+                        fixed_images += n
 
                     data = text.encode("utf-8")
 
@@ -109,6 +122,11 @@ def fix_hwpx_namespaces(hwpx_path):
                     zout.writestr(item, data)
 
     os.replace(tmp_path, hwpx_path)
+    if fixed_images:
+        print(
+            f"그림 원본 크기(imgDim, imgClip)를 픽셀 x 75 로 바로잡음: {fixed_images}개",
+            file=sys.stderr,
+        )
 
 
 def apply_layout_if_possible(path):
@@ -121,7 +139,10 @@ def apply_layout_if_possible(path):
         apply_layout(path)
         return True
     except RhwpError as e:
-        print(f"WARNING: 줄 배치 보정을 하지 못했다({e}). 더미 줄 배치가 남아 rhwp 등에서 줄바꿈과 표 높이가 어긋날 수 있다(한글에서는 문제없다).", file=sys.stderr)
+        print(
+            f"WARNING: 줄 배치 보정을 하지 못했다({e}). 더미 줄 배치가 남아 rhwp 등에서 줄바꿈과 표 높이가 어긋날 수 있다(한글에서는 문제없다).",
+            file=sys.stderr,
+        )
         return False
 
 
