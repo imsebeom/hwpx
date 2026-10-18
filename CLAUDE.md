@@ -39,6 +39,7 @@
 - KS X 6101 반영(2026-09-25): start 가 전자서명(§16), 암호화(§15) 문서를 거절(--force), run 이 문자열을 NFC 정규화(§5.3), EDITOR.md 에 요청→명령 사전(한컴 렌더 실측: repeatHeader, 캡션, pageBreakBefore, 수식, 머리말 글).
 
 ## 함정
+- 🔴 **시험용 에디터는 포트를 정하지 않고 `HWPX_EDITOR_INSTANCE=<이름> node cli.mjs start …` 로만 띄우고, 브라우저는 `cli.mjs url` 이 준 주소로만 연다**(2026-10-18). 7781 을 정해 `server.mjs` 를 직접 띄웠다가 그 포트에 있던 다른 세션의 에디터 창을 Playwright 로 열었다. 스킬 f8f152e 부터 포트를 정해 주면 남의 포트일 때 `start` 가 멈춘다
 - **Node 24.11 `fs.rmSync`/`fs.cpSync`(recursive)는 한글 경로에서 node 를 소리 없이 죽인다**(종료 코드 127). vite 가 outDir 를 비울 때도 같다. setup.mjs 는 자체 rmrf/copyDir 를 쓰고 빌드 전에 dist 를 지운다.
 - Claude Code 의 작업 디렉터리가 폴더 안에 잡혀 있으면 그 폴더를 옮기거나 이름을 바꿀 수 없다.
 - StreamDocs(standard.go.kr) 링크는 밖에서 열면 "문서를 열 수 없습니다" — 세션에 묶여 있다.
