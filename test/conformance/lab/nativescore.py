@@ -118,7 +118,11 @@ def one(path, tmp):
         capture_output=True,
         text=True,
         encoding="utf-8",
-        env={**os.environ, "CLAUDE_CELLS": "1", "CLAUDE_METRICS_DIR": str(HERE.parent / "out" / "metrics")},
+        env={
+            **os.environ,
+            "CLAUDE_CELLS": "1",
+            "CLAUDE_METRICS_DIR": str(HERE.parent / "out" / "metrics"),
+        },
     )
     rb, rc = {}, {}
     pages = None
@@ -157,7 +161,23 @@ def main():
     if ids:
         files = [f for f in files if os.path.basename(f)[:-5] in ids]
     tmp = tempfile.mkdtemp(prefix="nativescore_")
-    tot = {k: 0 for k in ("bc", "bs", "bm", "bms", "cc", "cs", "cm", "cms", "pc", "ps", "qc", "qs")}
+    tot = {
+        k: 0
+        for k in (
+            "bc",
+            "bs",
+            "bm",
+            "bms",
+            "cc",
+            "cs",
+            "cm",
+            "cms",
+            "pc",
+            "ps",
+            "qc",
+            "qs",
+        )
+    }
     page_bad = []
     han_pages = {}
     for line in open(HERE.parent / "out" / "oracle.jsonl", encoding="utf-8"):
@@ -184,6 +204,10 @@ def main():
             ):
                 tot["qc"] += len(han_bp)
                 tot["qs"] += sum(a == b for a, b in zip(para_pages, han_bp))
+                # NATIVE_PP=1 이면 문단 쪽이 어긋난 문서와 개수를 찍는다
+                miss = sum(a != b for a, b in zip(para_pages, han_bp))
+                if miss and os.environ.get("NATIVE_PP"):
+                    print(f"문단 쪽 다름 {name} {miss}/{len(han_bp)}", file=sys.stderr)
             if len(rb) == len(body):
                 for p, h in enumerate(body):
                     if not h:

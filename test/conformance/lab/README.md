@@ -75,6 +75,7 @@
 | 정답본, d078 | 쪽 나눔(pageBreak=1) 문단 바로 앞 빈 문단이 현재 쪽에 안 들어가면 한/글 2024 는 다음 쪽 첫머리로 넘긴다(그래서 빈 쪽이 생긴다). 그런 빈 문단 11개 중 9개, 흡수 1개(`harvest_emptybreak.py`). 엔진의 흡수 분기(Task #967, HWP5 표본)는 HWP5 출처에만 | `empty-before-break-*` |
 | e36, e37 | 1단 구역의 단 나누기(columnBreak=1) 문단은 글이든 빈 문단이든 새 쪽을 연다(다음이 쪽 나눔이면 빈 쪽). 단 여러 쪽에 걸쳐 나뉜 표 바로 다음 문단이면 무시한다(d058 사본 변형 셋: 원본 무시, 표를 한 쪽으로 줄이면 지킴, 사이에 글 문단을 넣으면 지킴). e37 변형은 `apply_ops.mjs` 로 만들었다(표 T6 행 3~30 지우기, p11 뒤 글 문단 넣기) | `colbreak-after-split-table-*` |
 | d076, d133 | Word 호환 문서(`compatibleDocument targetProgram="MS_WORD"` 에 `adjustLineheightToFont`)의 비율 간격 줄: 줄 높이 = 크기 x 글꼴 hhea (ascender + descender + lineGap)/em x 1.3(맑은 고딕 1.729, Pretendard 1.551), 기준선 = ascender x 크기 + (줄 높이 - hhea 높이)/2, 간격은 그 줄 높이에 기존 4 단위 식(`harvest_wordcompat.py`). 문단 끝 빈 run 이 글보다 크면 줄 높이 = 빈 run 줄 높이 + 글 아랫부분, 기준선과 간격 기준은 빈 run 의 것(d133 한 줄 문단 126줄, `harvest_wordmix.py`). 세로 수치는 `font-metrics.mjs` 가 글꼴 파일에서 읽어 `vm` 으로 넘긴다. 두 문서 본문 줄 217개 모두 일치(`segcmp.py`), 쪽수 94.5 → 95.1% | `word-compat-lineheight-*` |
+| 정답본 | 글 없는 줄(글자처럼 취급 개체만 든 줄, 빈 문단)의 줄 높이와 간격은 그 줄에 걸친 run 가운데 가장 큰 글자 크기로 셈한다. 구역 정의만 든 첫 run 과 끝 빈 run 도 친다(`secpr_engine.py`: 첫 문단 일치 292 → 307, d001 1900, 1900, 2200 → 간격 1320. `harvest_emptyruns.py`: 빈 문단 11건 중 10건, 예외 d174). 문단 쪽 6887 → 6888 | `ctrl-line-max-charpr-*` |
 
 ## 남은 것 (2026-10-18)
 
@@ -82,8 +83,13 @@
 - 한/글 줄 폭이 칸 폭보다 큰 경우(d010 칸 45: horzsize 44601 > 칸 45038 − 여백)
 - Word 호환 문서 줄 높이는 넣었다(위 표 d076, d133). 고정, 최소 줄 간격과 줄 안에서 크기가 다른 글 run 이 섞인 경우는 정답본에 없어
   실측하지 않았다. 문단 모양 `fontLineHeight="1"` 도 함초롬바탕에서 1.3
-- d193 p0(첫 run 에 구역 정의만 있고 그 크기가 1000, 뒤 run 은 글자처럼 취급 표 1500): 한/글 줄 간격 900(뒤 run 크기 기준), 엔진 600.
-  정답본 전체(`harvest_secprrun.py`)로는 뒤 run 기준 19, 앞 run 기준 7, 둘 다 아님 21 로 갈려 넣지 않았다
+- d193 p0 줄 간격(구역 정의 run 1000 + 표 run 1500 → 한/글 900)은 위 표 `ctrl-line-max-charpr` 로 맞췄다. d193 쪽 차이의 남은 원인:
+  글자처럼 취급 표 문단의 전진을 엔진이 cap 「줄 높이 + 줄 간격/2 + 바깥 위 여백」으로 깎는다(typeset.rs `TAC 표 높이 보정`).
+  한/글은 「줄 높이 + 줄 간격 전체」다(`harvest_tacstep.py`: 표만 든 한 줄 문단 1,700건 중 1,685건 전체, cap 0건). 저장 줄이 있으면
+  tac-cap-ladder 가 풀지만 엔진이 만든 줄(줄 배치 없는 문서, 편집 뒤)은 표마다 1~2px 덜 내려가 d193 1쪽에 한 줄을 더 담는다.
+  엔진이 만든 줄의 한 줄 표 문단에서 cap 을 풀어 보니(`apply_tac_cap_synth.py`, 넣지 않음) 쪽수 95.1 → 95.4% 인데 문단 쪽 98.7 → 94.7%:
+  d292 p75(유효한 글자처럼 취급 표로 안 잡히는 큰 표, tac_count 0)가 쪽 끝 들어감 판정에 뒤 줄 간격 12px 를 넣어(문단 전체 높이 391.9 =
+  표 379.9 + 12) 남은 386.7px 에 못 들어가고 다음 쪽으로 간다. 지금은 cap 이 앞 표들을 10.6px 덜 세어 우연히 들어간다. 이 판정을 먼저 고쳐야 한다
 - `!` 뒤에 한/글이 PDF 에 찍는 빈칸은 글자 위치 비교(advances, pdfadv)에서 빈칸으로 잡힌다
 - 쪽수 지표 93.6%, 문단 쪽 96.4%(네이티브 6726/6976, wasm 96.4%), 불일치 줄 327. 남은 쪽수 불일치 21개 문서.
 - d302/d314 본문 p100, p229(글머리표 문단, condense=20): 한/글 첫 줄 글 폭 46,356 이 줄 폭 46,988 에서 글머리표 자리 1,650 을 빼면
@@ -127,6 +133,9 @@
 - `harvest_overflow.py`, `harvest_cellmargin.py`: 칸 내용 대 행 높이 집계. ⚠ cellSz 를 행 높이로 쓰므로 판정은 참고만
 - `harvest_tblsplit.py [--list]`: 쪽을 넘는 표가 한/글에서 행 경계로 나뉘었는지(첫 조각 높이 = 행 높이 누적합) pageBreak 별로 센다
 - `harvest_tblnext.py`: 표만 담은 문단에서 한/글이 문단 아래 간격을 더하는지 정답본으로 센다
+- `secpr_engine.py`: 구역 정의 run 으로 시작하는 첫 문단 셋의 첫 줄 높이/간격을 엔진과 한/글로 맞대고 어긋난 문단의 run 구성을 찍는다
+- `harvest_tacstep.py`, `harvest_emptyruns.py`: 표만 든 문단의 한/글 전진량, 빈 문단의 줄 높이 기준 run
+- `nativescore.py` 에 `NATIVE_PP=1`: 문단 쪽이 어긋난 문서와 개수를 찍는다
 - `segcmp.py <id>`: 첫 구역 본문 문단 줄마다 한/글 줄 기록(높이/간격)과 엔진 값을 맞댄다
 - `pagecmp.mjs <id>`: 쪽마다 첫 글자를 한/글 PDF(`../out/lab/hanpdf/rt/<id>.pdf`)와 rhwp SVG 로 맞대 처음 갈리는 쪽을 찾는다
 - `linecmp.mjs <id> <쪽>`: 한 쪽의 글줄 세로 위치를 한/글 PDF 와 rhwp 로 나란히 찍고 차이가 바뀌는 줄을 표시한다

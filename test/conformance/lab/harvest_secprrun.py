@@ -59,8 +59,31 @@ for path in sorted(glob.glob("../out/oracle/*.hwpx")):
             )
         )
         want = {"A": a, "B": b}
+        # C: 첫 글자처럼 취급 개체가 든 run 의 크기
+        obj_run = next(
+            (
+                c
+                for c, t in runs[1:]
+                if re.search(
+                    r'<hp:(tbl|pic|equation|container|rect)\b[^>]*>.*?treatAsChar="1"',
+                    t,
+                    re.S,
+                )
+            ),
+            None,
+        )
+        if obj_run:
+            want["C"] = int(size.get(obj_run, 0))
         if ls and ls[0] == "PERCENT":
-            fit = [k for k, f in want.items() if abs(sp - f * (ls[1] - 100) / 100) <= 2]
+            # 엔진과 같은 4 단위 식(spacing-quantum)도 맞으면 친다
+            def quant(f):
+                return int((f // 4) * (ls[1] - 100) / 100 + 0.5 + 1e-6) * 4
+
+            fit = [
+                k
+                for k, f in want.items()
+                if abs(sp - f * (ls[1] - 100) / 100) <= 2 or sp == quant(f)
+            ]
             key = (
                 "간격이 " + ("/".join(fit) if fit else "둘 다 아님"),
                 "개체줄" if has_obj else "글줄",
