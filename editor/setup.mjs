@@ -624,6 +624,9 @@ const RUST_PATCHES = [
     // 각주, 미주 글에 글자 모양을 적용하고 읽는다(스튜디오 fn-char-format-* 와 짝, 각주 편집 중 Ctrl+B 무반응)
     ['fn-char-format-footnote-ops', 'src/document_core/commands/footnote_ops.rs'],
     ['fn-char-format-wasm-api', 'src/wasm_api.rs'],
+    // HWP5 구역 끝 메모 목록(MEMO_LIST)의 본문을 메모 필드에 붙인다(hwp 를 hwpx 로 바꾸면 메모 본문이 사라지던 문제, 사용자 보고 2026-10-19)
+    ['memo-list-body-text', 'src/parser/body_text.rs'],
+    ['memo-list-section', 'src/serializer/hwpx/section.rs'],
     // 엔진이 만든 줄의 첫 vpos 0 은 저장 쪽 경계로 읽지 않는다(format_text 뒤 문단이 다음 쪽으로 넘어가던 문제)
     ['synth-no-reset-typeset', 'src/renderer/typeset.rs'],
     // 표 속성(캡션 등)을 바꾸면 표 높이를 다시 잰다(캡션 높이가 빠지던 문제)

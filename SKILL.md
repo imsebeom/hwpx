@@ -1301,6 +1301,10 @@ python "${CLAUDE_SKILL_DIR}/scripts/hwp_to_hwpx_hancom.py" "폴더경로"
 - 원본 `.hwp` 옆에 동일명 `.hwpx` 생성 (원본 보존).
 - 핵심: `rhwp export-hwpx <in.hwp> <out.hwpx> --verify`(산출물을 다시 읽어 IR 차이가 있으면 실패). 하나만 쓰려면 `python scripts/rhwp_convert.py hwpx <in.hwp> <out.hwpx>`.
 - 무손실이므로 별도 fix_namespaces/verify 후처리 불필요.
+- **메모 본문**: rhwp CLI 0.8.6 은 .hwp 의 메모 본문(구역 끝 메모 목록)을 읽지 않고 빈 본문을 쓴다(2026-10-19 사용자 보고, 표지와 작성자만 남음).
+  `rhwp_convert.hwp_to_hwpx` 가 변환본에 글 없는 메모가 있으면 에디터 엔진(패치 `memo-list-*`)으로 다시 내보내고 「메모 본문 N개가 빠져 에디터 엔진으로
+  다시 내보냈다」를 알린다. 에디터를 빌드하지 않은 PC 에서는 경고만 낸다(`node editor/setup.mjs --build`). 한/글이 저장한 메모 필드는 %me 가 아니라
+  %unk 에 명령 「MEMO/…/번호/…」이고 본문은 구역 끝 MEMO_LIST(번호) → LIST_HEADER → 문단 순이다(블랙박스 실측).
 
 ### 폴백: 순수 Python (jkf87)
 

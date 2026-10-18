@@ -31,7 +31,9 @@ import zipfile
 HERE = os.path.dirname(os.path.abspath(__file__))
 EDITOR = os.path.join(HERE, "..", "editor")
 EDITOR_ENGINE = os.path.join(EDITOR, "studio-dist", "node")
-FONTS = os.path.join(HERE, "..", "fonts")  # 동봉 Pretendard(OFL). 시스템에 없어도 PDF 가 이 글꼴로 나온다
+FONTS = os.path.join(
+    HERE, "..", "fonts"
+)  # 동봉 Pretendard(OFL). 시스템에 없어도 PDF 가 이 글꼴로 나온다
 CACHE = os.path.join(os.path.expanduser("~"), ".cache")
 RELEASE = "https://github.com/edwardkim/rhwp/releases/download/v{ver}/{name}"
 DUMMY_RE = re.compile(
@@ -138,6 +140,75 @@ def cli_path():
         shutil.rmtree(work, ignore_errors=True)
 
 
+_MEMO_BEGIN_RE = re.compile(
+    r'<hp:fieldBegin\b[^>]*type="MEMO"[^>]*>(.*?)</hp:fieldBegin>', re.S
+)
+
+
+_MEMO_TEXT_RE = re.compile(r"<hp:t\b[^>]*>[^<]*\S")
+
+
+def _lost_memo_count(hwpx):
+    """글 없는 메모 수. rhwp CLI 0.8.6 은 .hwp 의 메모 목록(MEMO_LIST)을 읽지 않고 빈 본문(빈 문단 하나)을 고정으로 쓴다"""
+    with zipfile.ZipFile(hwpx) as z:
+        n = 0
+        for name in z.namelist():
+            if re.match(r"Contents/section\d+\.xml$", name):
+                xml = z.read(name).decode("utf-8", "replace")
+                n += sum(
+                    1
+                    for m in _MEMO_BEGIN_RE.finditer(xml)
+                    if not _MEMO_TEXT_RE.search(m.group(1))
+                )
+        return n
+
+
+def _repair_lost_memos(src, dst, timeout):
+    """변환본에 본문 없는 메모가 있으면 에디터 엔진(스킬 패치 memo-list-body-text)으로 다시 내보낸다(2026-10-19 사용자 보고).
+    다시 내보낸 쪽이 낫지 않거나 Node, 에디터 빌드가 없으면 CLI 변환본을 두고 경고한다."""
+    lost = _lost_memo_count(dst)
+    if not lost:
+        return
+    script = os.path.join(EDITOR, "hwp_export_hwpx.mjs")
+    if not (
+        shutil.which("node") and _has_engine(EDITOR_ENGINE) and os.path.isfile(script)
+    ):
+        print(
+            f"WARNING: 메모 {lost}개의 본문이 빠졌다(rhwp CLI). 에디터 엔진을 빌드하면(setup.mjs) 살릴 수 있다",
+            file=sys.stderr,
+        )
+        return
+    fd, tmp = tempfile.mkstemp(suffix=".hwpx")
+    os.close(fd)
+    try:
+        r = subprocess.run(
+            ["node", script, os.path.abspath(src), tmp],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=timeout,
+            env=dict(os.environ, RHWP_ENGINE=EDITOR_ENGINE),
+        )
+        if (
+            r.returncode == 0
+            and os.path.getsize(tmp) > 0
+            and _lost_memo_count(tmp) < lost
+        ):
+            shutil.copyfile(tmp, dst)
+            print(
+                f"메모 본문 {lost}개가 빠져 에디터 엔진으로 다시 내보냈다",
+                file=sys.stderr,
+            )
+        else:
+            print(
+                f"WARNING: 메모 {lost}개의 본문이 빠졌다. 에디터 엔진으로도 살리지 못했다",
+                file=sys.stderr,
+            )
+    finally:
+        os.remove(tmp)
+
+
 def hwp_to_hwpx(src, dst, timeout=120):
     """HWP → HWPX. 성공하면 True, 실패하면 이유를 알리고 False."""
     if os.path.exists(dst):
@@ -157,6 +228,7 @@ def hwp_to_hwpx(src, dst, timeout=120):
         with zipfile.ZipFile(dst) as z:
             if "Contents/section0.xml" not in z.namelist():
                 raise RhwpError("산출물에 본문(section0.xml)이 없다")
+        _repair_lost_memos(src, dst, timeout)
         return True
     except (RhwpError, OSError, subprocess.TimeoutExpired, zipfile.BadZipFile) as e:
         print(f"rhwp 변환 실패: {os.path.basename(src)}: {e}", file=sys.stderr)
@@ -182,7 +254,18 @@ def to_pdf(src, pdf, timeout=300):
             ) as e:  # 보정을 못 해도 그림은 낸다(쪽 나눔이 어긋날 수 있다)
                 print(f"WARNING: 줄 배치 보정 없이 그린다({e})", file=sys.stderr)
                 target = src
-        _run([cli_path(), "export-pdf", target, "-o", pdf, "--font-path", os.path.abspath(FONTS)], timeout)
+        _run(
+            [
+                cli_path(),
+                "export-pdf",
+                target,
+                "-o",
+                pdf,
+                "--font-path",
+                os.path.abspath(FONTS),
+            ],
+            timeout,
+        )
     finally:
         shutil.rmtree(work, ignore_errors=True)
     if not os.path.isfile(pdf) or os.path.getsize(pdf) == 0:
