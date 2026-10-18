@@ -22,6 +22,11 @@ pub(crate) fn claude_bullet_head_hwp(
     // [claude-hwpx bullet-place] 자동 내어쓰기를 끈 글머리표도 자리를 돌려준다(종전 None)
     let char_style_id = if (bullet.char_shape_id as usize) < styles.char_styles.len() {
 // ==== next ====
+    let cell = if (bullet.bullet_char as u32) < 0x80 {
+// ==== replace ====
+    // [claude-hwpx bullet-place] 반각은 U+0100 미만(ASCII 와 Latin-1 · § × ° 도 반각, • – → ○ ■ 와 기호 글꼴 PUA 는 전각. 한/글 실측 12종)
+    let cell = if (bullet.bullet_char as u32) < 0x100 {
+// ==== next ====
     Some(advance + i32::from(bullet.width_adjust))
 }
 // ==== replace ====
