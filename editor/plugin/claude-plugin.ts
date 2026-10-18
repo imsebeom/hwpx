@@ -568,6 +568,30 @@ export function createClaudePlugin(getInputHandler) {
         const inCell = pos.parentParaIndex != null;
         const after = !im.at || im.end;
         const sec = pos.sectionIndex;
+        // [claude-hwpx image-wrap] 글 배치를 주면 글자처럼 취급하지 않는 그림으로, 새 빈 문단 없이 그 문단에 붙인다
+        // (어울림은 글이 그림 옆으로 흘러야 해서 빈 문단을 만들면 안 된다). 본문만. 사용자 요청 2026-10-19
+        if (im.wrap) {
+          if (inCell) throw new Error('칸 안 그림은 아직 글자처럼 취급(--wrap 없이)만 넣을 수 있습니다');
+          const p = pos.paragraphIndex;
+          const width = im.widthMm ? Math.round((im.widthMm * 7200) / 25.4) : Math.min(im.naturalW * 75, 42520);
+          const height = Math.round((width * im.naturalH) / im.naturalW);
+          const bytes = Uint8Array.from(atob(im.base64), (c) => c.charCodeAt(0));
+          const r = parseMaybe(doc.insertPictureEx(JSON.stringify({
+            sectionIdx: sec, paraIdx: p, charOffset: im.end ? doc.getParagraphLength(sec, p) : 0, cellPath: '',
+            width, height, naturalWidthPx: im.naturalW, naturalHeightPx: im.naturalH, extension: im.ext, description: im.desc ?? '',
+          }), bytes));
+          if (!r?.ok) return r;
+          const mm = (v) => Math.round(((v ?? 0) * 7200) / 25.4);
+          const wrapName = { square: 'Square', topbottom: 'TopAndBottom', behind: 'BehindText', front: 'InFrontOfText' }[im.wrap];
+          const alignName = { left: 'Left', center: 'Center', right: 'Right' }[im.align ?? 'left'];
+          doc.setPictureProperties(sec, r.paraIdx, r.controlIdx, JSON.stringify({
+            treatAsChar: false, textWrap: wrapName, textFlow: 'BothSides',
+            vertRelTo: im.page ? 'Page' : 'Para', horzRelTo: im.page ? 'Page' : 'Column',
+            vertAlign: 'Top', horzAlign: alignName, vertOffset: mm(im.yMm), horzOffset: mm(im.xMm),
+            restrictInPage: !im.page, allowOverlap: !!im.page,
+          }));
+          return { ...r, at: `p${p}`, wrap: im.wrap, widthMm: +(width * 25.4 / 7200).toFixed(1), heightMm: +(height * 25.4 / 7200).toFixed(1), inCell: false };
+        }
         // 새 빈 문단을 만들고 그 번호를 얻는다
         let target;
         let replaced = 0;

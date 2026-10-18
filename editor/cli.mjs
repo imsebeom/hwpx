@@ -9,7 +9,7 @@
  *   node cli.mjs text                  현재 본문 텍스트
  *   node cli.mjs outline [시작 끝]      좌표(p12, T1r2c1)가 붙은 문서 개요
  *   node cli.mjs state                 문서 상태와 사용자 커서(셀 좌표, 선택한 글자)
- *   node cli.mjs image <그림> [좌표] [--end] [--replace] [--width mm] [--desc 설명]
+ *   node cli.mjs image <그림> [좌표] [--end] [--replace] [--width mm] [--desc 설명] [--wrap square|topbottom|behind|front [--align left|center|right] [--x mm] [--y mm] [--page]]
  *                                       그림을 좌표(p7, T2r0c0) 앞(--end 면 끝)이나 사용자 커서에 넣는다. undo 1스텝
  *   node cli.mjs start 원고.md [--theme ink|--accent #색] [--template report] [--rebuild]
  *                                       마크다운을 빌더(md2hwpx, 디자인 옵션이면 md2hwpx_design)로 같은 이름 .hwpx 로 만들어 연다
@@ -425,15 +425,22 @@ switch (sub) {
   case 'image': {
     // 그림 넣기: image <그림 파일> [좌표] [--end] [--replace] [--width mm] [--desc 설명]. 자리를 안 주면 사용자 커서
     const file = args[0];
-    if (!file || !fs.existsSync(file)) die('image <그림 파일> [좌표] [--end] [--replace] [--width mm] [--desc 설명]');
+    if (!file || !fs.existsSync(file)) die('image <그림 파일> [좌표] [--end] [--replace] [--width mm] [--desc 설명] [--wrap square|topbottom|behind|front [--align left|center|right] [--x mm] [--y mm] [--page]]');
     const buf = fs.readFileSync(file);
     const ext = path.extname(file).slice(1).toLowerCase();
     const size = imageSize(buf);
     if (!size) die(`그림 크기를 못 읽음(PNG, JPEG, GIF, BMP 만): ${file}`);
     const opt = (name) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : undefined; };
-    const at = args.slice(1).find((a, i, arr) => !a.startsWith('--') && !['--width', '--desc'].includes(arr[i - 1]));
+    const valued = ['--width', '--desc', '--wrap', '--align', '--x', '--y'];
+    const at = args.slice(1).find((a, i, arr) => !a.startsWith('--') && !valued.includes(arr[i - 1]));
+    // 글 배치(--wrap square|topbottom|behind|front)를 주면 글자처럼 취급하지 않는 그림으로 넣는다(본문만). 사용자 요청 2026-10-19
+    const wrap = opt('--wrap');
+    if (wrap && !['square', 'topbottom', 'behind', 'front'].includes(wrap)) die('--wrap 은 square(어울림), topbottom(자리 차지), behind(글 뒤로), front(글 앞으로) 가운데 하나');
+    const align = opt('--align');
+    if (align && !['left', 'center', 'right'].includes(align)) die('--align 은 left, center, right 가운데 하나');
     const image = { base64: buf.toString('base64'), ext: ext === 'jpeg' ? 'jpg' : ext, naturalW: size.w, naturalH: size.h,
-      at, end: args.includes('--end'), replace: args.includes('--replace'), widthMm: opt('--width') ? Number(opt('--width')) : undefined, desc: opt('--desc') };
+      at, end: args.includes('--end'), replace: args.includes('--replace'), widthMm: opt('--width') ? Number(opt('--width')) : undefined, desc: opt('--desc'),
+      wrap, align, xMm: opt('--x') ? Number(opt('--x')) : undefined, yMm: opt('--y') ? Number(opt('--y')) : undefined, page: args.includes('--page') };
     out((await cmd({ type: 'run', ops: [{ image }] })).result);
     break;
   }
