@@ -567,6 +567,10 @@ const RUST_PATCHES = [
     ['space-run-keep2-line-breaking', 'src/renderer/composer/line_breaking.rs'],
     // 동그라미 글자 겹치기도 줄 나눔에서 「◯」 폭(장평 반영, 자간 빼고)만큼 차지(d113 한/글 PDF 실측, 정답본 18곳)
     ['char-overlap-width-line-breaking', 'src/renderer/composer/line_breaking.rs'],
+    // 순수 HWPX 에서 쪽 나눔 앞 빈 문단이 안 들어가면 다음 쪽으로(정답본 11곳 중 9곳, d078). 흡수는 HWP5 출처에만
+    ['empty-before-break-typeset', 'src/renderer/typeset.rs'],
+    // 1단 구역에서 여러 쪽에 걸쳐 나뉜 표 바로 다음 문단의 단 나누기는 무시(e37, d058)
+    ['colbreak-after-split-table-typeset', 'src/renderer/typeset.rs'],
     // 엔진이 만든 줄의 첫 vpos 0 은 저장 쪽 경계로 읽지 않는다(format_text 뒤 문단이 다음 쪽으로 넘어가던 문제)
     ['synth-no-reset-typeset', 'src/renderer/typeset.rs'],
     // 표 속성(캡션 등)을 바꾸면 표 높이를 다시 잰다(캡션 높이가 빠지던 문제)
