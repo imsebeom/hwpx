@@ -634,6 +634,9 @@ const RUST_PATCHES = [
     // 옆에 글 자리가 없는 어울림 개체 무리(도형 포함)는 열 때 자리 차지처럼 다루고 저장 때 되돌린다(d268 차트 둘, lab exp/make_squarepair.py)
     ['square-block-mod', 'src/document_core/mod.rs'],
     ['square-block-document', 'src/document_core/commands/document.rs'],
+    // 어울림 도형(차트, OLE)도 띠로 비켜 다음 문단이 빈 자리로 흐른다(도형과 그림 여럿을 제외 영역으로, 띠 안 위아래 간격을 셈. lab exp/make_squarepair.py)
+    ['shape-band-line-breaking', 'src/renderer/composer/line_breaking.rs'],
+    ['shape-band-document', 'src/document_core/commands/document.rs'],
     // 엔진이 만든 줄의 첫 vpos 0 은 저장 쪽 경계로 읽지 않는다(format_text 뒤 문단이 다음 쪽으로 넘어가던 문제)
     ['synth-no-reset-typeset', 'src/renderer/typeset.rs'],
     // 표 속성(캡션 등)을 바꾸면 표 높이를 다시 잰다(캡션 높이가 빠지던 문제)
