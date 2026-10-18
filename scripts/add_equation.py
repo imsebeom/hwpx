@@ -42,8 +42,8 @@ from hwpx_helpers import ensure_dummy_linesegs_etree, xpath_local  # noqa: E402
 HP = "http://www.hancom.co.kr/hwpml/2011/paragraph"
 
 # 실물 문항지에서 뽑은 기본값. baseUnit 은 수식 글자 크기(HWPUNIT/100)다.
-DEFAULT_BASE_UNIT = 1000          # 10pt
-EQ_FONT = "HYhwpEQ"               # 한컴 수식 전용 글꼴
+DEFAULT_BASE_UNIT = 1000  # 10pt
+EQ_FONT = "HYhwpEQ"  # 한컴 수식 전용 글꼴
 EQ_VERSION = "Equation Version 60"
 
 
@@ -72,7 +72,9 @@ def _estimate_size(script: str, base_unit: int) -> tuple[int, int]:
     return width, height
 
 
-def build_equation_xml(script: str, eq_id: int, *, base_unit: int = DEFAULT_BASE_UNIT) -> str:
+def build_equation_xml(
+    script: str, eq_id: int, *, base_unit: int = DEFAULT_BASE_UNIT
+) -> str:
     """인라인 `<hp:equation>` 봉투 한 개를 만든다.
 
     `treatAsChar="1"` 은 수식에서 옳다. 글자 크기의 인라인 개체라 쪽을 넘길 일이
@@ -91,9 +93,9 @@ def build_equation_xml(script: str, eq_id: int, *, base_unit: int = DEFAULT_BASE
         f'allowOverlap="0" holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="PARA" '
         f'vertAlign="TOP" horzAlign="LEFT" vertOffset="0" horzOffset="0"/>'
         f'<hp:outMargin left="56" right="56" top="0" bottom="0"/>'
-        f'<hp:shapeComment>수식입니다.</hp:shapeComment>'
-        f'<hp:script>{body}</hp:script>'
-        f'</hp:equation>'
+        f"<hp:shapeComment>수식입니다.</hp:shapeComment>"
+        f"<hp:script>{body}</hp:script>"
+        f"</hp:equation>"
     )
 
 
@@ -102,28 +104,26 @@ def escape_script(script: str) -> str:
 
     스크립트 문법의 `<`, `>`(부등호)와 `&`가 그대로 들어가면 XML 이 깨진다.
     """
-    return (
-        script.replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-    )
+    return script.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
-def _make_equation_para(script: str, eq_id: int, *, para_pr: str, char_pr: str,
-                        base_unit: int) -> etree._Element:
+def _make_equation_para(
+    script: str, eq_id: int, *, para_pr: str, char_pr: str, base_unit: int
+) -> etree._Element:
     """수식 하나만 담은 문단을 만든다."""
     eq = build_equation_xml(script, eq_id, base_unit=base_unit)
     xml = (
         f'<hp:p xmlns:hp="{HP}" id="0" paraPrIDRef="{para_pr}" styleIDRef="0" '
         f'pageBreak="0" columnBreak="0" merged="0">'
         f'<hp:run charPrIDRef="{char_pr}">{eq}</hp:run>'
-        f'</hp:p>'
+        f"</hp:p>"
     )
     return etree.fromstring(xml.encode("utf-8"))
 
 
-def _insert_after_anchor(root: etree._Element, anchor: str, script: str, eq_id: int,
-                         base_unit: int) -> None:
+def _insert_after_anchor(
+    root: etree._Element, anchor: str, script: str, eq_id: int, base_unit: int
+) -> None:
     """앵커 문구가 있는 문단 바로 뒤에 수식 문단을 넣는다."""
     for para in xpath_local(root, "p"):
         text = "".join(t.text or "" for t in xpath_local(para, "t"))
@@ -132,7 +132,8 @@ def _insert_after_anchor(root: etree._Element, anchor: str, script: str, eq_id: 
         parent = para.getparent()
         run = para.find(f"{{{HP}}}run")
         new_para = _make_equation_para(
-            script, eq_id,
+            script,
+            eq_id,
             para_pr=para.get("paraPrIDRef", "0"),
             char_pr=run.get("charPrIDRef", "0") if run is not None else "0",
             base_unit=base_unit,
@@ -142,8 +143,15 @@ def _insert_after_anchor(root: etree._Element, anchor: str, script: str, eq_id: 
     raise ValueError(f"앵커 문구를 찾지 못했다: {anchor!r}")
 
 
-def _insert_in_cell(root: etree._Element, table_idx: int, row: int, col: int,
-                    script: str, eq_id: int, base_unit: int) -> None:
+def _insert_in_cell(
+    root: etree._Element,
+    table_idx: int,
+    row: int,
+    col: int,
+    script: str,
+    eq_id: int,
+    base_unit: int,
+) -> None:
     """표 셀 안 문단 끝에 수식을 붙인다. 좌표는 cellAddr 격자 기준."""
     tables = xpath_local(root, "tbl")
     if table_idx >= len(tables):
@@ -163,18 +171,30 @@ def _insert_in_cell(root: etree._Element, table_idx: int, row: int, col: int,
         char_pr = run.get("charPrIDRef", "0") if run is not None else "0"
         eq_run = etree.fromstring(
             f'<hp:run xmlns:hp="{HP}" charPrIDRef="{char_pr}">'
-            f'{build_equation_xml(script, eq_id, base_unit=base_unit)}'
-            f'</hp:run>'.encode("utf-8")
+            f"{build_equation_xml(script, eq_id, base_unit=base_unit)}"
+            f"</hp:run>".encode("utf-8")
         )
+        # 글이 바뀐 문단의 줄 배치 캐시는 지운다(SKILL.md 규칙 17). 그대로 두면 수식이 없던 때의 줄 높이가 남아 rhwp(에디터)가
+        # 칸을 늘리지 않고 수식을 잘라 그렸다. run 은 linesegarray 앞에 와야 하므로 캐시를 먼저 떼고 붙인다(더미는 아래에서 다시 넣는다)
+        for seg in target.findall(f"{{{HP}}}linesegarray"):
+            target.remove(seg)
         target.append(eq_run)
         return
     raise ValueError(f"표 {table_idx} 에 셀 ({row},{col}) 이 없다")
 
 
-def add_equation(src: str, dst: str, *, script: str, after: str | None = None,
-                 table: int | None = None, row: int | None = None,
-                 col: int | None = None, size_pt: float = 10.0,
-                 section: str = "Contents/section0.xml") -> None:
+def add_equation(
+    src: str,
+    dst: str,
+    *,
+    script: str,
+    after: str | None = None,
+    table: int | None = None,
+    row: int | None = None,
+    col: int | None = None,
+    size_pt: float = 10.0,
+    section: str = "Contents/section0.xml",
+) -> None:
     """HWPX 에 수식 개체를 하나 삽입한다.
 
     Args:
@@ -224,22 +244,36 @@ def main() -> None:
     )
     p.add_argument("input", help="원본 HWPX")
     p.add_argument("--output", "-o", required=True, help="출력 HWPX")
-    p.add_argument("--script", "-s", required=True,
-                   help="수식 스크립트 (예: \"x = {-b +- sqrt{b^2 -4ac}} over {2a}\")")
+    p.add_argument(
+        "--script",
+        "-s",
+        required=True,
+        help='수식 스크립트 (예: "x = {-b +- sqrt{b^2 -4ac}} over {2a}")',
+    )
     p.add_argument("--after", help="이 문구가 든 문단 뒤에 새 문단으로 삽입")
     p.add_argument("--table", type=int, help="표 인덱스 (0부터)")
     p.add_argument("--row", type=int, help="행 좌표 (cellAddr rowAddr)")
     p.add_argument("--col", type=int, help="열 좌표 (cellAddr colAddr)")
-    p.add_argument("--size", type=float, default=10.0, help="수식 글자 크기 pt (기본 10)")
+    p.add_argument(
+        "--size", type=float, default=10.0, help="수식 글자 크기 pt (기본 10)"
+    )
     args = p.parse_args()
 
     add_equation(
-        args.input, args.output,
-        script=args.script, after=args.after,
-        table=args.table, row=args.row, col=args.col,
+        args.input,
+        args.output,
+        script=args.script,
+        after=args.after,
+        table=args.table,
+        row=args.row,
+        col=args.col,
         size_pt=args.size,
     )
-    where = f"'{args.after}' 뒤" if args.after else f"표 {args.table} ({args.row},{args.col})"
+    where = (
+        f"'{args.after}' 뒤"
+        if args.after
+        else f"표 {args.table} ({args.row},{args.col})"
+    )
     print(f"수식 삽입: {where} → {Path(args.output).name}")
 
 

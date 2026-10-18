@@ -11,6 +11,10 @@
  *   node cli.mjs state                 문서 상태와 사용자 커서(셀 좌표, 선택한 글자)
  *   node cli.mjs image <그림> [좌표] [--end] [--replace] [--width mm] [--desc 설명]
  *                                       그림을 좌표(p7, T2r0c0) 앞(--end 면 끝)이나 사용자 커서에 넣는다. undo 1스텝
+ *   node cli.mjs start 원고.md [--theme ink|--accent #색] [--template report] [--rebuild]
+ *                                       마크다운을 빌더(md2hwpx, 디자인 옵션이면 md2hwpx_design)로 같은 이름 .hwpx 로 만들어 연다
+ *   node cli.mjs builder <스크립트> <인자… {in} … {out} …>   열린 문서를 빌더 스크립트(scripts/*.py)로 처리해 새 판으로 다시 연다
+ *                                       (차트, 도장, 메모 만들기, 합치기 등). Ctrl+Z 기록은 끊기니 되돌리려면 builder --undo
  *   node cli.mjs goto <좌표>            사용자 화면의 커서를 그 문단이나 셀로 옮긴다
  *   node cli.mjs memos [번호] [--json]  문서에 달린 메모(작성자, 날짜, 걸린 글, 본문). 번호를 주면 그 메모가 걸린 글로 화면을 옮긴다
  *   node cli.mjs inspect | slots       행정문서 표기 검수 / 아직 안 채운 칸
@@ -314,7 +318,24 @@ switch (sub) {
       }
       fs.copyFileSync(path.join(HERE, 'blank.hwpx'), file);
     }
-    if (!file || !fs.existsSync(file)) die('사용법: start [문서.hwpx|.hwp] — 문서를 빼면 빈 문서로 연다');
+    // 마크다운 원고를 주면 빌더로 hwpx 를 만들어 연다(같은 이름 .hwpx). --theme, --accent, --light, --font, --design 을 주면
+    // 디자인 판(md2hwpx_design: 배너, 절 띠, 표 머리 색), 아니면 md2hwpx(--template 으로 템플릿). 만든 파일이 있으면 --rebuild 로만 다시 만든다
+    if (file && /\.md$/i.test(file) && fs.existsSync(file)) {
+      const opt = (k) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : null; };
+      const design = ['--theme', '--accent', '--light', '--font', '--design'].some((k) => args.includes(k));
+      const built = file.replace(/\.md$/i, '.hwpx');
+      if (fs.existsSync(built) && !args.includes('--rebuild')) die(`이미 있는 파일: ${built} — 그 파일을 열거나, md 로 다시 만들려면 --rebuild`);
+      const extra = design
+        ? [...['--theme', '--accent', '--light', '--font'].flatMap((k) => (opt(k) ? [k, opt(k)] : [])), ...(args.includes('--no-layout') ? ['--no-layout'] : [])]
+        : (opt('--template') ? ['--template', opt('--template')] : []);
+      const script = path.join(HERE, '..', 'scripts', design ? 'md2hwpx_design.py' : 'md2hwpx.py');
+      const py = process.platform === 'win32' ? 'python' : 'python3';
+      const r = spawnSync(py, [script, file, '-o', built, ...extra], { encoding: 'utf8', windowsHide: true, env: { ...process.env, PYTHONIOENCODING: 'utf-8' } });
+      if (r.status !== 0 || !fs.existsSync(built)) die(`md 변환 실패: ${(r.stderr || r.stdout || '').slice(-800)}`);
+      out(`md → ${path.basename(built)} (${design ? 'md2hwpx_design' : 'md2hwpx'})`);
+      file = built;
+    }
+    if (!file || !fs.existsSync(file)) die('사용법: start [문서.hwpx|.hwp|원고.md] — 문서를 빼면 빈 문서로 연다');
     const blocker = editBlocker(file);
     if (blocker && !args.includes('--force')) die(`열지 않음: ${blocker}. 사용자가 원하면 --force`);
     if (!process.env.HWPX_EDITOR_PORT) { PORT = await allocatePort(); BASE = `http://127.0.0.1:${PORT}`; }
@@ -492,6 +513,55 @@ switch (sub) {
       rows.push(`${dir === STATE_DIR ? '*' : ' '} ${path.basename(dir).padEnd(10)} 포트 ${port}  창 ${h.browser ? '열림' : '없음'}  ${doc}`);
     }
     out(rows.length ? rows.join('\n') : '떠 있는 에디터 없음');
+    break;
+  }
+  case 'builder': {
+    // 에디터에 열린 문서를 빌더 스크립트(scripts/*.py)로 처리하고 결과를 새 판으로 다시 연다 — 에디터에서 빌더 기능(차트, 도장, 메모 만들기,
+    // 문서 합치기, 표 칸 수식, 스타일 조건 치환 등)을 쓰는 다리. 인자 안의 {in} 은 지금 화면 문서(저장 안 한 편집 포함)를 꺼낸 파일,
+    // {out} 은 결과 파일(원본 옆 새 판 <이름>_<YYMMDD>_<NN>.hwpx)로 바뀐다. 다시 열면 그 앞의 되돌리기(Ctrl+Z) 기록은 끊긴다 —
+    // 처리 직전 상태는 상태 폴더에 남겨 두고 `builder --undo` 가 그것을 새 판으로 다시 연다.
+    //   builder chart_hwpx {in} {out} --type bar --data data.json      builder seal_hwpx {in} {out} --image 도장.png
+    //   builder add_review_memo {in} {out} --memos 메모.json             builder --undo
+    const s = JSON.parse(fs.readFileSync(SESSION, 'utf8'));
+    if (args[0] === '--undo') {
+      const u = s.builderUndo;
+      if (!u || !fs.existsSync(u.before)) die('되돌릴 빌더 처리가 없다');
+      const target = nextVersion(u.source);
+      fs.copyFileSync(u.before, target);
+      fs.writeFileSync(SESSION, JSON.stringify({ ...s, source: target, builderUndo: null }, null, 2));
+      await cmd({ type: 'open' });
+      await postLog('builder', { undo: true, path: target });
+      out(`되돌림: 빌더 처리 직전 상태를 새 판으로 열었다 — ${target}`);
+      break;
+    }
+    const [name, ...rest] = args;
+    if (!name) die('사용법: builder <스크립트 이름|경로.py> <인자… {in} … {out} …> | builder --undo');
+    const scriptsDir = path.join(HERE, '..', 'scripts');
+    const script = fs.existsSync(name) ? path.resolve(name) : path.join(scriptsDir, name.endsWith('.py') ? name : `${name}.py`);
+    if (!fs.existsSync(script)) die(`빌더 스크립트가 없다: ${script}\n있는 것: ${fs.readdirSync(scriptsDir).filter((f) => f.endsWith('.py')).join(', ')}`);
+    if (!rest.some((a) => a.includes('{in}')) || !rest.some((a) => a.includes('{out}'))) {
+      die('인자에 {in}(지금 문서)과 {out}(결과)을 넣는다. 스크립트마다 자리가 다르다: 예) chart_hwpx {in} {out} …, add_equation {in} --output {out} …');
+    }
+    if (!/\.hwpx$/i.test(s.source || '')) die('hwpx 문서에서만 쓴다(hwp 는 먼저 hwpx 로 저장)');
+    const dir = path.join(STATE_DIR, 'builder');
+    fs.mkdirSync(dir, { recursive: true });
+    const before = path.join(dir, `before_${Date.now()}.hwpx`);
+    const r = await cmd({ type: 'save' });
+    const fix = fixHfFields(Buffer.from(r.base64, 'base64'), r.hfMarkers ?? []);
+    if (s.proxyMap) fix.buf = restoreImages(fix.buf, s.proxyMap).buf;   // 그림 축소 보기면 원본 그림으로 넘긴다
+    fs.writeFileSync(before, fix.buf);
+    const result = nextVersion(s.source);
+    const argv = rest.map((a) => a.replaceAll('{in}', before).replaceAll('{out}', result));
+    const py = process.platform === 'win32' ? 'python' : 'python3';
+    const run = spawnSync(py, [script, ...argv], { encoding: 'utf8', windowsHide: true, cwd: process.cwd(), env: { ...process.env, PYTHONIOENCODING: 'utf-8' } });
+    if (run.stdout?.trim()) out(run.stdout.trim().split('\n').slice(-20).join('\n'));
+    if (run.status !== 0 || !fs.existsSync(result)) {
+      die(`빌더 실패(에디터 문서는 그대로): ${path.basename(script)} 종료 ${run.status}\n${(run.stderr || '').trim().split('\n').slice(-15).join('\n')}`);
+    }
+    fs.writeFileSync(SESSION, JSON.stringify({ ...s, source: result, proxyMap: null, builderUndo: { before, source: s.source } }, null, 2));
+    await cmd({ type: 'open' });
+    await postLog('builder', { script: path.basename(script), args: rest.join(' ').slice(0, 300), path: result });
+    out(`빌더 적용: ${path.basename(script)} → 새 판 ${result}\n화면 저장(Ctrl+S)도 이 파일에 저장한다. 되돌리려면 builder --undo`);
     break;
   }
   case 'stop': {

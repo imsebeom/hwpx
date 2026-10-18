@@ -52,7 +52,7 @@ ${CLAUDE_SKILL_DIR}/
 │   ├── app.py                 # 에디터 앱 창 (pywebview=WebView2, 한/글 단축키 전부)
 │   ├── aside_open.pyw         # .hwpx 연결 프로그램: Aside 가 연 것은 에디터 탭, 나머지는 한/글 (--install / --uninstall)
 │   ├── server.mjs · host/     # 브리지 서버와 호스트 페이지
-│   ├── plugin/                # studio 플러그인, 한/글 단축키 층, 편집 도구 25종(lib/)
+│   ├── plugin/                # studio 플러그인, 한/글 단축키 층, 편집 도구 36종(lib/)
 │   └── tests/                 # 왕복 보존력, 쪽 번호, 실제 키 입력 시험
 ├── fonts/                      # Pretendard Regular, Bold + OFL.txt (rhwp PDF 용, 기본 글꼴)
 ├── templates/
@@ -74,7 +74,7 @@ ${CLAUDE_SKILL_DIR}/
     ├── gonmunseo-2025-writing-rules.md  # ★ 2025-01-08 개정 행정업무규정 룰셋 (수신·항목기호 등, jkf87 차용)
     ├── xml-internals.md       # 저수준 XML 구조
     ├── rhwp-benchmark.md      # rhwp 포팅 배경·표 수식·필드 API 사용법
-    ├── editor-mode.md         # ★ 에디터 모드 설명서 — 명령, 도구 25종, 요청→명령 사전, 한/글 단축키, 한계
+    ├── editor-mode.md         # ★ 에디터 모드 설명서 — 명령, 도구 36종, 요청→명령 사전, 한/글 단축키, 한계
     ├── python-hwpx-api.md     # python-hwpx API 시그니처 + 버전 매트릭스(2.9.1 설치 / 6.3.0 검증 / 7.0 대비)
     ├── equation-syntax.md     # ★ 한컴 수식 스크립트 문법 — 검증한 토큰과 함정 3종 (규칙 39)
     ├── gaejosik-munche.md     # ★ 개조식 실측 — 층별 길이·종결 분포 (교육청 공문 16건 494줄)
@@ -180,12 +180,13 @@ pip install python-hwpx lxml --break-system-packages
 
 - 시작: `node "${CLAUDE_SKILL_DIR}/editor/cli.mjs" start <문서.hwpx>` (최초 1회 `node editor/setup.mjs`, 앱 창은 `pip install pywebview`)
 - 사용자가 말을 걸면 답하기 전에 `cli.mjs changes` 로 사용자가 에디터에서 고친 내역(좌표 diff, 커서, 선택 글자)부터 읽는다
-- 편집: `cli.mjs run` 에 JSON 배치 — 편집 도구 25종(`tool`) 우선, 없으면 WASM 직접(`doc`). 배치 하나가 undo 1스텝
+- 편집: `cli.mjs run` 에 JSON 배치 — 편집 도구 36종(`tool`) 우선, 없으면 WASM 직접(`doc`). 배치 하나가 undo 1스텝
+- **빌더와 에디터 다리**(2026-10-18): 에디터 도구를 화면 없이 파일에 쓰려면 `node editor/apply_ops.mjs <문서> <작업.json> -o <결과>`, 열린 문서에 빌더 스크립트(차트, 도장, 메모, 칸 수식)를 쓰려면 `cli.mjs builder <스크립트> <인자… {in} … {out}>`(되돌리기는 `builder --undo`), 원고에서 바로 열려면 `cli.mjs start 원고.md`. 어느 쪽에서 무엇이 되는지는 editor-mode.md 「빌더와 에디터」
 - 🔴 **에디터에 열린 문서는 다시 생성하거나 새로 열지 않고 `cli.mjs run` 으로 에디터 위에서 고친다**(2026-10-05 사용자 지시 — 사용자도 실시간으로 고치고 있다). 생성 스크립트의 원고는 고친 뒤 실물에 맞춘다. 다시 빌드가 꼭 필요하면 먼저 저장을 부탁한다(editor-mode.md 「대화 규칙」)
 - 큰 문서(150MB 초과)는 그림만 1,200px JPEG 로 줄인 사본을 열고, 저장할 때 원본 그림으로 되돌린다(editor-mode.md 「큰 문서」)
 - 저장: `cli.mjs save` → 매번 새 판 `<이름>_<YYMMDD>_<NN>.hwpx`, 덮어쓰기 없음. 사용자의 화면 저장(Ctrl+S)은 연결된 원본에 덮어쓴다(첫 저장 전 백업)
 - 메모 읽기: `cli.mjs memos` 가 문서에 달린 메모를 번호, 좌표, 작성자, 날짜, 걸린 글, 본문으로 준다(`memos 3` 은 그 메모 자리로 화면 이동). 사용자 화면에는 메모 패널과 걸린 글 표시가 뜬다. 「메모 반영해 줘」에는 이것부터 읽는다(editor-mode.md 「메모 보기」)
-- 하지 않는 일: 새 문서 생성(A), 양식 복제·추출(F/H), 병합(I), 시험지(J), 첨삭 메모(N) — 저장·종료 후 기존 워크플로로. 그 결과물은 다시 에디터로 연다(위 「마지막 단계」)
+- 에디터 안에서 바로 하지 않는 일: 양식 복제·추출(F/H), 시험지(J) — 저장·종료 후 기존 워크플로로. 그 결과물은 다시 에디터로 연다(위 「마지막 단계」). 차트, 도장, 메모, 칸 수식은 `cli.mjs builder` 로 열린 문서에 넣는다(2026-10-18 넷 모두 넣고 다시 열어 확인). 새 문서 생성(A)은 `cli.mjs start 원고.md`
 
 ## 워크플로우 A: 콘텐츠 → HWPX (가장 중요!)
 
