@@ -599,6 +599,13 @@ const RUST_PATCHES = [
     ['cut-row-pad-stored-table-layout', 'src/renderer/layout/table_layout.rs'],
     ['test-1949-bounds-tests', 'src/wasm_api/tests.rs'],
     ['terminal-squeeze-rest-typeset', 'src/renderer/typeset.rs'],
+    // 줄 배치 없는 각주 문단도 불러올 때 줄을 만든다(각주 높이를 문단당 400 HU 로 세어 표가 각주와 겹치던 문제, 사용자 보고 2026-10-18)
+    ['footnote-reflow-document', 'src/document_core/commands/document.rs'],
+    // 들어가지 않는 표 칸 각주는 다음 쪽으로 넘기고, 각주 안전 여유 40px 는 HWPX 에서 뺀다(한/글 실측, 가이드북 2장, d327)
+    ['footnote-carry-typeset', 'src/renderer/typeset.rs'],
+    // 찾아 바꾸기가 각주, 미주 안 글도 찾고 바꾼다(스튜디오 footnote-search-* 와 짝)
+    ['footnote-search-search-query', 'src/document_core/queries/search_query.rs'],
+    ['footnote-search-wasm-api', 'src/wasm_api.rs'],
     // 엔진이 만든 줄의 첫 vpos 0 은 저장 쪽 경계로 읽지 않는다(format_text 뒤 문단이 다음 쪽으로 넘어가던 문제)
     ['synth-no-reset-typeset', 'src/renderer/typeset.rs'],
     // 표 속성(캡션 등)을 바꾸면 표 높이를 다시 잰다(캡션 높이가 빠지던 문제)
@@ -802,7 +809,13 @@ for (const [id, rel] of [['wrap-text-labels', 'ui/picture-props-dialog.ts'], ['w
   // 에디터 서버가 읽은 설치 글꼴을 로컬 글꼴로(host-fonts), 처음 고르는 글꼴은 폭 표를 받아 등록한 뒤 적용(font-metrics-on-pick)
   ['host-fonts', 'core/local-fonts.ts'], ['font-metrics-on-pick', 'ui/toolbar.ts'],
   // 여러 칸 테두리를 바깥 네 변, 안쪽 가로, 안쪽 세로 여섯 부분으로 나눠 바꾼 부분만 적용(「아래」만 바꿔도 안쪽 선까지 바뀌던 문제)
-  ['cell-border-parts', 'ui/cell-border-bg-dialog.ts'], ['cell-border-parts-cmd', 'engine/command.ts']]) {
+  ['cell-border-parts', 'ui/cell-border-bg-dialog.ts'], ['cell-border-parts-cmd', 'engine/command.ts'],
+  // 문자표 「넣기」 뒤 대화상자를 닫는다(사용자 요청 2026-10-18)
+  ['symbols-insert-close', 'ui/symbols-dialog.ts'],
+  // 찾아 바꾸기가 각주, 미주 안 글도 찾고 바꾼다(엔진 footnote-search-* 와 짝, 사용자 보고 2026-10-18)
+  ['footnote-search-bridge', 'core/wasm-bridge.ts'], ['footnote-search-find', 'ui/find-dialog.ts'],
+  // 각주 편집 중 Ctrl+C, X, V 와 Shift+방향키 고르기(사용자 보고 2026-10-18)
+  ['footnote-clipboard', 'engine/input-handler-keyboard.ts']]) {
   const f = path.join(STUDIO, 'src', ...rel.split('/'));
   let src = fs.readFileSync(f, 'utf8');
   if (src.includes(`[claude-hwpx ${id}]`)) continue;
