@@ -19,6 +19,13 @@ VARIANTS = {
     "circle": "○",
     "ascii": "-",
     "latin1": "·",
+    "sect": "§",
+    "times": "×",
+    "bull": "•",
+    "endash": "–",
+    "arrow": "→",
+    "ring": "°",
+    "square": "■",
 }
 for name, ch in VARIANTS.items():
     with zipfile.ZipFile(out / f"b_{name}.hwpx", "w", zipfile.ZIP_DEFLATED) as z:

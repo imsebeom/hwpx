@@ -62,6 +62,12 @@ pub(crate) fn claude_bullet_head_hwp(
     ),
     (
         LB,
+        "    let cell = if (bullet.bullet_char as u32) < 0x80 {\n",
+        "    // [claude-hwpx bullet-place] 반각은 U+0100 미만(ASCII 와 Latin-1 · § × ° 도 반각, • – → ○ ■ 와 기호 글꼴 PUA 는 전각. 한/글 실측 12종)\n"
+        "    let cell = if (bullet.bullet_char as u32) < 0x100 {\n",
+    ),
+    (
+        LB,
         "        match claude_number_head_hwp(para, styles).filter(|(advance, _)| *advance > 0 && *advance < seg_width_hwp) {\n",
         "        match claude_number_head_hwp(para, styles)\n"
         "            .or_else(|| claude_bullet_head_hwp(para, styles).filter(|(_, auto)| !*auto))\n"
