@@ -593,6 +593,11 @@ const RUST_PATCHES = [
     ['square-empty-host-line-typeset', 'src/renderer/typeset.rs'],
     ['square-empty-host-line-paragraph-layout', 'src/renderer/layout/paragraph_layout.rs'],
     ['tac-multi-fit-tail-typeset', 'src/renderer/typeset.rs'],
+    ['cell-cut-trailing-spacing-table-layout', 'src/renderer/layout/table_layout.rs'],
+    ['cell-split-outer-bottom-typeset', 'src/renderer/typeset.rs'],
+    ['cut-pad-unscaled-table-layout', 'src/renderer/layout/table_layout.rs'],
+    ['cut-row-pad-stored-table-layout', 'src/renderer/layout/table_layout.rs'],
+    ['test-1949-bounds-tests', 'src/wasm_api/tests.rs'],
     // 엔진이 만든 줄의 첫 vpos 0 은 저장 쪽 경계로 읽지 않는다(format_text 뒤 문단이 다음 쪽으로 넘어가던 문제)
     ['synth-no-reset-typeset', 'src/renderer/typeset.rs'],
     // 표 속성(캡션 등)을 바꾸면 표 높이를 다시 잰다(캡션 높이가 빠지던 문제)
