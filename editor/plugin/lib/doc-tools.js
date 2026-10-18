@@ -527,7 +527,7 @@ export const TOOLS = [
   },
   {
     name: 'cell_style',
-    description: '표의 칸 범위(from_row,from_col ~ to_row,to_col, 생략하면 한 칸)에 배경색, 테두리, 안쪽 여백을 정한다. bg_color 는 #RRGGBB 또는 none. border.sides 는 all(모든 칸 테두리), outer(범위 바깥), inner(범위 안쪽), top, bottom, left, right(범위의 그쪽 가장자리) 중 하나 또는 배열. border.type 은 solid, dash, dot, dash_dot, long_dash, double, none. padding_mm 은 숫자 하나(네 방향) 또는 {left,right,top,bottom}.',
+    description: '표의 칸 범위(from_row,from_col ~ to_row,to_col, 생략하면 한 칸)에 배경색, 테두리, 안쪽 여백을 정한다. bg_color 는 #RRGGBB 또는 none. border.sides 는 all(모든 칸 테두리), outer(범위 바깥), inner(범위 안쪽 가로와 세로), inner_h(안쪽 가로선), inner_v(안쪽 세로선), top, bottom, left, right(범위의 그쪽 가장자리) 중 하나 또는 배열. border.type 은 solid, dash, dot, dash_dot, long_dash, double, none. padding_mm 은 숫자 하나(네 방향) 또는 {left,right,top,bottom}.',
     parameters: {
       type: 'object',
       properties: {
@@ -1012,7 +1012,7 @@ function exec(doc, name, a) {
         if (!HEX.test(color)) throw new Error('border.color 는 #RRGGBB 입니다.');
         line = { type, width: borderWidthIdx(a.border.width_mm ?? 0.12), color: color.toLowerCase() };
         sides = new Set([].concat(a.border.sides ?? 'all'));
-        const ok = ['all', 'outer', 'inner', 'top', 'bottom', 'left', 'right'];
+        const ok = ['all', 'outer', 'inner', 'inner_h', 'inner_v', 'top', 'bottom', 'left', 'right'];
         for (const s of sides) if (!ok.includes(s)) throw new Error(`border.sides 는 ${ok.join(', ')} 중에서 고릅니다.`);
       }
       if (!Object.keys(base).length && !line) throw new Error('바꿀 것이 없습니다(bg_color, border, padding_mm).');
@@ -1020,9 +1020,18 @@ function exec(doc, name, a) {
         const props = { ...base };
         if (line) {
           const edge = { top: c.row <= r0, bottom: c.row + c.rowSpan - 1 >= r1, left: c.col <= c0, right: c.col + c.colSpan - 1 >= c1 };
+          const innerOf = { top: 'inner_h', bottom: 'inner_h', left: 'inner_v', right: 'inner_v' };
+          // 엔진은 borderLeft 키가 있어야 테두리 변경으로 알아보고, 없는 변은 borderFillId 의 값을 따른다. 바꾸지 않는 변도 그 칸의
+          // 제 값으로 네 변을 모두 보낸다(2026-10-18 실측: sides 가 bottom 이면 아무것도 안 바뀌고, outer, inner 는 왼쪽 변이 없는 칸이 빠졌다)
+          const own = J(doc.getCellOwnProperties(t.section, t.para, t.ctrl, c.idx));
+          if (own.borderFillId != null) props.borderFillId = own.borderFillId;
           for (const side of ['top', 'bottom', 'left', 'right']) {
-            const want = sides.has('all') || (sides.has('outer') && edge[side]) || (sides.has('inner') && !edge[side]) || (sides.has(side) && edge[side]);
-            if (want) props[`border${side[0].toUpperCase()}${side.slice(1)}`] = line;
+            const want = sides.has('all') || (sides.has('outer') && edge[side]) || (sides.has('inner') && !edge[side])
+              || (sides.has(innerOf[side]) && !edge[side]) || (sides.has(side) && edge[side]);
+            const key = `border${side[0].toUpperCase()}${side.slice(1)}`;
+            const o = own[key];
+            props[key] = want ? line : o ? { type: o.type, width: o.width, color: o.color } : undefined;
+            if (!props[key]) delete props[key];
           }
         }
         if (Object.keys(props).length) doc.setCellProperties(t.section, t.para, t.ctrl, c.idx, JSON.stringify(props));
