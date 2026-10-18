@@ -231,6 +231,62 @@ def replace_in_text_nodes(xml_text: str, replacements, *, longest_first: bool = 
     return _HP_T_RE.sub(_in_text, xml_text), count
 
 
+_P_SCAN_RE = re.compile(
+    r"<hp:p\b[^>]*?/>|<hp:p\b[^>]*>|</hp:p>"
+    r"|<hp:linesegarray\b[^>]*/>|<hp:linesegarray\b.*?</hp:linesegarray>",
+    re.DOTALL,
+)
+
+
+def drop_linesegs_where_text_changed(old_xml: str, new_xml: str):
+    """글자 치환 전후 section XML 을 견주어, 글이 바뀐 문단(그 `<hp:t>` 를 직접 담은 `<hp:p>`)의
+    linesegarray 만 지운다.
+
+    표 칸 문단의 글을 줄이고 옛 줄 배치를 그대로 두면 한글이 문서를 열지 못한다(규칙 17, 2026-10-19
+    zip_replace_all 로 칸 글 두 개를 짧게 바꾼 사본이 Open False). 문서 전체를 지우면 손대지 않은 문단의
+    줄 배치까지 잃어 rhwp, 에디터에서 글이 벌어진다. 치환은 `<hp:t>` 안만 바꾸므로 전후 `<hp:t>` 가 순서대로
+    짝지어진다. 개수가 다르면(예상 밖) 안전하게 그 파트의 줄 배치를 모두 지운다.
+
+    Returns:
+        (줄 배치를 지운 new_xml, 지운 문단 수)
+    """
+    old_ts = list(_HP_T_RE.finditer(old_xml))
+    new_ts = list(_HP_T_RE.finditer(new_xml))
+    if len(old_ts) != len(new_ts):
+        stripped, n = _LINESEG_PATTERN.subn("", new_xml)
+        return stripped, n
+    changed = [n.start() for o, n in zip(old_ts, new_ts) if o.group(2) != n.group(2)]
+    if not changed:
+        return new_xml, 0
+    # 문단 시작, 끝, 줄 배치를 위치 순서로 훑으며 바뀐 글을 담은 문단을 표시한다
+    events = [(m.start(), 0, m) for m in _P_SCAN_RE.finditer(new_xml)]
+    events += [(pos, 1, None) for pos in changed]
+    events.sort(key=lambda e: (e[0], e[1]))
+    stack = []  # [표시 여부, 그 문단 깊이의 줄 배치 구간들]
+    drop = []
+    dropped = 0
+    for _, kind, m in events:
+        if kind == 1:
+            if stack:
+                stack[-1][0] = True
+            continue
+        tok = m.group(0)
+        if tok.startswith("</hp:p"):
+            if stack:
+                marked, spans = stack.pop()
+                if marked and spans:
+                    drop.extend(spans)
+                    dropped += 1
+        elif tok.startswith("<hp:linesegarray"):
+            if stack:
+                stack[-1][1].append((m.start(), m.end()))
+        elif not tok.endswith("/>"):
+            stack.append([False, []])
+    for a, b in sorted(drop, reverse=True):
+        new_xml = new_xml[:a] + new_xml[b:]
+    return new_xml, dropped
+
+
 def risky_replacement_keys(replacements) -> list:
     """XML 전체 치환(raw)에 쓰면 속성값을 깨뜨리기 쉬운 키 — 숫자만이거나 3자 미만.
 

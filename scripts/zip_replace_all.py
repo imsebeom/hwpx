@@ -38,6 +38,7 @@ if str(SCRIPT_DIR) not in sys.path:
 from fix_namespaces import fix_hwpx_namespaces  # noqa: E402
 from form_gate import TemplateGateError, guard_write, record_template  # noqa: E402
 from hwpx_helpers import (  # noqa: E402
+    drop_linesegs_where_text_changed,
     force_default_print_method,
     inject_dummy_linesegs,
     replace_in_text_nodes,
@@ -135,6 +136,7 @@ def zip_replace_all(
         "replacements": 0,
         "decode_failed": 0,
         "lineseg_injected": 0,
+        "lineseg_dropped": 0,
         "print_method_reset": 0,
         "is_template": int(is_template),
     }
@@ -179,6 +181,12 @@ def zip_replace_all(
                     if text != original_text:
                         stats["changed_xml"] += 1
                         stats["replacements"] += replaced_here
+                        # 글이 바뀐 문단만 줄 배치를 지운다(칸 글이 줄었는데 옛 캐시가 남으면 한글이 열지 못한다)
+                        if _is_section_xml(info.filename):
+                            text, dropped = drop_linesegs_where_text_changed(
+                                original_text, text
+                            )
+                            stats["lineseg_dropped"] += dropped
 
                     if ensure_linesegs and _is_section_xml(info.filename):
                         text, injected = inject_dummy_linesegs(text)
@@ -325,6 +333,9 @@ def main(argv: list[str]) -> int:
         )
     except TemplateGateError as exc:
         print(f"[게이트 차단] {exc}", file=sys.stderr)
+        # 임시 출력(hwpx-replace-*.hwpx)을 미리 만들어 두므로 막혔을 때 0바이트로 남지 않게 지운다
+        if replace_out != target_path:
+            replace_out.unlink(missing_ok=True)
         return 2
     except Exception as exc:
         print(f"[ERR] replacement failed: {exc}", file=sys.stderr)
@@ -376,6 +387,7 @@ def main(argv: list[str]) -> int:
         f"parts={replace_stats['parts']} xml={replace_stats['xml_parts']} "
         f"changed_xml={replace_stats['changed_xml']} replacements={replace_stats['replacements']} "
         f"lineseg_injected={replace_stats['lineseg_injected']} "
+        f"lineseg_dropped={replace_stats['lineseg_dropped']} "
         f"decode_failed={replace_stats['decode_failed']}"
     )
     if ns_applied:
