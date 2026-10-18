@@ -138,6 +138,7 @@ section_xml = section_xml[:p_start] + pic_xml + "\n" + section_xml[p_start:]
 | 원인 | 해결 |
 |------|------|
 | **낡은/불일치 linesegarray** — 다른 문서(특히 용지 방향·폭이 다른 원본)에서 섹션·표를 이식하면 셀 내부 문단의 lineseg 캐시(textpos/vertpos/horzsize)가 실제 내용과 어긋나고, 한글이 해당 문단부터 조용히 파싱을 중단·폐기함 | 해당 섹션의 `<hp:linesegarray>` 전체 제거 → (polaris JID 11004 대응 필요 시) `zip_replace_all(..., ensure_linesegs=True)`로 더미 재주입. 더미 lineseg는 렌더링을 깨지 않음(2026-07-05 실측: 331개 주입 후 11페이지 완전 렌더링) |
+| **각주, 미주 안 문단의 낡은 linesegarray** — 메모를 각주로 옮기거나 각주 글을 줄이고 캐시를 두면, 캐시가 글보다 뒤를 가리켜 한글이 문서 전체를 열지 못한다(`Open()` False). 합본에서는 각주 하나 때문에 합본 전체가 열리지 않았고 `fix_namespaces` 의 줄 배치 재계산으로도 풀리지 않았다(2026-10-18 보고). 2026-10-19 실측: textpos 120 > 글 5 는 Open False, 폭만 다르거나(메모 폭으로 나눈 줄) 줄 수가 모자란 캐시는 열렸다 | 그 각주 문단(또는 그 각주를 담은 본문 문단)의 `<hp:linesegarray>` 를 지운다. `verify_hwpx.py` 가 표 칸과 같이 FAIL 로 잡는다(`tests/fixtures/stale_footnote_lineseg.hwpx`) |
 
 **진단법 (한글 재저장 프로브)**: COM으로 열어 HWPX로 재저장한 뒤 섹션별 `<hp:p>`/`<hp:tbl>` 수를 원본과 비교하면, 한글 파서가 어느 문단에서 내용을 버렸는지 정확히 드러난다. 렌더링 문제와 달리 파싱 단계 폐기는 이 방법으로만 확실히 잡힌다.
 

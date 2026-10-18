@@ -22,6 +22,9 @@ FIX = ROOT / "tests" / "fixtures"
 CASES = [
     ("stale_cell_lineseg.hwpx", "error"),
     ("stale_body_lineseg.hwpx", "warning"),
+    # 각주 안 문단 캐시가 글보다 뒤 → 한글 Open=False(2026-10-19), 폭만 다른 캐시는 열림
+    ("stale_footnote_lineseg.hwpx", "error"),
+    ("footnote_lineseg_width_only.hwpx", "pass"),
     ("long_table_hancom_saved.hwpx", "pass"),
 ]
 

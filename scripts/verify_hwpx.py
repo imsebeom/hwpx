@@ -429,13 +429,19 @@ def check_stale_lineseg(hwpx_path):
                             ctrls += 1
                 if max(pos) <= text + ctrls * _CTRL_SPAN:
                     continue
-                in_cell = any(a.tag == f"{hp}tc" for a in p.iterancestors())
+                # 각주, 미주 안 문단도 표 칸과 같다 — 글보다 뒤를 가리키는 캐시를 두면 한컴이 열지 못했다
+                # (2026-10-19 실측: 본문에 끼운 각주 안 문단 textpos 120 > 글 5 → Open=False. 폭만 다르거나
+                # 줄 수가 모자란 캐시는 열렸다). 종전에는 본문으로 분류돼 경고만 냈다
+                in_cell = any(
+                    a.tag in (f"{hp}tc", f"{hp}footNote", f"{hp}endNote")
+                    for a in p.iterancestors()
+                )
                 (cell_bad if in_cell else body_bad).append(
                     f"{name} 문단 id={p.get('id')}: textpos {max(pos)} > 글 {text}"
                 )
     if cell_bad:
         errors.append(
-            f"표 칸 문단 {len(cell_bad)}개의 줄 배치 캐시가 글보다 뒤를 가리킨다 — 한컴이 열지 못한다"
+            f"표 칸, 각주 문단 {len(cell_bad)}개의 줄 배치 캐시가 글보다 뒤를 가리킨다 — 한컴이 열지 못한다"
             f"(Open=False). 해당 섹션의 <hp:linesegarray>를 지울 것. 예: {cell_bad[0]}"
         )
     if body_bad:
