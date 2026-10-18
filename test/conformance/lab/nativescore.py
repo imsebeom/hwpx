@@ -208,6 +208,14 @@ def main():
                 miss = sum(a != b for a, b in zip(para_pages, han_bp))
                 if miss and os.environ.get("NATIVE_PP"):
                     print(f"문단 쪽 다름 {name} {miss}/{len(han_bp)}", file=sys.stderr)
+                    # NATIVE_PPI=1 이면 어긋난 문단 번호와 쪽(한/글, rhwp)도 찍는다
+                    if os.environ.get("NATIVE_PPI"):
+                        bad_pi = [
+                            (i, b + 1, a + 1)
+                            for i, (a, b) in enumerate(zip(para_pages, han_bp))
+                            if a != b
+                        ]
+                        print("   ", bad_pi[:6], file=sys.stderr)
             elif os.environ.get("NATIVE_QC") and hp is not None and han_bp:
                 # NATIVE_QC=1 이면 문단 쪽 셈에서 빠진 문서와 까닭(한/글 vertpos 쪽 수, 문단 수)을 찍는다
                 print(
