@@ -87,7 +87,14 @@
 
 ## 남은 것 (2026-10-18)
 
-- 좁은 칸에서 한/글이 문단 여백을 무시하는 경우(d034: 칸 2447, 여백 500+200, 한/글 horzpos 0)
+- 좁은 칸에서 한/글이 문단 여백, 들여쓰기를 무시하는 규칙을 찾았다(아직 엔진에 안 넣음). d322 사본에서 칸(줄 폭 5824) 문단의 내어쓰기를
+  0~5048 로 바꿔 한/글 재저장 줄 시작을 보니(`exp/make_hanging.py`, `HANG_VALUES`) 4350(남는 폭 1474)까지는 지키고 4400(1424)부터 무시해
+  들여쓰기 0 과 같은 줄이 된다. 경계 1456 = 줄 폭의 25%(글자 크기 2배 1600 가설은 틀림). 「여백, 들여쓰기를 뺀 가장 좁은 줄 폭 < 줄 폭의 25%」면
+  그 문단의 왼쪽, 오른쪽 여백과 들여쓰기를 모두 무시한다(d033, d159: 칸 2440 에 여백 1000+1000 → horzpos 0, d334: 1440 에 여백 200 + 내어쓰기
+  1200 → horzpos 0). `harvest_hanging.py <불일치.jsonl>`: 칸 내어쓰기 문단 가운데 남는 폭 비율 0.2 미만은 엔진이 모두 틀린다(d322 칸 1297,
+  1309 는 한두 글자마다 꺾여 칸이 매우 길어진다). 넣을 자리: 줄 나눔의 들여쓰기(`reflow_line_segs_impl`, `layout_paragraph_in_frame_impl`),
+  여백(문단 상자 `ParagraphBox::body_for_style` 와 칸 문단 여백 패치), 화면 배치(`paragraph_layout.rs` 의 margin_left, indent). 셋을 같이 바꿔야
+  줄 나눔과 그리기가 어긋나지 않는다
 - 한/글 줄 폭이 칸 폭보다 큰 경우(d010 칸 45: horzsize 44601 > 칸 45038 − 여백)
 - Word 호환 문서 줄 높이는 넣었다(위 표 d076, d133). 고정, 최소 줄 간격과 줄 안에서 크기가 다른 글 run 이 섞인 경우는 정답본에 없어
   실측하지 않았다. 문단 모양 `fontLineHeight="1"` 도 함초롬바탕에서 1.3
@@ -139,6 +146,7 @@
 - `harvest_tacstep.py`, `harvest_emptyruns.py`: 표만 든 문단의 한/글 전진량, 빈 문단의 줄 높이 기준 run
 - 엔진 임시 진단(넣고 빼기, `exp/instr_adv.py`, `exp/instr_ch.py`, `exp/instr_units.py`: `<백업 경로>` 로 넣고 `<백업 경로> restore` 로 되돌린다): 쪽 넘김 호출 스택(`advance_column_or_new_page` 에 Backtrace), 누적 높이 대입마다 출력, 칸 단위 높이(`advance_row_cut_inner` 의 units). 진단 출력 `RHWP_DIAG_SCAN`, `RHWP_DIAG_SPLITSCAN`, `RHWP_TABLE_DRIFT`, `RHWP_DIAG_TAC`, `RHWP_FLOW_DBG`
 - `exp/`: 한/글 실험 변형 생성기(오라클이나 회귀 사본을 고쳐 `in/` 에 둔다) → `REA/hwp2024/hwpx_lab/measure.py`(HWP5 는 `exp/measure_hwp.py`)를 `~/.claude/references/hidden_desktop.py` 로 돌려 PDF 를 얻는다. `exp/copy_reg.py`(회귀 코퍼스 사본과 줄 배치 지운 사본), `exp/svgpdf.mjs`(claude-linestarts `CLAUDE_SVG` 쪽 SVG 를 한/글 PDF 와 쪽 첫 글로 대조), `exp/pagecmp_hwp.mjs`(HWP5 판 pagecmp)
+- `showcell.py <id> <칸 번호>...`: 채점기 칸 번호의 칸 크기, 여백, 문단 글과 줄 기록. `harvest_narrowmargin.py`: 칸 문단 horzpos 로 여백 지킴, 무시 집계
 - `nativescore.py` 에 `NATIVE_PP=1`: 문단 쪽이 어긋난 문서와 개수를 찍는다
 - `segcmp.py <id>`: 첫 구역 본문 문단 줄마다 한/글 줄 기록(높이/간격)과 엔진 값을 맞댄다
 - `pagecmp.mjs <id>`: 쪽마다 첫 글자를 한/글 PDF(`../out/lab/hanpdf/rt/<id>.pdf`)와 rhwp SVG 로 맞대 처음 갈리는 쪽을 찾는다
