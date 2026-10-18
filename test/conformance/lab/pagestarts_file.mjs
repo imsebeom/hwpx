@@ -20,7 +20,7 @@ if (rest.includes('--strip')) {
 const buf = writeZip(entries);
 registerInto(m, docFontMetrics(buf, m).metrics);
 const doc = new m.HwpDocument(buf);
-const norm = (s) => s.replace(/\s+/g, '');
+const norm = (s) => s.replace(/\s+/g, '').replace(/-\d+-/g, ''); // 쪽 번호 「-N-」은 뺀다(한/글은 처음, rhwp 는 끝에 나온다)
 const dec = (s) => s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&');
 const rh = [];
 for (let p = 0; p < doc.pageCount(); p++) {
