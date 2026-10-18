@@ -73,7 +73,9 @@ def analyze(hwpx_path):
             pics = len(re.findall(r"<hp:pic ", sec))
             paras = len(re.findall(r"<hp:p ", sec))
             runs = len(re.findall(r"<hp:run ", sec))
-            print(f"문단: {paras}개, 런: {runs}개, 테이블: {tables}개, 이미지: {pics}개")
+            print(
+                f"문단: {paras}개, 런: {runs}개, 테이블: {tables}개, 이미지: {pics}개"
+            )
             print(f"section0.xml 크기: {len(sec):,} bytes")
 
     # 텍스트 추출
@@ -120,7 +122,9 @@ def auto_analyze(hwpx_path, output_json=None):
     has_tables = structure.get("tables", 0) > 0
     has_images = structure.get("images", 0) > 0
     if has_tables or has_images:
-        recommendation = "Workflow F (clone_form.py) — 테이블/이미지 포함, 양식 복제 필수"
+        recommendation = (
+            "Workflow F (clone_form.py) — 테이블/이미지 포함, 양식 복제 필수"
+        )
     else:
         recommendation = "Workflow C 또는 F 가능 — 단순 텍스트 문서"
 
@@ -144,9 +148,11 @@ def auto_analyze(hwpx_path, output_json=None):
         with open(output_json, "w", encoding="utf-8") as f:
             f.write(output)
         print(f"자동 분석 완료: {output_json}")
-        print(f"  구조: 테이블 {structure.get('tables', 0)}개, "
-              f"이미지 {structure.get('images', 0)}개, "
-              f"문단 {structure.get('paragraphs', 0)}개")
+        print(
+            f"  구조: 테이블 {structure.get('tables', 0)}개, "
+            f"이미지 {structure.get('images', 0)}개, "
+            f"문단 {structure.get('paragraphs', 0)}개"
+        )
         print(f"  텍스트 조각: {len(texts)}개")
         print(f"  추천: {recommendation}")
     else:
@@ -175,6 +181,7 @@ def _apply_keywords_in_xml(xml_text, sorted_keywords):
     분리하는 경우를 처리하기 위해 태그 경계에서 텍스트를 분할하여
     각 조각에 개별적으로 치환을 적용한다.
     """
+
     def replace_in_t(match):
         inner = match.group(1)
         # 인라인 XML 태그로 분할
@@ -192,8 +199,16 @@ def _apply_keywords_in_xml(xml_text, sorted_keywords):
     return re.sub(r"<hp:t>(.*?)</hp:t>", replace_in_t, xml_text, flags=re.DOTALL)
 
 
-def clone(src_path, dst_path, replacements=None, keywords=None,
-          title=None, creator=None, skip_gate=False, raw=False):
+def clone(
+    src_path,
+    dst_path,
+    replacements=None,
+    keywords=None,
+    title=None,
+    creator=None,
+    skip_gate=False,
+    raw=False,
+):
     """HWPX 양식을 복제하고 텍스트를 치환한다.
 
     치환 값이 전부 플레이스홀더면 템플릿 제작으로 보고 통과시키고, 실제 값이면
@@ -222,7 +237,9 @@ def clone(src_path, dst_path, replacements=None, keywords=None,
             for item in zin.infolist():
                 data = zin.read(item.filename)
 
-                if item.filename.startswith("Contents/") and item.filename.endswith(".xml"):
+                if item.filename.startswith("Contents/") and item.filename.endswith(
+                    ".xml"
+                ):
                     text = data.decode("utf-8")
 
                     # Phase 1: 구문 수준 치환 — 기본은 <hp:t> 안의 글자만. raw 는 XML 전체(속성값까지 바뀐다)
@@ -297,14 +314,14 @@ def validate_result(src_path, dst_path, replacements=None, keywords=None):
     replaced = total - len(remaining)
     coverage = (1 - len(remaining) / max(total, 1)) * 100
 
-    print(f"\n=== 치환 검증 ===")
+    print("\n=== 치환 검증 ===")
     print(f"원본 텍스트 조각: {total}개")
     print(f"치환 완료: {replaced}개")
     print(f"미치환 키워드: {len(remaining)}개")
     print(f"커버리지: {coverage:.1f}%")
 
     if remaining:
-        print(f"\n미치환 키워드:")
+        print("\n미치환 키워드:")
         for r in remaining[:20]:
             display = r[:60] + "..." if len(r) > 60 else r
             print(f"  - {display}")
@@ -342,17 +359,25 @@ def main():
     parser.add_argument("source", help="원본 HWPX 파일")
     parser.add_argument("output", nargs="?", help="출력 HWPX 파일")
     parser.add_argument("--analyze", action="store_true", help="양식 분석 모드")
-    parser.add_argument("--auto-analyze", metavar="JSON", help="자동 분석 + 치환 맵 템플릿 JSON 출력")
+    parser.add_argument(
+        "--auto-analyze", metavar="JSON", help="자동 분석 + 치환 맵 템플릿 JSON 출력"
+    )
     parser.add_argument("--map", help="구문 치환 JSON 파일 (Phase 1)")
     parser.add_argument("--keywords", help="키워드 치환 JSON 파일 (Phase 2)")
     parser.add_argument("--replace", nargs="*", help="CLI 치환 쌍 (old=new)")
     parser.add_argument("--title", help="문서 제목 메타데이터")
     parser.add_argument("--creator", help="작성자 메타데이터")
     parser.add_argument("--validate", action="store_true", help="치환 후 검증 실행")
-    parser.add_argument("--raw", action="store_true",
-                        help="Phase 1 치환을 <hp:t> 밖(속성값 포함)까지 적용. 태그 밖 플레이스홀더에만 쓴다")
-    parser.add_argument("--skip-template-gate", action="store_true",
-                        help="플레이스홀더 템플릿 게이트 생략 (원본에 값 직접 치환)")
+    parser.add_argument(
+        "--raw",
+        action="store_true",
+        help="Phase 1 치환을 <hp:t> 밖(속성값 포함)까지 적용. 태그 밖 플레이스홀더에만 쓴다",
+    )
+    parser.add_argument(
+        "--skip-template-gate",
+        action="store_true",
+        help="플레이스홀더 템플릿 게이트 생략 (원본에 값 직접 치환)",
+    )
 
     args = parser.parse_args()
 
@@ -402,10 +427,20 @@ def main():
         if args.raw:
             risky = risky_replacement_keys(replacements)
             if risky:
-                print(f"[WARN] --raw 에 짧거나 숫자뿐인 키 {risky} — 속성값까지 바뀔 수 있다", file=sys.stderr)
-        clone(args.source, args.output, replacements, keywords,
-              title=args.title, creator=args.creator,
-              skip_gate=args.skip_template_gate, raw=args.raw)
+                print(
+                    f"[WARN] --raw 에 짧거나 숫자뿐인 키 {risky} — 속성값까지 바뀔 수 있다",
+                    file=sys.stderr,
+                )
+        clone(
+            args.source,
+            args.output,
+            replacements,
+            keywords,
+            title=args.title,
+            creator=args.creator,
+            skip_gate=args.skip_template_gate,
+            raw=args.raw,
+        )
     except TemplateGateError as e:
         print(f"[게이트 차단] {e}", file=sys.stderr)
         sys.exit(2)
