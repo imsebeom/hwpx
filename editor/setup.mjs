@@ -834,7 +834,9 @@ for (const [id, rel] of [['wrap-text-labels', 'ui/picture-props-dialog.ts'], ['w
   // 각주 편집 중 고른 범위 위 타자와 조합 시작이 각주 범위를 지운다(Ctrl+A, 위아래 방향키, Backspace 범위는 footnote-clipboard)
   ['footnote-edit-handler', 'engine/input-handler.ts'], ['footnote-edit-text', 'engine/input-handler-text.ts'],
   // 표 칸 안 각주도 각주 영역을 눌러 편집한다(엔진 fn-cell-target-* 와 짝). 편집 중 다른 각주를 누르면 그 각주로 옮겨 탄다
-  ['fn-cell-target-bridge', 'core/wasm-bridge.ts'], ['fn-cell-target-mouse', 'engine/input-handler-mouse.ts']]) {
+  ['fn-cell-target-bridge', 'core/wasm-bridge.ts'], ['fn-cell-target-mouse', 'engine/input-handler-mouse.ts'],
+  // 각주 첫 문단의 커서가 번호 앞(0, 1)으로 가지 않게 한다(Home, 왼쪽 키, 누르기, Ctrl+A, Backspace)
+  ['fn-number-floor-cursor', 'engine/cursor.ts'], ['fn-number-floor-keyboard', 'engine/input-handler-keyboard.ts']]) {
   const f = path.join(STUDIO, 'src', ...rel.split('/'));
   let src = fs.readFileSync(f, 'utf8');
   if (src.includes(`[claude-hwpx ${id}]`)) continue;
