@@ -398,6 +398,8 @@ class HwpxFormFiller:
                     if placeholder in t_elem.text:
                         t_elem.text = t_elem.text.replace(placeholder, content)
                         filled += 1
+                        # 바뀐 글을 담은 문단과 그 문단을 담은 표들의 문단(본문 자리표시자 포함)
+                        self._drop_host_linesegs(t_elem)
 
                         # 해당 셀의 linesegarray 제거를 위해 상위 tc 찾기
                         parent = t_elem.getparent()
@@ -530,6 +532,7 @@ class HwpxFormFiller:
                 lines = [line for line in content.split("\n") if line.strip()]
                 if self._set_cell_multi_paragraph(cell, lines):
                     filled += 1
+                    self._drop_host_linesegs(cell)
                     continue
                 # fallback: 멀티 문단 실패 시 단일 텍스트로 처리
 
@@ -578,6 +581,8 @@ class HwpxFormFiller:
             # 부모를 통해 지운다 — 위 fill_table_cells와 같은 이유 (2026-09-16)
             for lsa in cell.findall(".//{*}linesegarray"):
                 lsa.getparent().remove(lsa)
+            # 칸 높이가 바뀌면 표를 담은 문단의 줄 높이도 낡는다(save 의 일괄 삭제가 없어진 뒤 필요)
+            self._drop_host_linesegs(cell)
 
         return filled
 
@@ -664,6 +669,9 @@ class HwpxFormFiller:
         parent = source_row.getparent()
         idx = list(parent).index(source_row)
         parent.insert(idx + 1, new_row)
+        # 새 행 글과 표 높이가 바뀌었으니 새 행과 표를 담은 문단의 줄 배치를 지운다(save 는 이제 일괄로 지우지 않는다)
+        self._drop_linesegs(new_row)
+        self._drop_host_linesegs(table)
 
         # 7. 테이블의 rowCnt 속성 업데이트
         current_row_cnt = int(table.get("rowCnt", len(rows)))
@@ -763,6 +771,9 @@ class HwpxFormFiller:
         parent = rows[source_row].getparent()
         idx = list(parent).index(rows[source_row])
         parent.insert(idx + 1, new_row)
+        # 새 행 글과 표 높이가 바뀌었으니 새 행과 표를 담은 문단의 줄 배치를 지운다(save 는 이제 일괄로 지우지 않는다)
+        self._drop_linesegs(new_row)
+        self._drop_host_linesegs(table)
 
         # 7. 테이블의 rowCnt 속성 업데이트
         current_row_cnt = int(table.get("rowCnt", len(rows)))
@@ -788,16 +799,28 @@ class HwpxFormFiller:
     # 저장 및 정리
     # =========================================================================
 
+    @staticmethod
+    def _drop_linesegs(elem):
+        """elem 아래 줄 배치 캐시를 모두 지운다. 부모를 통해 지운다(손자 linesegarray 도 있다)"""
+        for lsa in elem.findall(".//{*}linesegarray"):
+            lsa.getparent().remove(lsa)
+
+    @staticmethod
+    def _drop_host_linesegs(elem):
+        """elem 을 담은 표마다 그 표를 담은 문단의 줄 배치를 지운다(칸 글이 바뀌면 표 높이와 그 줄 높이가 낡는다).
+        표 밖 본문 문단이면 그 문단 자신의 줄 배치를 지운다"""
+        node = elem
+        while node is not None:
+            if node.tag.endswith("}p"):
+                for lsa in node.findall("{*}linesegarray"):
+                    node.remove(lsa)
+            node = node.getparent()
+
     def save(self, output_path: str) -> str:
         """수정된 HWPX 파일 저장"""
-        # linesegarray 제거 (텍스트 수정 후 레이아웃 캐시 무효화 → 한글이 자동 재계산)
-        # 단, 빈 lineSegArray 가 polaris-dvc JID 11004 를 트리거하므로 더미를 다시 박는다
-        for lsa in list(
-            self.section_tree.iter(
-                "{http://www.hancom.co.kr/hwpml/2011/paragraph}linesegarray"
-            )
-        ):
-            lsa.getparent().remove(lsa)
+        # 줄 배치 캐시는 바꾼 칸과 문단에서만 지운다(채우기, 행 추가 함수가 지운다). 종전에는 여기서 문서
+        # 전체를 지워, 칸 12개만 채워도 손대지 않은 동의서 글이 양쪽으로 벌어지고 3쪽이 4쪽이 됐다(2026-10-18 보고).
+        # 빈 lineSegArray 가 polaris-dvc JID 11004 를 트리거하므로 캐시가 없는 문단에만 더미를 박는다
         from hwpx_helpers import ensure_dummy_linesegs_etree
 
         ensure_dummy_linesegs_etree(self.section_tree)
