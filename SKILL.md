@@ -1288,6 +1288,8 @@ xml = build_section_xml(data)
 
 > **순수 Python(jkf87)보다 무조건 1차 경로를 쓴다.** LibreOffice `--convert-to` 는 hwpx 출력을 지원하지 않는다.
 
+> ⚠ **rhwp 변환은 한글 메모의 본문을 버린다**(2026-10-19 실측, 메모 11개가 자리만 남고 글이 빔). 메모가 든 hwp 를 메모까지 살려야 하면 한글 COM `SaveAs(<out>, "HWPX")` 를 `~/.claude/references/hidden_desktop.py` 로 감싸 쓴다. 변환 뒤 `type="MEMO"` 필드 안 `<hp:t>` 가 비었는지 확인한다.
+
 > **⚠️ 확장자 위장 함정 (2026-07-06 실측)**: `.hwp` 확장자여도 **내용이 이미 HWPX(ZIP)** 인 파일이 섞여 있을 수 있다(GUI 저장·이관 과정에서 발생). 이것을 **바이너리 HWP라고 못박아 열면 열기 실패 → 빈 문서 → 표 통째 소실**된다(한컴 COM 시절 실측). 반드시 **파일 시그니처로 실제 포맷을 먼저 판별**하라: 선두 4바이트가 `50 4B 03 04`(=`PK`, ZIP)이면 이미 hwpx이므로 **복사만** 하고, `D0 CF 11 E0`(OLE)이면 변환한다. `hwp_to_hwpx_hancom.py` 는 이 판별을 내장했다.
 
 ### 1차: `hwp_to_hwpx_hancom.py` (rhwp CLI)
