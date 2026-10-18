@@ -651,6 +651,10 @@ const RUST_PATCHES = [
     ['page-base-sb-layout', 'src/renderer/layout.rs'],
     ['para-tbl-omtop-table-layout', 'src/renderer/layout/table_layout.rs'],
     ['keep-stored-base-layout', 'src/renderer/layout.rs'],
+    // 쪽에 걸친 문단 기준 표의 바깥 위 여백(HWPX 저장본, 오프셋 0 첫 조각 포함, d072), 쪽 머리 글자처럼 취급 표의 위 간격(d218, page-base-sb 뒤)
+    ['partial-omtop-hwpx-table-partial', 'src/renderer/layout/table_partial.rs'],
+    ['tac-top-sb-layout', 'src/renderer/layout.rs'],
+    ['test-1949-omtop-tests', 'src/wasm_api/tests.rs'],
     // 엔진이 만든 줄의 첫 vpos 0 은 저장 쪽 경계로 읽지 않는다(format_text 뒤 문단이 다음 쪽으로 넘어가던 문제)
     ['synth-no-reset-typeset', 'src/renderer/typeset.rs'],
     // 표 속성(캡션 등)을 바꾸면 표 높이를 다시 잰다(캡션 높이가 빠지던 문제)
