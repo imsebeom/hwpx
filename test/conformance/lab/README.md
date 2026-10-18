@@ -74,14 +74,16 @@
 | 빌더 차트 | `c:title` 이 없어도 `autoTitleDeleted=0` 이고 이름 있는 계열이 하나면 그 이름을 제목으로 그린다(한/글 PDF). 여러 계열은 실측 없음 | `chart-auto-title-*` |
 | 정답본, d078 | 쪽 나눔(pageBreak=1) 문단 바로 앞 빈 문단이 현재 쪽에 안 들어가면 한/글 2024 는 다음 쪽 첫머리로 넘긴다(그래서 빈 쪽이 생긴다). 그런 빈 문단 11개 중 9개, 흡수 1개(`harvest_emptybreak.py`). 엔진의 흡수 분기(Task #967, HWP5 표본)는 HWP5 출처에만 | `empty-before-break-*` |
 | e36, e37 | 1단 구역의 단 나누기(columnBreak=1) 문단은 글이든 빈 문단이든 새 쪽을 연다(다음이 쪽 나눔이면 빈 쪽). 단 여러 쪽에 걸쳐 나뉜 표 바로 다음 문단이면 무시한다(d058 사본 변형 셋: 원본 무시, 표를 한 쪽으로 줄이면 지킴, 사이에 글 문단을 넣으면 지킴). e37 변형은 `apply_ops.mjs` 로 만들었다(표 T6 행 3~30 지우기, p11 뒤 글 문단 넣기) | `colbreak-after-split-table-*` |
-| d076, d133 | (남은 일) Word 호환 문서(`compatibleDocument targetProgram="MS_WORD"`, `adjustLineheightToFont`)는 줄 높이 = 글자 크기 x 글꼴 hhea 줄 높이 x 1.3(맑은 고딕 1.729, Pretendard 1.551), 줄 간격 = (비율 - 100)% x 그 줄 높이, 기준선 = ascent + (줄 높이 - hhea)/2. 엔진은 글자 크기를 줄 높이로 써서 쪽이 모자란다(d076 8 대 5). 정답본 2개뿐이라 아직 넣지 않음(`harvest_wordcompat.py`) | — |
+| d076, d133 | Word 호환 문서(`compatibleDocument targetProgram="MS_WORD"` 에 `adjustLineheightToFont`)의 비율 간격 줄: 줄 높이 = 크기 x 글꼴 hhea (ascender + descender + lineGap)/em x 1.3(맑은 고딕 1.729, Pretendard 1.551), 기준선 = ascender x 크기 + (줄 높이 - hhea 높이)/2, 간격은 그 줄 높이에 기존 4 단위 식(`harvest_wordcompat.py`). 문단 끝 빈 run 이 글보다 크면 줄 높이 = 빈 run 줄 높이 + 글 아랫부분, 기준선과 간격 기준은 빈 run 의 것(d133 한 줄 문단 126줄, `harvest_wordmix.py`). 세로 수치는 `font-metrics.mjs` 가 글꼴 파일에서 읽어 `vm` 으로 넘긴다. 두 문서 본문 줄 217개 모두 일치(`segcmp.py`), 쪽수 94.5 → 95.1% | `word-compat-lineheight-*` |
 
 ## 남은 것 (2026-10-18)
 
 - 좁은 칸에서 한/글이 문단 여백을 무시하는 경우(d034: 칸 2447, 여백 500+200, 한/글 horzpos 0)
 - 한/글 줄 폭이 칸 폭보다 큰 경우(d010 칸 45: horzsize 44601 > 칸 45038 − 여백)
-- Word 호환 문서(`compatibleDocument targetProgram="MS_WORD"`, `adjustLineheightToFont`)는 줄 높이가 글꼴 세로 지표 × 1.3 이다
-  (Pretendard 1.1934 → 1.551, 맑은 고딕 1.3301 → 1.73). 정답본 2개(d076, d133)뿐이라 미뤘다. 문단 모양 `fontLineHeight="1"` 도 함초롬바탕에서 1.3
+- Word 호환 문서 줄 높이는 넣었다(위 표 d076, d133). 고정, 최소 줄 간격과 줄 안에서 크기가 다른 글 run 이 섞인 경우는 정답본에 없어
+  실측하지 않았다. 문단 모양 `fontLineHeight="1"` 도 함초롬바탕에서 1.3
+- d193 p0(첫 run 에 구역 정의만 있고 그 크기가 1000, 뒤 run 은 글자처럼 취급 표 1500): 한/글 줄 간격 900(뒤 run 크기 기준), 엔진 600.
+  정답본 전체(`harvest_secprrun.py`)로는 뒤 run 기준 19, 앞 run 기준 7, 둘 다 아님 21 로 갈려 넣지 않았다
 - `!` 뒤에 한/글이 PDF 에 찍는 빈칸은 글자 위치 비교(advances, pdfadv)에서 빈칸으로 잡힌다
 - 쪽수 지표 93.6%, 문단 쪽 96.4%(네이티브 6726/6976, wasm 96.4%), 불일치 줄 327. 남은 쪽수 불일치 21개 문서.
 - d302/d314 본문 p100, p229(글머리표 문단, condense=20): 한/글 첫 줄 글 폭 46,356 이 줄 폭 46,988 에서 글머리표 자리 1,650 을 빼면
@@ -125,4 +127,7 @@
 - `harvest_overflow.py`, `harvest_cellmargin.py`: 칸 내용 대 행 높이 집계. ⚠ cellSz 를 행 높이로 쓰므로 판정은 참고만
 - `harvest_tblsplit.py [--list]`: 쪽을 넘는 표가 한/글에서 행 경계로 나뉘었는지(첫 조각 높이 = 행 높이 누적합) pageBreak 별로 센다
 - `harvest_tblnext.py`: 표만 담은 문단에서 한/글이 문단 아래 간격을 더하는지 정답본으로 센다
+- `segcmp.py <id>`: 첫 구역 본문 문단 줄마다 한/글 줄 기록(높이/간격)과 엔진 값을 맞댄다
+- `pagecmp.mjs <id>`: 쪽마다 첫 글자를 한/글 PDF(`../out/lab/hanpdf/rt/<id>.pdf`)와 rhwp SVG 로 맞대 처음 갈리는 쪽을 찾는다
+- `linecmp.mjs <id> <쪽>`: 한 쪽의 글줄 세로 위치를 한/글 PDF 와 rhwp 로 나란히 찍고 차이가 바뀌는 줄을 표시한다
 - `claude-linestarts` 환경 변수: `CLAUDE_SEGV`(엔진이 가진 본문 문단 줄 배치 vpos), `CLAUDE_VY`(문단 y), `CLAUDE_XP=<문단|all>`(글자 x), `CLAUDE_ITEMS`(쪽 항목), `CLAUDE_SVG=<폴더>`(쪽 SVG), `CLAUDE_METRICS_DIR`(문서별 폭 표, `dump_metrics.mjs` 로 만든다)
