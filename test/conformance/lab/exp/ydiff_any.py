@@ -40,7 +40,7 @@ def keyed(pairs):
 
 
 total = bad_total = 0
-for f in sorted(src.glob("*.hwpx")):
+for f in sorted(list(src.glob("*.hwpx")) + list(src.glob("*.hwp"))):
     pdf = pdfs / (f.stem + ".pdf")
     if not pdf.exists():
         continue
