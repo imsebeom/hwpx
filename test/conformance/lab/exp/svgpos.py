@@ -12,7 +12,9 @@ _TR = re.compile(r'transform="translate\(([-\d.]+),\s*([-\d.]+)\)')
 
 
 def text_xy(attrs):
-    """속성 문자열 → (x, y) px 또는 None"""
+    """속성 문자열 → (x, y) px 또는 None. 고르기용 투명 글(fill-opacity="0", 「·」 등 그림으로 그린 글자 위에 겹침)은 None"""
+    if 'fill-opacity="0"' in attrs:
+        return None
     m = _TR.search(attrs)
     if m:
         return float(m.group(1)), float(m.group(2))
