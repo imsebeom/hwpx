@@ -1,4 +1,7 @@
-"""한글 COM 으로 hwpx 사본을 PDF 로 저장하고 쪽 수를 찍는다. python hwp2pdf.py <hwpx> <pdf>"""
+"""한글 COM 으로 hwpx 사본을 PDF 로 저장하고 쪽 수를 찍는다. python hwp2pdf.py <hwpx> <pdf>
+
+⚠ 줄 배치(linesegarray)를 지운 사본은 「pages 1」만 찍고 PDF 를 남기지 않는다(2026-10-20) — 그런 사본은 REA/hwp2024/hwpx_lab/measure.py 로 잰다.
+"""
 
 import sys
 
