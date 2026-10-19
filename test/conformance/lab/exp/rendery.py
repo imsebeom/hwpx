@@ -18,6 +18,7 @@ from collections import Counter
 from pathlib import Path
 
 import fitz
+from svgpos import text_xy
 
 sys.stdout.reconfigure(encoding="utf-8")
 HERE = Path(__file__).resolve().parent.parent
@@ -73,12 +74,9 @@ def one(name):
         s = sv.read_text(encoding="utf-8")
         ech = []
         for m in re.finditer(r"<text\b([^>]*)>([^<]*)</text>", s):
-            ym = re.search(r'\by="([-\d.]+)"', m.group(1))
-            xm = re.search(r'\bx="([-\d.]+)"', m.group(1))
-            if ym and xm:
-                ech.append(
-                    (float(xm.group(1)) * 0.75, float(ym.group(1)) * 0.75, m.group(2))
-                )
+            xy = text_xy(m.group(1))
+            if xy:
+                ech.append((xy[0] * 0.75, xy[1] * 0.75, m.group(2)))
         hch = [
             (c["origin"][0], c["origin"][1], c["c"])
             for b in pg.get_text("rawdict")["blocks"]

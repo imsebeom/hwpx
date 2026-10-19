@@ -17,6 +17,7 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 import fitz
+from svgpos import text_xy
 
 sys.stdout.reconfigure(encoding="utf-8")
 HERE = Path(__file__).resolve().parent.parent
@@ -68,23 +69,22 @@ def one(name):
     if len(svgs) != len(doc):
         return name, None
     acc = defaultdict(list)
+    absd = defaultdict(list)
     for sv, pg in zip(svgs, doc):
         s = sv.read_text(encoding="utf-8")
         ech = []
         for m in re.finditer(r"<text\b([^>]*)>([^<]*)</text>", s):
             a = m.group(1)
-            xm, ym = re.search(r'\bx="([-\d.]+)"', a), re.search(r'\by="([-\d.]+)"', a)
+            xy = text_xy(a)
             fm = re.search(r'font-family="&apos;([^&]+)&apos;', a)
             sm = re.search(r'font-size="([\d.]+)"', a)
             t = dec(m.group(2))
-            if xm and ym and len(t) == 1:
+            if xy and len(t) == 1:
                 meta = (
                     fm.group(1) if fm else "?",
                     round(float(sm.group(1)) * 0.75, 1) if sm else 0,
                 )
-                ech.append(
-                    (float(xm.group(1)) * 0.75, float(ym.group(1)) * 0.75, t, meta)
-                )
+                ech.append((xy[0] * 0.75, xy[1] * 0.75, t, meta))
         hch = [
             (c["origin"][0], c["origin"][1], c["c"], None)
             for b in pg.get_text("rawdict")["blocks"]
@@ -107,8 +107,10 @@ def one(name):
                 font, size = e[j][2]
                 if gap_spaces == 0:
                     acc[(font, size, e[j][1])].append(de - dh)
+                    absd[(font, size, e[j][1])].append((de, dh))
                 elif gap_spaces == 1:
                     acc[(font, size, "␣after")].append(de - dh)
+    acc["__abs__"] = absd
     return name, acc
 
 
@@ -116,6 +118,7 @@ files = sorted(p.stem for p in (OUT / "left" / "in").glob("*.hwpx"))
 if ids:
     files = [f for f in files if f in ids]
 total = defaultdict(list)
+absall = defaultdict(list)
 docs = Counter()
 with cf.ThreadPoolExecutor(8) as ex:
     for name, acc in ex.map(one, files):
@@ -123,6 +126,8 @@ with cf.ThreadPoolExecutor(8) as ex:
             docs["건너뜀"] += 1
             continue
         docs["문서"] += 1
+        for k, v in acc.pop("__abs__").items():
+            absall[k].extend(v)
         for k, v in acc.items():
             total[k].extend(v)
 print(dict(docs), "쌍", sum(len(v) for v in total.values()))
@@ -133,4 +138,10 @@ for k, v in total.items():
         if abs(m) > 0.05:
             bad.append((abs(m) * len(v), k, round(m, 3), len(v)))
 for score, k, m, n in sorted(bad, reverse=True)[:top]:
-    print(f"{k[0]:12s} {k[1]:5.1f}pt {k[2]!r:10s} 평균 {m:+.3f}pt  {n}쌍")
+    a = absall.get(k)
+    ab = (
+        f"  엔진 {sum(x for x, _ in a) / len(a):.3f} 한/글 {sum(y for _, y in a) / len(a):.3f}"
+        if a
+        else ""
+    )
+    print(f"{k[0]:12s} {k[1]:5.1f}pt {k[2]!r:10s} 평균 {m:+.3f}pt  {n}쌍{ab}")
