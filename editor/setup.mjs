@@ -606,8 +606,10 @@ const RUST_PATCHES = [
     // 찾아 바꾸기가 각주, 미주 안 글도 찾고 바꾼다(스튜디오 footnote-search-* 와 짝)
     ['footnote-search-search-query', 'src/document_core/queries/search_query.rs'],
     ['footnote-search-wasm-api', 'src/wasm_api.rs'],
-    // 선택 음영이 각주, 미주 번호 뒤에서 그 수만큼 앞으로 밀리던 문제(사용자 보고 2026-10-19, 4장 칸 안 끌어 고르기)
-    ['sel-footnote-slot-cursor-nav', 'src/document_core/queries/cursor_nav.rs'],
+    // 선택 음영과 줄 시작에서 각주, 미주를 캐럿 칸으로 세지 않는다(사용자 보고 2026-10-19: 4장 칸 안 끌어 고르기 밀림,
+    // 3장 본문 각주 뒤 조각이 줄 처음부터 그려짐. 종전 sel-footnote-slot 대체)
+    ['sel-note-text-axis-helpers', 'src/document_core/helpers.rs'],
+    ['sel-note-text-axis-cursor-nav', 'src/document_core/queries/cursor_nav.rs'],
     // 붙여넣기와 범위 지우기 뒤 각주, 미주 번호를 문서 순서대로 다시 매긴다(잘라 붙인 각주가 옛 번호를 가져가던 문제, 사용자 보고 2026-10-19)
     ['note-renumber-footnote-ops', 'src/document_core/commands/footnote_ops.rs'],
     ['note-renumber-clipboard', 'src/document_core/commands/clipboard.rs'],
@@ -687,6 +689,7 @@ const RUST_PATCHES = [
     ['host-title-offset-layout', 'src/renderer/layout.rs'],
     ['min-line-margin-style-resolver', 'src/renderer/style_resolver.rs'],
     ['synth-single-row-keep-composer', 'src/renderer/composer.rs'],
+    ['unbounded-float-paint-table-layout', 'src/renderer/layout/table_layout.rs'],
     // 엔진이 만든 줄의 첫 vpos 0 은 저장 쪽 경계로 읽지 않는다(format_text 뒤 문단이 다음 쪽으로 넘어가던 문제)
     ['synth-no-reset-typeset', 'src/renderer/typeset.rs'],
     // 표 속성(캡션 등)을 바꾸면 표 높이를 다시 잰다(캡션 높이가 빠지던 문제)
