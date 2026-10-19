@@ -7,8 +7,9 @@
 p78 을 34쪽에 두어 쪽이 하나 늘었다.
 - 미루기: 블록 표를 놓기 전, 같은 문단에서 앞서 놓인 표가 있고(order_pos > 0) 공동 앵커 표이며 표 높이가 남은 자리보다 크고 새 쪽에는 들어가면
   deferred_table_controls 에 넣고 건너뛴다.
-- 꺼내기: 문단을 처리하기 전, 미룬 표가 있고 쪽이 비었거나 이 문단이 쪽 나누기면(먼저 쪽을 넘긴 뒤) 미룬 표를 새 쪽 맨 위에 놓는다.
-  (글이 넘쳐 새 쪽이 생기는 경우는 그 문단이 먼저 놓여 한/글과 순서가 다르다 — 실험의 12~40 꼴. 다음 할 일)
+- 꺼내기: 문단을 처리하기 전, 미룬 표가 있고 쪽이 비었거나 이 문단이 쪽 나누기거나 첫 줄(위 간격 포함)이 남은 자리에 안 들어가면
+  (먼저 쪽을 넘긴 뒤) 미룬 표를 새 쪽 맨 위에 놓는다. 실험 순서(32쪽 글, 33쪽 체육과 표, 34쪽 글)가 한/글과 같아졌다.
+  남은 차이: 첫 표 뒤 빈 호스트 줄을 엔진이 높이에 넣지 않아 32쪽에 글이 한 줄 더 들어간다(엔진 12줄, 한/글 11줄).
 """
 
 import sys
@@ -29,7 +30,20 @@ EDITS = [
         "                    para.column_type,\n"
         "                    ColumnBreakType::Page | ColumnBreakType::Section\n"
         "                );\n"
-        "                if claude_forced_break && !st.current_items.is_empty() {\n"
+        "                // 첫 줄(위 간격 포함)이 남은 자리에 안 들어가도 새 쪽을 열고 미룬 표부터 놓는다(사본 실험: 글 12 보다 체육과 표가 먼저)\n"
+        "                let claude_first_need = para\n"
+        "                    .line_segs\n"
+        "                    .first()\n"
+        "                    .map(|s| hwpunit_to_px(s.line_height, self.dpi))\n"
+        "                    .unwrap_or(0.0)\n"
+        "                    + styles\n"
+        "                        .para_styles\n"
+        "                        .get(para.para_shape_id as usize)\n"
+        "                        .map(|ps| ps.spacing_before.max(0.0))\n"
+        "                        .unwrap_or(0.0);\n"
+        "                let claude_first_overflows =\n"
+        "                    st.current_height + claude_first_need > st.available_height() + 0.01;\n"
+        "                if (claude_forced_break || claude_first_overflows) && !st.current_items.is_empty() {\n"
         "                    st.advance_column_or_new_page();\n"
         "                }\n"
         "                if st.current_items.is_empty() {\n"
