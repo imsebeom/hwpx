@@ -7,7 +7,20 @@
                     para.column_type,
                     ColumnBreakType::Page | ColumnBreakType::Section
                 );
-                if claude_forced_break && !st.current_items.is_empty() {
+                // 첫 줄(위 간격 포함)이 남은 자리에 안 들어가도 새 쪽을 열고 미룬 표부터 놓는다(사본 실험: 글 12 보다 체육과 표가 먼저)
+                let claude_first_need = para
+                    .line_segs
+                    .first()
+                    .map(|s| hwpunit_to_px(s.line_height, self.dpi))
+                    .unwrap_or(0.0)
+                    + styles
+                        .para_styles
+                        .get(para.para_shape_id as usize)
+                        .map(|ps| ps.spacing_before.max(0.0))
+                        .unwrap_or(0.0);
+                let claude_first_overflows =
+                    st.current_height + claude_first_need > st.available_height() + 0.01;
+                if (claude_forced_break || claude_first_overflows) && !st.current_items.is_empty() {
                     st.advance_column_or_new_page();
                 }
                 if st.current_items.is_empty() {
