@@ -110,5 +110,11 @@ with cf.ThreadPoolExecutor(8) as ex:
             worst.append((len(bad), name, bad[:show] if show else bad[:1]))
 print(dict(tot))
 print("차 분포(pt, 반올림):", sorted(hist.items(), key=lambda kv: -kv[1])[:15])
+if "--json" in args:
+    # 문서마다 2pt 넘게 다른 줄 수 — 엔진 수정 전후를 문서별로 견줄 때
+    import json
+
+    with open(args[args.index("--json") + 1], "w", encoding="utf-8") as fp:
+        json.dump({name: n for n, name, _ in worst}, fp, ensure_ascii=False)
 for n, name, ex_ in sorted(worst, reverse=True)[:25]:
     print(f"{name} {n}줄", ex_)
