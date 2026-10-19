@@ -167,7 +167,7 @@ autoSpaceKrNum verticalAlign englishBreakUnit koreanBreakUnit borderConnect bord
 | 문단이 쪽에서 안 쪼개지게 | `keepLines`, `widowOrphan` | `applyParaFormat` 같은 이름 키 | 미실측 |
 | 표 제목 행을 쪽마다 반복 | `tbl@repeatHeader` (표 194) | `setTableProperties(s, 표문단, 컨트롤, {"repeatHeader": true})` | 한컴 통과 |
 | 표를 행 경계에서만 나누기 | `tbl@pageBreak` | 같은 함수 `{"pageBreak": 2}` — 값 체계가 표준과 다르다: **0 나누지 않음, 1 셀 단위, 2 행 경계** | 속성 적용 확인 |
-| 그림 표가 쪽 아래로 넘쳐 각주와 겹침(나누지 않음 + 쪽 영역 제한 꺼짐) | `pos@treatAsChar` | 같은 함수 `{"treatAsChar": true}` — 통째로 다음 쪽으로, 글 순서 유지 | 한컴 통과(2026-10-19 가이드북 3장 그림 3-2). ⚠ `{"restrictInPage": true}`(쪽 영역 안으로 제한)만 켜면 한/글은 그림만 다음 쪽으로 보내고 뒤 글을 앞 쪽에 먼저 흘려 순서가 뒤바뀌고 에디터와도 다르다 |
+| 그림 표가 쪽 아래로 넘쳐 각주와 겹침(나누지 않음 + 쪽 영역 제한 꺼짐) | `pos@treatAsChar` | 같은 함수 `{"treatAsChar": true}` — 통째로 다음 쪽으로, 글 순서 유지 | 한컴 통과(2026-10-19 가이드북 3장 그림 3-2). ⚠ `{"restrictInPage": true}`(쪽 영역 안으로 제한)만 켜면 한/글은 그림만 다음 쪽 맨 위로 보내고 뒤 글을 앞 쪽에 먼저 흘려 글 순서가 그림과 뒤바뀐다(에디터도 2026-10-20 부터 같게 그린다) |
 | 표 캡션과 번호 | `caption` + `autoNum` (§10.9.2.5) | 같은 함수 `{"hasCaption": true, "captionDirection": 2}` (0 왼쪽, 1 오른쪽, 2 위, 3 아래) → "표 N" 자동 번호 | 한컴 통과. 캡션 제목 글자 넣기는 미실측 |
 | 책갈피 | `bookmark` | `addBookmark(s, p, offset, 이름)`, `getBookmarks()` | 적용 확인 |
 | 수식 | 부속서 I | `insertEquation(s, p, offset, "a over b", 1000, 0)` (글자 크기 HWPUNIT, 색 0) | 한컴 통과 |
