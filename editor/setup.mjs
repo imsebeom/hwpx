@@ -610,6 +610,10 @@ const RUST_PATCHES = [
     // 3장 본문 각주 뒤 조각이 줄 처음부터 그려짐. 종전 sel-footnote-slot 대체)
     ['sel-note-text-axis-helpers', 'src/document_core/helpers.rs'],
     ['sel-note-text-axis-cursor-nav', 'src/document_core/queries/cursor_nav.rs'],
+    // 본문 캐럿 그리기의 각주 표지 자리도 같은 축으로(표지 바로 뒤 캐럿이 「,」 앞에 그려지던 문제), 선택은 표지 앞 자리에서 표지부터 칠함
+    ['note-caret-axis-helpers', 'src/document_core/helpers.rs'],
+    ['note-caret-axis-cursor-rect', 'src/document_core/queries/cursor_rect.rs'],
+    ['note-caret-axis-cursor-nav', 'src/document_core/queries/cursor_nav.rs'],
     // 붙여넣기와 범위 지우기 뒤 각주, 미주 번호를 문서 순서대로 다시 매긴다(잘라 붙인 각주가 옛 번호를 가져가던 문제, 사용자 보고 2026-10-19)
     ['note-renumber-footnote-ops', 'src/document_core/commands/footnote_ops.rs'],
     ['note-renumber-clipboard', 'src/document_core/commands/clipboard.rs'],
@@ -696,6 +700,9 @@ const RUST_PATCHES = [
     ['table-props-dirty-table-ops', 'src/document_core/commands/table_ops.rs'],
     // 문단 수가 바뀐 구역은 표 측정 캐시를 버린다(표 넣기 뒤 뒤쪽 표들이 다른 표 높이를 받던 문제)
     ['measure-cache-shift-rendering', 'src/document_core/queries/rendering.rs'],
+    // 쪽 영역 제한 + 나누지 않음 빈 문단 표가 남은 자리에 안 들어가면 미루고 뒤 글이 지금 쪽을 채운다(한/글 실측, defer-coanchored-fresh 뒤에 와야 한다)
+    ['restrict-float-defer-typeset', 'src/renderer/typeset.rs'],
+    ['restrict-float-defer-layout', 'src/renderer/layout.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));
