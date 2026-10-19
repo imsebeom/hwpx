@@ -671,6 +671,9 @@ const RUST_PATCHES = [
     ['cell-unit-keep-hwpx-typeset', 'src/renderer/typeset.rs'],
     // 한 문단의 뒤쪽 공동 앵커 표가 남은 자리에 안 들어가면 미루고 뒤 글이 지금 쪽을 채운다(d322, 한/글 사본 실험)
     ['defer-coanchored-fresh-typeset', 'src/renderer/typeset.rs'],
+    ['multi-float-host-line-mod', 'src/renderer/mod.rs'],
+    ['multi-float-host-line-typeset', 'src/renderer/typeset.rs'],
+    ['multi-float-host-line-layout', 'src/renderer/layout.rs'],
     // 엔진이 만든 줄의 첫 vpos 0 은 저장 쪽 경계로 읽지 않는다(format_text 뒤 문단이 다음 쪽으로 넘어가던 문제)
     ['synth-no-reset-typeset', 'src/renderer/typeset.rs'],
     // 표 속성(캡션 등)을 바꾸면 표 높이를 다시 잰다(캡션 높이가 빠지던 문제)
