@@ -657,6 +657,11 @@ const RUST_PATCHES = [
     ['test-1949-omtop-tests', 'src/wasm_api/tests.rs'],
     // 하이픈 묶음도 글꼴 폭으로(한/글 사본 실험 6종). 0.3em 상한은 폭 표가 0.7em 넘는 글꼴만(Task #352)
     ['dash-natural-text-measurement', 'src/renderer/layout/text_measurement.rs'],
+    // 엔진이 만든 줄도 도형 항목 뒤 쪽 기준점 유지(d334), HWPX 개체 줄은 쪽 끝에 넘쳐 담지 않음(새 조판 14/14),
+    // HWPX 빈 앵커 자리 차지 표는 다음 항목이 표여도 위 간격을 쓰지 않음(새 조판 24/24)
+    ['keep-synth-shape-layout', 'src/renderer/layout.rs'],
+    ['atomic-hwpx-off-typeset', 'src/renderer/typeset.rs'],
+    ['empty-anchor-sb-hwpx-typeset', 'src/renderer/typeset.rs'],
     // 엔진이 만든 줄의 첫 vpos 0 은 저장 쪽 경계로 읽지 않는다(format_text 뒤 문단이 다음 쪽으로 넘어가던 문제)
     ['synth-no-reset-typeset', 'src/renderer/typeset.rs'],
     // 표 속성(캡션 등)을 바꾸면 표 높이를 다시 잰다(캡션 높이가 빠지던 문제)
