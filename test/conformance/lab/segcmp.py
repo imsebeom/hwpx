@@ -5,9 +5,11 @@
 엔진 값은 claude-linestarts 의 CLAUDE_SEGV 출력(vpos/높이/간격)이다. 줄 수가 다른 문단은 따로 센다.
 """
 
+import atexit
 import collections
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -60,6 +62,7 @@ def main():
     z = zipfile.ZipFile(src)
     han = top_paras(z.read("Contents/section0.xml").decode("utf-8"))
     tmp = tempfile.mkdtemp()
+    atexit.register(shutil.rmtree, tmp, True)
     dst = os.path.join(tmp, f"{doc}.hwpx")
     with zipfile.ZipFile(dst, "w") as w:
         for info in z.infolist():

@@ -7,11 +7,13 @@
 칸 수나 칸마다 문단 수가 다르면 그 문서의 칸은 뺀다. 엔진이 [] 를 주는 칸(표 안 표)도 뺀다.
 """
 
+import atexit
 import concurrent.futures as cf
 import glob
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -161,6 +163,7 @@ def main():
     if ids:
         files = [f for f in files if os.path.basename(f)[:-5] in ids]
     tmp = tempfile.mkdtemp(prefix="nativescore_")
+    atexit.register(shutil.rmtree, tmp, True)
     tot = {
         k: 0
         for k in (

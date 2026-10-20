@@ -5,9 +5,11 @@
 정답본 id 면 줄 배치를 지운 사본을 그린다(채점과 같은 조건).
 """
 
+import atexit
 import html
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -19,7 +21,9 @@ from nativescore import EXE, HERE, one  # noqa: E402
 def main():
     arg = sys.argv[1]
     tmp = tempfile.mkdtemp(prefix="svgl_")
+    atexit.register(shutil.rmtree, tmp, True)
     out = tempfile.mkdtemp(prefix="svgo_")
+    atexit.register(shutil.rmtree, out, True)
     if os.path.exists(arg):
         src = arg
         stem = os.path.splitext(os.path.basename(arg))[0]

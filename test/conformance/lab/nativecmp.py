@@ -3,10 +3,12 @@
 python nativecmp.py <한/글 재저장 폴더> [--show]
 """
 
+import atexit
 import glob
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -57,6 +59,7 @@ def main():
     src = sys.argv[1]
     show = "--show" in sys.argv
     tmp = tempfile.mkdtemp(prefix="nativecmp_")
+    atexit.register(shutil.rmtree, tmp, True)
     han, texts, files = {}, {}, []
     for f in sorted(glob.glob(os.path.join(src, "*.hwpx"))):
         name = os.path.basename(f)[:-5]

@@ -3,8 +3,10 @@
 python pagediff.py <id>...
 """
 
+import atexit
 import os
 import re
+import shutil
 import sys
 import tempfile
 import zipfile
@@ -45,6 +47,7 @@ def body_xml(path):
 
 def main():
     tmp = tempfile.mkdtemp(prefix="pagediff_")
+    atexit.register(shutil.rmtree, tmp, True)
     for doc in sys.argv[1:]:
         path = str(HERE.parent / "out" / "oracle" / f"{doc}.hwpx")
         _, body, _, _, _, (pages, para_pages, han_bp) = one(path, tmp)

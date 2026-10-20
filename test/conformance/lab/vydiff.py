@@ -4,8 +4,10 @@
 같은 쪽 안에서 「다음 문단 시작 - 이 문단 시작」을 비교한다(rhwp 는 px × 75 = HWPUNIT, 쪽 머리 여백 차이는 지운다).
 """
 
+import atexit
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -21,6 +23,7 @@ def main():
     start = int(sys.argv[2]) if len(sys.argv) > 2 else 0
     count = int(sys.argv[3]) if len(sys.argv) > 3 else 40
     tmp = tempfile.mkdtemp(prefix="vydiff_")
+    atexit.register(shutil.rmtree, tmp, True)
     path = str(HERE.parent / "out" / "oracle" / f"{doc}.hwpx")
     one(path, tmp)  # 줄 배치를 지운 사본을 tmp 에 만든다
     out = subprocess.run(

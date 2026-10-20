@@ -2,9 +2,11 @@
 
     python rowcmp.py <id> <본문 문단>
 """
+import atexit
 import collections
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -33,6 +35,7 @@ for tc in tcs(t[len(head) :]):
     r = int(a.group(1))
     han[r] = max(han[r], int(a.group(3)), (max(ends) + mt + mb) if ends else 0)
 tmp = tempfile.mkdtemp(prefix="rowcmp_")
+atexit.register(shutil.rmtree, tmp, True)
 one(path, tmp)
 err = subprocess.run([str(EXE), os.path.join(tmp, f"{doc}.hwpx")], capture_output=True, text=True, encoding="utf-8",
                      env={**os.environ, "RHWP_DIAG_ROWH": "1", "CLAUDE_METRICS_DIR": str(HERE.parent / "out" / "metrics")}).stderr

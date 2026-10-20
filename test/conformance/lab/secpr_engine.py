@@ -5,10 +5,12 @@
 어긋난 문단은 run 마다 (글자 모양 크기, 내용 종류)를 함께 찍는다. 종류: secPr, 글, 표, 그림 등과 글자처럼 취급(TAC) 여부.
 """
 
+import atexit
 import collections
 import glob
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -82,6 +84,7 @@ def main():
             continue
         han = top_paras(sec)
         tmp = tempfile.mkdtemp()
+        atexit.register(shutil.rmtree, tmp, True)
         dst = os.path.join(tmp, f"{doc}.hwpx")
         with zipfile.ZipFile(dst, "w") as w:
             for info in z.infolist():

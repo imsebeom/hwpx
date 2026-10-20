@@ -6,8 +6,10 @@ rhwp 값은 RHWP_DIAG_FLOW(글 문단)와 DIAG_TBLP(표 문단)의 cur_h(px × 7
 쪽이 바뀌면(한/글 vertpos 되감김, rhwp page 증가) 차는 새 쪽 기준이다.
 """
 
+import atexit
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -23,6 +25,7 @@ def main():
     start = int(sys.argv[2]) if len(sys.argv) > 2 else 0
     count = int(sys.argv[3]) if len(sys.argv) > 3 else 40
     tmp = tempfile.mkdtemp(prefix="curh_")
+    atexit.register(shutil.rmtree, tmp, True)
     path = str(HERE.parent / "out" / "oracle" / f"{doc}.hwpx")
     one(path, tmp)
     err = subprocess.run(
