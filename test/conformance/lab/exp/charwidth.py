@@ -7,9 +7,11 @@
 양쪽 정렬을 없앴으므로 줄 안 간격은 자연 폭이다(빈칸 줄이기도 쓰이지 않는다).
 """
 
+import atexit
 import concurrent.futures as cf
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -59,6 +61,7 @@ def one(name):
     if not pdf.exists():
         return name, None
     d = tempfile.mkdtemp(prefix="charw_")
+    atexit.register(shutil.rmtree, d, True)
     subprocess.run(
         [str(EXE), str(src)],
         capture_output=True,

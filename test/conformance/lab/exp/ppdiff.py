@@ -5,6 +5,8 @@
 한/글 쪽은 표가 쪽을 넘기면 되감김이 없어 덜 센다. 그래서 차가 한 번 바뀐 뒤 그대로면 그곳이 갈림이거나 못 센 쪽이다.
 """
 
+import atexit
+import shutil
 import sys
 import tempfile
 from pathlib import Path
@@ -16,7 +18,9 @@ sys.stdout.reconfigure(encoding="utf-8")
 OUT = Path(__file__).resolve().parent.parent.parent / "out"
 name = sys.argv[1]
 src = Path(sys.argv[2]) if len(sys.argv) > 2 else OUT / "oracle"
-_, _, _, _, _, (pages, pp, han) = one(str(src / f"{name}.hwpx"), tempfile.mkdtemp())
+tmp = tempfile.mkdtemp()
+atexit.register(shutil.rmtree, tmp, True)
+_, _, _, _, _, (pages, pp, han) = one(str(src / f"{name}.hwpx"), tmp)
 print("엔진 쪽", pages, "한/글 vpos 쪽", han[-1] + 1 if han else None)
 prev = None
 for i, (a, b) in enumerate(zip(pp, han)):

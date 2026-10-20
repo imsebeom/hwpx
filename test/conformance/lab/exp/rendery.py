@@ -8,9 +8,11 @@
 엔진 SVG 의 text y 는 px(0.75 를 곱해 pt), PDF 는 pt. 조판(쪽 나눔)이 아니라 그리기(layout)가 한/글과 얼마나 같은지 본다.
 """
 
+import atexit
 import concurrent.futures as cf
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -56,6 +58,7 @@ def one(name):
     if not pdf.exists():
         return name, "PDF 없음"
     d = tempfile.mkdtemp(prefix="rendery_")
+    atexit.register(shutil.rmtree, d, True)
     subprocess.run(
         [str(EXE), str(src)],
         capture_output=True,

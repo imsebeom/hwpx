@@ -5,8 +5,10 @@
 변형(글꼴, 장평, 자간)마다 글자별 한/글, 엔진, 차를 찍는다. --all 이 없으면 차가 0.02pt 넘는 것만. 「가␣」 는 가 + 빈칸.
 """
 
+import atexit
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -117,6 +119,7 @@ hp = [
     for pg in doc
 ]
 d = tempfile.mkdtemp(prefix="charcal_")
+atexit.register(shutil.rmtree, d, True)
 subprocess.run(
     [str(EXE), str(base / "in" / "charcal.hwpx")],
     capture_output=True,

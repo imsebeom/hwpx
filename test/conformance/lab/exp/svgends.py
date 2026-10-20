@@ -3,8 +3,10 @@
 python exp/svgends.py <파일.hwpx> [쪽 수 상한]
 """
 
+import atexit
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -18,6 +20,7 @@ EXE = (
 f = sys.argv[1]
 lim = int(sys.argv[2]) if len(sys.argv) > 2 else 999
 d = tempfile.mkdtemp()
+atexit.register(shutil.rmtree, d, True)
 subprocess.run([str(EXE), f], capture_output=True, env={**os.environ, "CLAUDE_SVG": d})
 pages = sorted(Path(d).glob("*.svg"), key=lambda p: int(p.stem))
 for p in pages[:lim]:
