@@ -120,16 +120,18 @@ def memos_to_hancom_shape(
     )
     converted = 0
     out: dict[str, str] = {}
+    # 본문 묶음은 메모가 걸린 구역이 아니라 마지막 구역에 들어갈 수 있다(2026-10-20 구역 6개 문서 실측).
+    # 그래서 본문은 문서 전체에서 모으고, 옮긴 본문은 모든 구역을 다 돈 뒤에 지운다.
+    bodies = {
+        memo_id: "\n".join(
+            "".join(re.findall(r"<hp:t\b[^>]*>([^<]*)</hp:t>", para))
+            for para in re.findall(r"<hp:p\b[^>]*>.*?</hp:p>", inner, re.S)
+        )
+        for group in _MEMOGROUP_RE.findall(whole)
+        for memo_id, inner in _MEMO_RE.findall(group)
+    }
+    done: set[str] = set()
     for name, xml in sections.items():
-        bodies = {
-            memo_id: "\n".join(
-                "".join(re.findall(r"<hp:t\b[^>]*>([^<]*)</hp:t>", para))
-                for para in re.findall(r"<hp:p\b[^>]*>.*?</hp:p>", inner, re.S)
-            )
-            for group in _MEMOGROUP_RE.findall(xml)
-            for memo_id, inner in _MEMO_RE.findall(group)
-        }
-        done: set[str] = set()
         end_ids: dict[str, int] = {}
 
         def rebuild(m: "re.Match[str]") -> str:
@@ -202,14 +204,15 @@ def memos_to_hancom_shape(
                 f'<hp:fieldEnd beginIDRef="{field_id}" fieldid="{MEMO_CTRL_ID}"/>',
                 xml,
             )
+        out[name] = xml
 
-        def prune(m: "re.Match[str]") -> str:
-            rest = _MEMO_RE.sub(
-                lambda memo: "" if memo.group(1) in done else memo.group(0), m.group(0)
-            )
-            return rest if "<hp:memo " in rest else ""  # 다 옮긴 묶음은 지운다
+    def prune(m: "re.Match[str]") -> str:
+        rest = _MEMO_RE.sub(
+            lambda memo: "" if memo.group(1) in done else memo.group(0), m.group(0)
+        )
+        return rest if "<hp:memo " in rest else ""  # 다 옮긴 묶음은 지운다
 
-        out[name] = _MEMOGROUP_RE.sub(prune, xml)
+    out = {name: _MEMOGROUP_RE.sub(prune, xml) for name, xml in out.items()}
     return out, converted
 
 
