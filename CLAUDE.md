@@ -41,6 +41,7 @@
 ## 함정
 - 🔴 **시험용 에디터는 포트를 정하지 않고 `HWPX_EDITOR_INSTANCE=<이름> node cli.mjs start …` 로만 띄우고, 브라우저는 `cli.mjs url` 이 준 주소로만 연다**(2026-10-18). 7781 을 정해 `server.mjs` 를 직접 띄웠다가 그 포트에 있던 다른 세션의 에디터 창을 Playwright 로 열었다. 스킬 f8f152e 부터 포트를 정해 주면 남의 포트일 때 `start` 가 멈춘다
 - **Node 24.11 `fs.rmSync`/`fs.cpSync`(recursive)는 한글 경로에서 node 를 소리 없이 죽인다**(종료 코드 127). vite 가 outDir 를 비울 때도 같다. setup.mjs 는 자체 rmrf/copyDir 를 쓰고 빌드 전에 dist 를 지운다.
+- 🔴 **`test/conformance/lab` 스크립트에서 `tempfile.mkdtemp` 를 쓰면 바로 뒤에 `atexit.register(shutil.rmtree, d, True)` 를 붙인다**(2026-10-20). 지우지 않은 `rendery_`, `nativescore_` 가 사흘 만에 Temp 에 122GB 쌓여 C 드라이브 여유가 31GB 로 떨어졌다(14개 수정 b606c42, d0d43d6).
 - Claude Code 의 작업 디렉터리가 폴더 안에 잡혀 있으면 그 폴더를 옮기거나 이름을 바꿀 수 없다.
 - StreamDocs(standard.go.kr) 링크는 밖에서 열면 "문서를 열 수 없습니다" — 세션에 묶여 있다.
 - 🔴 **스킬 파이프라인 산출물은 rhwp 에서 문단이 한 줄로 눌려 그려진다**(2026-09-25 생각쓰기캠프 문항 3에서 사용자 발견).
