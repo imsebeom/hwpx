@@ -354,6 +354,8 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/cmd' && req.method === 'POST') {
       const body = await readBody(req);
       if (body.type === 'shutdown') {
+        // 다른 인스턴스의 앱 창이 닫히며 보낸 종료는 무시한다. 남의 창을 닫았는데 이 서버가 꺼졌다(2026-10-21)
+        if (body.inst && body.inst !== path.basename(STATE_DIR)) return sendJson(res, 200, { ok: false, error: '다른 인스턴스의 종료 요청' });
         logEvent('stop');
         sendJson(res, 200, { ok: true });
         setTimeout(() => process.exit(0), 100);
@@ -370,6 +372,9 @@ const server = http.createServer(async (req, res) => {
       lastPollAt = Date.now();
       // 앱 창이 붙어 있으면 브라우저 탭은 물러나게 한다. 두 화면이 명령을 나눠 받으면 편집과 측정이 뒤섞인다(2026-10-21)
       const isApp = url.searchParams.get('client') === 'app';
+      // 다른 인스턴스의 앱 창이 포트를 물려받은 이 서버에 붙으면 물러나게 한다(2026-10-21, 협의회 보고서 창이 지도안 서버에 붙었다)
+      const inst = url.searchParams.get('inst');
+      if (isApp && inst && inst !== path.basename(STATE_DIR)) return sendJson(res, 200, { id: 0, type: 'yield' });
       if (isApp) {
         lastAppPollAt = Date.now();
         for (const r of pollers.filter((x) => !x.isApp)) sendJson(r, 200, { id: 0, type: 'yield' });

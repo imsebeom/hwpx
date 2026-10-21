@@ -12,7 +12,7 @@ import os
 import sys
 import threading
 import urllib.request
-from urllib.parse import urljoin
+from urllib.parse import parse_qs, urljoin, urlparse
 
 import webview
 
@@ -94,7 +94,10 @@ try:
     urllib.request.urlopen(
         urllib.request.Request(
             urljoin(url, "/api/cmd"),
-            data=json.dumps({"type": "shutdown"}).encode(),
+            # 인스턴스 이름을 함께 보내, 포트를 물려받은 다른 인스턴스의 서버를 끄지 않게 한다(2026-10-21)
+            data=json.dumps(
+                {"type": "shutdown", "inst": parse_qs(urlparse(url).query).get("inst", [""])[0]}
+            ).encode(),
             method="POST",
         ),
         timeout=3,

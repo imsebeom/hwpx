@@ -185,12 +185,13 @@ const handlers = {
 
 // 앱 창(app.py)은 주소에 ?client=app 을 달고 온다. 서버는 앱 창이 있으면 브라우저 탭에 yield 를 보낸다
 const CLIENT = new URLSearchParams(location.search).get('client') === 'app' ? 'app' : 'browser';
+const INST = new URLSearchParams(location.search).get('inst') || '';   // 앱 창의 인스턴스 이름
 
 async function pollLoop() {
   for (;;) {
     let cmd;
     try {
-      cmd = await fetch(`/api/poll?client=${CLIENT}`).then((x) => x.json());
+      cmd = await fetch(`/api/poll?client=${CLIENT}&inst=${encodeURIComponent(INST)}`).then((x) => x.json());
       setStatus('Claude 연결됨', 'ok');
     } catch {
       setStatus('브리지 서버 끊김', 'err');
@@ -198,7 +199,7 @@ async function pollLoop() {
       continue;
     }
     if (cmd.type === 'yield') {
-      setStatus('앱 창이 열려 이 탭은 Claude 명령을 받지 않는다', 'err');
+      setStatus(CLIENT === 'app' ? '이 창은 다른 에디터 서버에 붙어 있어 쉰다. 닫아도 된다' : '앱 창이 열려 이 탭은 Claude 명령을 받지 않는다', 'err');
       log('앱 창이 열려 이 탭은 쉰다. 닫아도 된다');
       return;
     }

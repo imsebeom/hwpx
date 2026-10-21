@@ -193,7 +193,9 @@ function openAppWindow(url, docName) {
   if (check.status !== 0) return false;
   // 창이 여럿일 수 있으니 제목에 문서 이름과 인스턴스를 넣어 가른다
   const title = `HWPX 에디터 · ${docName} · ${path.basename(STATE_DIR)}`;
-  const child = spawn(py, [path.join(HERE, 'app.py'), url, title], { detached: true, stdio: 'ignore', env: { ...process.env, HWPX_EDITOR_STATE: STATE_DIR } });
+  // 주소에 인스턴스 이름을 달아, 포트를 물려받은 다른 인스턴스의 서버에 붙지 않게 한다(2026-10-21)
+  const appUrl = `${url}${url.includes('?') ? '&' : '?'}client=app&inst=${encodeURIComponent(path.basename(STATE_DIR))}`;
+  const child = spawn(py, [path.join(HERE, 'app.py'), appUrl, title], { detached: true, stdio: 'ignore', env: { ...process.env, HWPX_EDITOR_STATE: STATE_DIR } });
   fs.writeFileSync(APP_PID, String(child.pid));
   child.unref();
   return true;
@@ -383,10 +385,13 @@ switch (sub) {
     await pruneStale();
     await postLog('start', { file, instance: path.basename(STATE_DIR), port: PORT });
     let h = await health();
-    if (!h.browser && aliveAppPid()) {                // 옛 앱 창이 새 서버에 다시 붙기를 기다린다
-      for (let i = 0; i < 20 && !h.browser; i++) { await sleep(500); h = await health(); }
-    }
     const mode = openMode(args);
+    // 옛 앱 창이 새 서버에 다시 붙기를 기다린다. 앱 모드에서는 앱 창(h.app)을 기다린다 — 다른 화면이 먼저 붙었다고
+    // 건너뛰면 앱 창이 없다고 보고 하나 더 띄워 창이 쌓였다(2026-10-21 사용자 지적)
+    const attached = (x) => (mode === 'app' ? x.app : x.browser);
+    if (!attached(h) && aliveAppPid()) {
+      for (let i = 0; i < 20 && !attached(h); i++) { await sleep(500); h = await health(); }
+    }
     // 이미 열린 화면이 있으면 그 화면에 새 문서를 연다. 다만 앱 모드(터미널 기본, --app)에서는 앱 창만 다시 쓴다.
     // 예전에 열어 둔 브라우저 탭이 서버에 붙어 있다고 앱 창 대신 그 탭에 열던 것을 막는다(2026-10-21 사용자 지적).
     // 앱 창이 뜨면 서버가 그 탭에 yield 를 보내 물러나게 한다
@@ -399,6 +404,10 @@ switch (sub) {
     } else if (!args.includes('--no-browser')) {
       const url = `http://localhost:${PORT}/`;
       // 기본은 앱 창(한/글 단축키 전부). --browser 면 브라우저 탭(Ctrl+N 계열은 Ctrl+M 으로 대신).
+      if (mode !== 'browser') {                        // 다시 붙지 않은 옛 앱 창은 닫는다(창 하나만 쓴다)
+        const old = aliveAppPid();
+        if (old) { try { process.kill(old); } catch { /* 이미 닫힘 */ } }
+      }
       if (mode === 'browser' || !openAppWindow(url, path.basename(file))) openBrowser(url);
     }
     // 스킬 파이프라인 산출물은 서버가 rhwp 로 표 높이를 재서 보내므로(rhwp_layout.mjs) 넉넉히 기다린다.
