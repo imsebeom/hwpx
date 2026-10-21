@@ -286,8 +286,51 @@ export function installKCommands(host, getInputHandler) {
     });
   };
 
+  // ── 새 메모(오른쪽 클릭, 2026-10-21) ─────────────────────
+  // 고른 글에 한/글 검토 메모를 건다(엔진 insertMemoEx, patches/memo-new-*.rs). 고른 글이 없으면 커서가 든 낱말에 건다.
+  // 작성자는 window.__claudeMemoAuthor(협업 사이트가 사용자 이름을 넣는다), 없으면 한/글 기본값 USER.
+  // 작성 시각: 한/글은 Command 의 FILETIME(UTC, 하위와 상위 32비트)에서 날짜를 읽고, CreateDateTime 에는 현지 시각을 Z 를 붙여 적는다
+  const memoTime = () => {
+    const now = new Date();
+    const ft = BigInt(now.getTime() + 11644473600000) * 10000n;
+    const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().replace(/\.\d+Z$/, 'Z');
+    return { created: local, fileTime: [Number(ft & 0xffffffffn), Number(ft >> 32n)] };
+  };
+  const memo = (ih) => {
+    const p = place(ih);
+    if (!p) return;
+    let { start, end } = p;
+    if (start === end) {
+      host.read((doc) => {
+        try {
+          const n = p.inCell ? doc.getCellParagraphLengthByPath(p.sec, p.para, JSON.stringify(p.path.map((c) => [c.controlIndex, c.cellIndex, c.cellParaIndex]))) : doc.getParagraphLength(p.sec, p.para);
+          const t = ops(doc, p).text(0, n);
+          while (start > 0 && /\S/.test(t[start - 1])) start--;
+          while (end < t.length && /\S/.test(t[end])) end++;
+        } catch { /* 낱말을 못 찾으면 커서 자리 한 점에 건다 */ }
+      });
+    }
+    const anchor = host.read((doc) => { try { return ops(doc, p).text(start, end); } catch { return ''; } });
+    dialog('새 메모', (body) => {
+      if (anchor) note(body, `걸 글: ${anchor.length > 40 ? `${anchor.slice(0, 40)}…` : anchor}`);
+      const text = row(body, '메모 내용(M):', input(''));
+      return () => (text.value.trim() ? { text: text.value } : (text.focus(), false));
+    }, ({ text }) => {
+      run(ih, 'insertMemo', (doc) => {
+        const r = JSON.parse(doc.insertMemoEx(JSON.stringify({
+          sectionIdx: p.sec, paraIdx: p.para, start, end, body: text,
+          author: window.__claudeMemoAuthor || 'USER', ...memoTime(),
+          path: p.inCell ? p.path.map((c) => [c.controlIndex, c.cellIndex, c.cellParaIndex]) : undefined,
+        })));
+        return after(p, r.end);
+      });
+      window.dispatchEvent(new Event('claude-memo-added'));   // 메모 패널을 연다(memo-panel.ts)
+    });
+  };
+
   const COMMANDS = [
     ['insert:hyperlink', '하이퍼링크', hyperlink],
+    ['insert:comment', '새 메모', memo],
     ['insert:cross-ref', '상호 참조', crossRef],
     ['insert:date-string', '날짜/시간 문자열', (ih) => insertString(ih, savedFormat())],
     ['insert:date-code', '날짜/시간 코드', dateCode],

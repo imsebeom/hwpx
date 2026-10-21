@@ -122,7 +122,10 @@ const RUST_PATCHES = [
   // Ctrl+K,H/R/C — 표시 글을 감싼 필드(하이퍼링크, 상호 참조, 문서 요약) 넣기(patches/field-ex-*.rs)
   ...[['field-ex', 'src/document_core/queries/field_query.rs', 'fn insert_click_here_field_in_para(', 'field-ex-helper'],
     ['field-ex-method', 'src/document_core/queries/field_query.rs', '    /// getFieldList: 모든 필드를 JSON 배열로 반환', 'field-ex-method'],
-    ['field-ex-wasm', 'src/wasm_api.rs', '    /// 현재 본문 위치에 ClickHere 누름틀 필드를 삽입한다.', 'field-ex-wasm']].map(([id, file, anchor, f]) => ({
+    ['field-ex-wasm', 'src/wasm_api.rs', '    /// 현재 본문 위치에 ClickHere 누름틀 필드를 삽입한다.', 'field-ex-wasm'],
+    // 오른쪽 클릭 「새 메모」 — 고른 글에 한/글 형식 메모를 건다(patches/memo-new-*.rs)
+    ['memo-new', 'src/document_core/queries/field_query.rs', '    /// getFieldList: 모든 필드를 JSON 배열로 반환', 'memo-new-method'],
+    ['memo-new-wasm', 'src/wasm_api.rs', '    /// 현재 본문 위치에 ClickHere 누름틀 필드를 삽입한다.', 'memo-new-wasm']].map(([id, file, anchor, f]) => ({
     id, file, anchor,
     insert: fs.readFileSync(path.join(HERE, 'patches', `${f}.rs`), 'utf8').replace(/\r\n/g, '\n'),
     done: `[claude-hwpx ${id}]`,

@@ -1,10 +1,11 @@
 // @ts-nocheck
 /**
  * 메모 보기(2026-10-06 사용자 요청 「에디터에서도 메모 볼 수 있나」).
- * 문서에 든 메모(한/글의 검토 메모)를 오른쪽 패널에 작성자, 날짜, 걸린 글, 본문으로 늘어놓고, 본문에서는 메모가 걸린 글을
- * 노란 바탕으로 칠하고 끝에 번호 표를 붙인다. 패널의 메모를 누르면 걸린 글 앞으로 커서와 화면이 가고, 번호 표를 누르거나
+ * 문서에 든 메모(한/글의 검토 메모)를 오른쪽 띠에 작성자, 날짜, 걸린 글, 본문 카드로 보인다. 카드는 한/글처럼 걸린 글과
+ * 같은 줄 높이에 놓이고(글과 함께 스크롤, 겹치면 아래로 밀고, 글에서 카드까지 점선), 목록이던 것을 2026-10-21 사용자 요청으로 바꿨다.
+ * 본문에서는 메모가 걸린 글에 밑줄을 긋고(바탕을 칠하면 글씨가 흐려져 밑줄만, 2026-10-21) 끝에 번호 표를 붙인다. 패널의 메모를 누르면 걸린 글 앞으로 커서와 화면이 가고, 번호 표를 누르거나
  * 커서가 걸린 글 안에 들어가면 패널에서 그 메모가 강조된다. 메모가 있는 문서를 열면 저절로 보이고, 도구 모음 「메모」 단추로
- * 숨긴다(숨긴 것은 기억한다). 메모는 읽기만 한다 — rhwp 에 메모를 만들거나 고치는 API 가 없다.
+ * 숨긴다(숨긴 것은 기억한다). 메모 고치기는 없다. 새 메모는 오른쪽 클릭 「새 메모」(k-commands.ts, 엔진 insertMemoEx).
  *
  * 자료는 엔진 패치 `getMemoList`(patches/memo-list*.rs)에서 온다. 위치는 캐럿 축이라 선택 영역 사각형 API 에 그대로 넣는다.
  * 패치가 없는 WASM(npm 원본)에서는 목록이 비어 단추만 보인다.
@@ -19,9 +20,12 @@ const CSS = `
 .claude-memo-panel header{display:flex;align-items:center;gap:6px;padding:6px 8px;border-bottom:1px solid var(--ui-border-light,#ccc)}
 .claude-memo-panel header b{flex:1;font-size:13px}
 .claude-memo-panel .close{border:0;background:transparent;color:inherit;font-size:16px;cursor:pointer}
-.claude-memo-panel ol{flex:1;overflow:auto;margin:0;padding:6px;list-style:none}
-.claude-memo-panel li{margin:0 0 6px;padding:6px 8px;border:1px solid #e6cf7a;border-left:4px solid #e0b020;border-radius:3px;background:#fffbe6;color:#222;cursor:pointer}
-.claude-memo-panel li.on{outline:2px solid #d18b00;background:#fff0b3}
+.claude-memo-panel ol{flex:1;position:relative;overflow:hidden;margin:0;padding:0;list-style:none}
+.claude-memo-panel li{position:absolute;left:6px;right:6px;box-sizing:border-box;padding:6px 8px;border:1px solid #e6cf7a;border-left:4px solid #e0b020;border-radius:3px;background:#fffbe6;color:#222;cursor:pointer}
+.claude-memo-panel li.on{outline:2px solid #d18b00;background:#fff0b3;z-index:1}
+.claude-memo-links{position:fixed;left:0;top:0;width:100vw;height:100vh;pointer-events:none;z-index:8899}
+.claude-memo-links path{fill:none;stroke:#d18b00;stroke-width:1;stroke-dasharray:3 2;opacity:.7}
+.claude-memo-links path.on{stroke:#c0392b;stroke-dasharray:none;opacity:1}
 .claude-memo-panel .head{display:flex;gap:6px;align-items:baseline;margin-bottom:3px}
 .claude-memo-panel .idx{min-width:10px;height:16px;border-radius:8px;background:#d18b00;color:#fff;font-size:10px;line-height:16px;text-align:center;padding:0 3px}
 .claude-memo-panel .who{font-weight:600}
@@ -31,8 +35,8 @@ const CSS = `
 .claude-memo-panel .body{white-space:pre-wrap;word-break:break-word;line-height:1.45;user-select:text}
 .claude-memo-panel .empty{padding:12px;opacity:.7}
 .claude-memo-layer{position:absolute;left:0;top:0;width:0;height:0;z-index:3;pointer-events:none}
-.claude-memo-hl{position:absolute;background:rgba(255,205,40,.38);mix-blend-mode:multiply;pointer-events:none}
-.claude-memo-hl.on{background:rgba(255,150,0,.5)}
+.claude-memo-hl{position:absolute;box-sizing:border-box;border-bottom:2px solid #e0a000;pointer-events:none}
+.claude-memo-hl.on{border-bottom-color:#c0392b;background:rgba(255,200,0,.12);mix-blend-mode:multiply}
 .claude-memo-pin{position:absolute;min-width:8px;height:14px;padding:0 3px;border:0;border-radius:7px;background:#d18b00;color:#fff;
   font:700 9px/14px sans-serif;text-align:center;cursor:pointer;pointer-events:auto;box-shadow:0 0 0 1px #fff}
 .claude-memo-pin.on{background:#c0392b}`;
@@ -68,6 +72,7 @@ export function installMemoPanel(host, getInputHandler) {
   let active = -1;
   let refreshTimer = null;
   let watched = null;
+  let links = null;   // 걸린 글에서 카드까지 잇는 선(화면 고정 SVG)
   const userHid = () => { try { return localStorage.getItem(HIDDEN_KEY) === '1'; } catch { return false; } };
 
   const readRaw = () => {
@@ -95,10 +100,10 @@ export function installMemoPanel(host, getInputHandler) {
     } catch { /* 자리를 못 재는 메모(글상자 안 등)는 패널에만 보인다 */ }
   };
 
-  const setActive = (i, scrollCard) => {
+  const setActive = (i) => {
     active = i;
     for (const e of document.querySelectorAll('.claude-memo-hl,.claude-memo-pin,.claude-memo-panel li')) e.classList.toggle('on', Number(e.dataset.i) === i);
-    if (scrollCard && i >= 0) panel?.querySelector(`li[data-i="${i}"]`)?.scrollIntoView({ block: 'nearest' });
+    for (const e of links?.querySelectorAll('path') ?? []) e.classList.toggle('on', Number(e.dataset.i) === i);
   };
 
   /** 본문 위 덧그리기: 걸린 글 바탕과 번호 표 */
@@ -132,11 +137,55 @@ export function installMemoPanel(host, getInputHandler) {
       pin.title = `${m.author || '메모'}: ${m.text.slice(0, 80)}`;
       pin.style.cssText = `left:${p.left - 3}px;top:${p.top - 9}px`;
       pin.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });   // 본문 포커스와 캐럿을 그대로 둔다
-      pin.addEventListener('click', (e) => { e.stopPropagation(); setActive(i, true); });
+      pin.addEventListener('click', (e) => { e.stopPropagation(); setActive(i); });
       nodes.push(pin);
     });
     layer.replaceChildren(...nodes);
+    placeCards();
     setActive(active);
+  };
+
+  /** 카드를 걸린 글의 줄 높이에 놓는다. 겹치면 아래로 밀고, 걸린 글 끝에서 카드까지 선을 긋는다 */
+  const placeCards = () => {
+    const ih = getInputHandler();
+    const list = panel?.querySelector('ol');
+    if (!list || !ih?.container) return;
+    const zoom = ih.viewportManager.getZoom();
+    const vs = ih.virtualScroll;
+    const c = ih.container;
+    const sc = c.querySelector('#scroll-content');
+    const cr = c.getBoundingClientRect();
+    const lr = list.getBoundingClientRect();
+    // 쪽 좌표 → 화면 좌표
+    const screen = (r) => ({
+      x: cr.left - c.scrollLeft + vs.getPageLeftResolved(r.pageIndex, sc?.clientWidth ?? c.clientWidth) + r.x * zoom,
+      y: cr.top - c.scrollTop + vs.getPageOffset(r.pageIndex) + r.y * zoom,
+    });
+    let bottom = -Infinity;
+    const paths = [];
+    memos.forEach((m, i) => {
+      const card = list.querySelector(`li[data-i="${i}"]`);
+      if (!card) return;
+      const first = m.rects[0] ?? m.caret;
+      const last = m.rects[m.rects.length - 1];
+      const tip = last ? screen({ pageIndex: last.pageIndex, x: last.x + last.width, y: last.y }) : first ? screen(first) : null;
+      const want = first ? screen(first).y - lr.top - 4 : bottom + 6;   // 자리를 못 잰 메모는 앞 카드 아래
+      const top = Math.max(want, bottom + 6);
+      card.style.top = `${top}px`;
+      bottom = top + card.offsetHeight;
+      if (!tip || top > lr.height || bottom < 0) return;
+      const y2 = lr.top + top + 10;
+      const mid = Math.max(tip.x + 8, cr.right - 12);
+      paths.push(`<path data-i="${i}" d="M${tip.x},${tip.y + 2} L${mid},${tip.y + 2} L${lr.left},${y2} L${lr.left + 6},${y2}"/>`);
+    });
+    if (!links) {
+      links = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      links.setAttribute('class', 'claude-memo-links');
+      document.body.appendChild(links);
+    }
+    // 글이 보이는 편집 영역 밖(도구 모음 위 등)으로 선이 새지 않게 자른다
+    links.style.clipPath = `inset(${cr.top}px 0 ${Math.max(0, window.innerHeight - cr.bottom)}px 0)`;
+    links.innerHTML = paths.join('');
   };
 
   const render = () => {
@@ -217,7 +266,7 @@ export function installMemoPanel(host, getInputHandler) {
       const y = ih.virtualScroll.getPageOffset(first.pageIndex) + first.y * ih.viewportManager.getZoom();
       c.scrollTop = Math.max(0, Math.min(c.scrollHeight - c.clientHeight, y - c.clientHeight / 3));
     }
-    setActive(i, true);
+    setActive(i);
     return true;
   };
 
@@ -248,7 +297,7 @@ export function installMemoPanel(host, getInputHandler) {
     if (!shown || !memos.length) return;
     const pos = getInputHandler()?.getCursorPosition?.();
     const i = pos ? memoAt(pos) : -1;
-    if (i !== active) setActive(i, true);
+    if (i !== active) setActive(i);
   });
 
   /** 패널을 편집 영역 오른쪽에 붙이고 그만큼 편집 영역을 줄인다(쪽을 가리지 않게) */
@@ -267,6 +316,8 @@ export function installMemoPanel(host, getInputHandler) {
     if (!sc || watched === sc) return;
     watched = sc;
     new ResizeObserver(() => { dock(); placeSoon(); }).observe(sc);
+    let raf = 0;
+    sc.addEventListener('scroll', () => { if (shown && !raf) raf = requestAnimationFrame(() => { raf = 0; placeCards(); }); }, { passive: true });
   };
 
   const show = (byUser) => {
@@ -294,6 +345,8 @@ export function installMemoPanel(host, getInputHandler) {
     panel = null;
     layer?.remove();
     layer = null;
+    links?.remove();
+    links = null;
     dock();
     updateButton();
   };
@@ -333,7 +386,13 @@ export function installMemoPanel(host, getInputHandler) {
   };
   host.onDocumentSwap(() => setTimeout(onOpen, 300));
   setTimeout(onOpen, 600);
-  host.events.on('document-mutated', () => { if (shown && memos.length) refreshSoon(); });
+  // 메모가 없던 문서에 첫 메모가 생기면(남이 단 메모 포함) 여는 때처럼 패널을 연다
+  let firstMemoTimer = null;
+  host.events.on('document-mutated', () => {
+    if (shown && memos.length) refreshSoon();
+    else if (!memos.length) { clearTimeout(firstMemoTimer); firstMemoTimer = setTimeout(onOpen, 400); }
+  });
+  window.addEventListener('claude-memo-added', () => setTimeout(() => (shown ? refresh() : show(false)), 100));   // 새 메모(k-commands.ts)
   host.events.on('document-layout-refreshed', () => { if (shown && memos.length) refreshSoon(200); });
   for (const name of ['zoom-changed', 'page-view-settings-changed', 'viewport-resize']) host.events.on(name, () => { if (shown) placeSoon(); });
 
