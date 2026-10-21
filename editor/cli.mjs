@@ -4,6 +4,7 @@
  *
  *   node cli.mjs start [문서.hwpx]     (문서를 빼면 빈 문서 「새 문서.hwpx」를 작업 폴더에 만들어) 서버를 띄우고 앱 창(터미널) 또는 데스크탑 앱 미리보기(.claude/launch.json)에 연다 [--app|--preview|--browser]
  *                                       같은 문서(같은 이름의 다른 판 포함)가 이미 떠 있으면 열지 않는다 — 고칠 것은 run 으로. 꼭 다시 열 때만 --reopen
+ *                                       (다른 판이면 --reopen="사용자 요청" 처럼 사유를 적어야 연다)
  *   node cli.mjs hold <상태 폴더>      미리보기가 실행한다 — 떠 있는 에디터 서버에 붙어 있다
  *   node cli.mjs run <ops.json | ->    JSON 명령 배열을 에디터에 적용 (한 트랜잭션, undo 1스텝)
  *   node cli.mjs text                  현재 본문 텍스트
@@ -365,11 +366,22 @@ switch (sub) {
       let open;
       try { open = JSON.parse(fs.readFileSync(SESSION, 'utf8')).source; } catch { /* 열린 문서 기록 없음 */ }
       const stem = (f) => path.basename(f, path.extname(f)).replace(/_\d{6}_\d{2}$/, '').normalize('NFC');
-      if (open && !args.includes('--reopen') && (path.resolve(open) === file || stem(open) === stem(file))) {
+      const reopenArg = args.find((a) => a === '--reopen' || a.startsWith('--reopen='));
+      const reason = reopenArg?.includes('=') ? reopenArg.slice('--reopen='.length).trim() : '';
+      const same = open && (path.resolve(open) === file || stem(open) === stem(file));
+      if (same && !reopenArg) {
         die(`열지 않음: 같은 문서가 이미 에디터에 떠 있다(${path.basename(open)}).\n`
           + `고치는 일이면 다시 빌드하거나 새로 열지 말고 cli.mjs run 으로 에디터 위에서 고친다(editor-mode.md 「대화 규칙」).\n`
           + `사용자가 다시 열라고 했거나 저장본을 정본으로 다시 빌드한 경우에만 start --reopen`);
       }
+      // 같은 이름의 다른 판(빌드 스크립트가 새로 만든 _NN)은 사유 없이 다시 열지 않는다. 편집 요청마다 다시 빌드하고
+      // --reopen 으로 열어 열네 판을 갈아 끼우고 사용자 편집까지 버린 일이 있었다(2026-10-21 사용자 지적)
+      if (same && path.resolve(open) !== file && !reason) {
+        die(`열지 않음: 떠 있는 문서(${path.basename(open)})의 다른 판(${path.basename(file)})이다.\n`
+          + `편집 요청을 반영하려는 것이면 다시 빌드하지 말고 cli.mjs run 으로 떠 있는 문서를 고친다.\n`
+          + `다른 판을 꼭 열어야 하면 사유를 적는다: --reopen="사용자 요청" 또는 --reopen="저장본 기준 다시 빌드"`);
+      }
+      if (same) await postLog('reopen', { from: path.basename(open), to: path.basename(file), reason: reason || '같은 파일 다시 열기' });
     }
     fs.mkdirSync(STATE_DIR, { recursive: true });
     fs.writeFileSync(SESSION, JSON.stringify({ source: file, startedAt: new Date().toISOString() }, null, 2));
