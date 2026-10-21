@@ -3,7 +3,7 @@
  * 메모 보기(2026-10-06 사용자 요청 「에디터에서도 메모 볼 수 있나」).
  * 문서에 든 메모(한/글의 검토 메모)를 오른쪽 띠에 작성자, 날짜, 걸린 글, 본문 카드로 보인다. 카드는 한/글처럼 걸린 글과
  * 같은 줄 높이에 놓이고(글과 함께 스크롤, 겹치면 아래로 밀고, 글에서 카드까지 점선), 목록이던 것을 2026-10-21 사용자 요청으로 바꿨다.
- * 본문에서는 메모가 걸린 글에 밑줄을 긋고(바탕을 칠하면 글씨가 흐려져 밑줄만, 2026-10-21) 끝에 번호 표를 붙인다. 패널의 메모를 누르면 걸린 글 앞으로 커서와 화면이 가고, 번호 표를 누르거나
+ * 본문에서는 메모가 걸린 글의 바탕을 노랗게 칠하고(층 전체를 darken 으로 섞어 글자 색은 그대로, 반투명 덮기는 글씨를 흐렸다. 2026-10-21) 끝에 번호 표를 붙인다. 패널의 메모를 누르면 걸린 글 앞으로 커서와 화면이 가고, 번호 표를 누르거나
  * 커서가 걸린 글 안에 들어가면 패널에서 그 메모가 강조된다. 메모가 있는 문서를 열면 저절로 보이고, 도구 모음 「메모」 단추로
  * 숨긴다(숨긴 것은 기억한다). 메모 고치기는 없다. 새 메모는 오른쪽 클릭 「새 메모」(k-commands.ts, 엔진 insertMemoEx).
  *
@@ -34,9 +34,9 @@ const CSS = `
 .claude-memo-panel .anchor{opacity:.75;font-size:11px;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .claude-memo-panel .body{white-space:pre-wrap;word-break:break-word;line-height:1.45;user-select:text}
 .claude-memo-panel .empty{padding:12px;opacity:.7}
-.claude-memo-layer{position:absolute;left:0;top:0;width:0;height:0;z-index:3;pointer-events:none}
-.claude-memo-hl{position:absolute;box-sizing:border-box;border-bottom:2px solid #e0a000;pointer-events:none}
-.claude-memo-hl.on{border-bottom-color:#c0392b;background:rgba(255,200,0,.12);mix-blend-mode:multiply}
+.claude-memo-layer{position:absolute;left:0;top:0;width:0;height:0;z-index:3;pointer-events:none;mix-blend-mode:darken}
+.claude-memo-hl{position:absolute;background:#ffe98a;pointer-events:none}
+.claude-memo-hl.on{background:#ffcf5c}
 .claude-memo-pin{position:absolute;min-width:8px;height:14px;padding:0 3px;border:0;border-radius:7px;background:#d18b00;color:#fff;
   font:700 9px/14px sans-serif;text-align:center;cursor:pointer;pointer-events:auto;box-shadow:0 0 0 1px #fff}
 .claude-memo-pin.on{background:#c0392b}`;
