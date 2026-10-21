@@ -709,6 +709,10 @@ const RUST_PATCHES = [
     // 쪽 영역 제한 + 나누지 않음 빈 문단 표가 남은 자리에 안 들어가면 미루고 뒤 글이 지금 쪽을 채운다(한/글 실측, defer-coanchored-fresh 뒤에 와야 한다)
     ['restrict-float-defer-typeset', 'src/renderer/typeset.rs'],
     ['restrict-float-defer-layout', 'src/renderer/layout.rs'],
+    // 쪽에 vpos 기준이 없을 때(이어지는 표로 시작한 쪽) 문단 간격을 줄여 세지 않는다(조판이 그리기보다 짧게 세어 뒤 표가 본문 아래로 넘치던 문제)
+    ['no-base-trim-typeset', 'src/renderer/typeset.rs'],
+    // 그림 자르기 값을 원본 크기(orgSz)와 imgDim 사이 비율로 바꿔 읽고 쓴다(두 단위가 다른 그림을 자르면 크게 확대돼 보이던 문제)
+    ['crop-dim-scale', 'src/document_core/commands/object_ops/picture.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));
@@ -921,7 +925,9 @@ for (const [id, rel] of [['wrap-text-labels', 'ui/picture-props-dialog.ts'], ['w
   ['fn-number-floor-cursor', 'engine/cursor.ts'], ['fn-number-floor-keyboard', 'engine/input-handler-keyboard.ts'],
   // 각주 편집 중 글자 모양(Ctrl+B, 툴바)을 고른 범위에 입히고, 툴바 표시와 토글 방향을 각주 글에서 읽는다(엔진 fn-char-format-* 와 짝)
   ['fn-char-format-bridge', 'core/wasm-bridge.ts'], ['fn-char-format-handler', 'engine/input-handler.ts'],
-  ['fn-char-format-keyboard', 'engine/input-handler-keyboard.ts']]) {
+  ['fn-char-format-keyboard', 'engine/input-handler-keyboard.ts'],
+  // 인쇄 미리보기 새 창이 막히거나 못 쓰면 화면 안에서 바로 브라우저 인쇄 창을 연다(2026-10-21 로컬 에디터 팝업 차단, 미리보기에서 멈춤)
+  ['print-fallback', 'command/commands/file.ts']]) {
   const f = path.join(STUDIO, 'src', ...rel.split('/'));
   let src = fs.readFileSync(f, 'utf8');
   if (src.includes(`[claude-hwpx ${id}]`)) continue;
