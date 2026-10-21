@@ -47,6 +47,7 @@ const queue = [];              // 브라우저가 아직 안 가져간 명령
 const waiting = new Map();     // id → { resolve, timer }  (CLI 가 결과를 기다리는 중)
 let pollers = [];              // 대기 중인 브라우저 long-poll 응답
 let lastPollAt = 0;
+let lastAppPollAt = 0;   // 앱 창(app.py, ?client=app)이 마지막으로 명령을 받으러 온 때
 
 function dispatch() {
   while (queue.length && pollers.length) {
@@ -348,7 +349,7 @@ const server = http.createServer(async (req, res) => {
       }
     }
     if (p === '/api/health') {
-      return sendJson(res, 200, { ok: true, pid: process.pid, browser: Date.now() - lastPollAt < 30_000, session: readSession(), stateDir: STATE_DIR });
+      return sendJson(res, 200, { ok: true, pid: process.pid, browser: Date.now() - lastPollAt < 30_000, app: Date.now() - lastAppPollAt < 30_000, session: readSession(), stateDir: STATE_DIR });
     }
     if (p === '/api/cmd' && req.method === 'POST') {
       const body = await readBody(req);
@@ -367,6 +368,16 @@ const server = http.createServer(async (req, res) => {
     }
     if (p === '/api/poll') {
       lastPollAt = Date.now();
+      // 앱 창이 붙어 있으면 브라우저 탭은 물러나게 한다. 두 화면이 명령을 나눠 받으면 편집과 측정이 뒤섞인다(2026-10-21)
+      const isApp = url.searchParams.get('client') === 'app';
+      if (isApp) {
+        lastAppPollAt = Date.now();
+        for (const r of pollers.filter((x) => !x.isApp)) sendJson(r, 200, { id: 0, type: 'yield' });
+        pollers = pollers.filter((x) => x.isApp);
+      } else if (Date.now() - lastAppPollAt < 30_000) {
+        return sendJson(res, 200, { id: 0, type: 'yield' });
+      }
+      res.isApp = isApp;
       if (queue.length) return sendJson(res, 200, queue.shift());
       pollers.push(res);
       const t = setTimeout(() => {

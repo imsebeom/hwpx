@@ -17,6 +17,9 @@ from urllib.parse import urljoin
 import webview
 
 url = sys.argv[1] if len(sys.argv) > 1 else "http://localhost:7780/"
+# 서버가 앱 창과 브라우저 탭을 가르도록 표시를 단다(앱 창이 있으면 탭은 명령을 받지 않고 물러난다)
+if "client=" not in url:
+    url += ("&" if "?" in url else "?") + "client=app"
 title = sys.argv[2] if len(sys.argv) > 2 else "HWPX 에디터 · Claude"
 
 

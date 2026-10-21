@@ -183,16 +183,24 @@ const handlers = {
   async svg(cmd) { return { ok: true, svg: await studio.getPageSvg(cmd.page ?? 0) }; },
 };
 
+// 앱 창(app.py)은 주소에 ?client=app 을 달고 온다. 서버는 앱 창이 있으면 브라우저 탭에 yield 를 보낸다
+const CLIENT = new URLSearchParams(location.search).get('client') === 'app' ? 'app' : 'browser';
+
 async function pollLoop() {
   for (;;) {
     let cmd;
     try {
-      cmd = await fetch('/api/poll').then((x) => x.json());
+      cmd = await fetch(`/api/poll?client=${CLIENT}`).then((x) => x.json());
       setStatus('Claude 연결됨', 'ok');
     } catch {
       setStatus('브리지 서버 끊김', 'err');
       await new Promise((r) => setTimeout(r, 2000));
       continue;
+    }
+    if (cmd.type === 'yield') {
+      setStatus('앱 창이 열려 이 탭은 Claude 명령을 받지 않는다', 'err');
+      log('앱 창이 열려 이 탭은 쉰다. 닫아도 된다');
+      return;
     }
     if (!cmd.id) continue;
     busy = true;

@@ -387,7 +387,10 @@ switch (sub) {
       for (let i = 0; i < 20 && !h.browser; i++) { await sleep(500); h = await health(); }
     }
     const mode = openMode(args);
-    if (h.browser) await cmd({ type: 'open' });       // 이미 열린 탭이 있으면 그 탭에 새 문서를 연다
+    // 이미 열린 화면이 있으면 그 화면에 새 문서를 연다. 다만 앱 모드(터미널 기본, --app)에서는 앱 창만 다시 쓴다.
+    // 예전에 열어 둔 브라우저 탭이 서버에 붙어 있다고 앱 창 대신 그 탭에 열던 것을 막는다(2026-10-21 사용자 지적).
+    // 앱 창이 뜨면 서버가 그 탭에 yield 를 보내 물러나게 한다
+    if (h.browser && (mode !== 'app' || h.app)) await cmd({ type: 'open' });
     else if (mode === 'preview') {
       // 데스크탑 앱: 창을 띄우지 않고 앱 내장 브라우저(미리보기)가 열 항목을 .claude/launch.json 에 둔다
       const where = registerPreview(`http://localhost:${PORT}/`);
