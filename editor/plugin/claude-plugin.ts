@@ -25,6 +25,7 @@ import { CharShapeDialog } from '@/ui/char-shape-dialog';
 import { ParaShapeDialog } from '@/ui/para-shape-dialog';
 import { TableCellPropsDialog } from '@/ui/table-cell-props-dialog';
 import { installKCommands } from './k-commands';
+import { installContextMenu } from './context-menu';
 import { installLogPanel } from './log-panel';
 import { installMemoPanel } from './memo-panel';
 import { installColorPalettes } from './color-palette';
@@ -539,6 +540,7 @@ export function createClaudePlugin(getInputHandler) {
       installCellBlockErase(getInputHandler);
       installCellClipboard(getInputHandler);   // 칸 블록 Ctrl+C, X, V
       installPictureCrop(getInputHandler);
+      installContextMenu(getInputHandler);   // 오른쪽 클릭 메뉴를 한/글처럼(지우기, 스타일, 글머리표, 하이퍼링크 등)
       installSystemFonts();   // 이 PC 설치 글꼴을 글꼴 목록에, 고른 글꼴의 폭 표를 엔진에
       installLogPanel();
       const memoPanel = installMemoPanel(host, getInputHandler);   // 메모 보기(패널, 걸린 글 표시, `$E memos`)
