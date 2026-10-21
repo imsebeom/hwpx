@@ -81,6 +81,9 @@ const pkgDir = path.join(RHWP, 'pkg');
 const cargoBin = path.join(os.homedir(), '.cargo', 'bin');
 const hasRust = ['cargo', 'wasm-pack'].every((b) => fs.existsSync(path.join(cargoBin, `${b}${process.platform === 'win32' ? '.exe' : ''}`)));
 // 패치 두 형태: anchor 앞에 insert 끼우기, 또는 find 를 replace 로 바꾸기(이미 replace 가 들어 있으면 건너뜀).
+// ⚠ 이미 적용한 patches/*.rs 를 고치면 다시 적용되지 않는다(소스의 표식만 보고 건너뛰고, pkg/.claude-patched 가 이름만 보고 WASM 빌드도 건너뛴다).
+//    고친 뒤에는 .build/rhwp 소스에서 그 패치 덩어리(표식 줄부터 anchor 앞까지)를 걷어 내고 .build/rhwp/pkg/.claude-patched 를 지운 다음 --build.
+//    2026-10-21 memo-new 에서 두 번 옛 코드로 빌드됐다. 내용 대조로 막으려 했으나 뒤 패치가 앞 패치 자리를 다시 고쳐 오탐이 나서 접었다.
 const RUST_PATCHES = [
   {
     id: 'hwpx-hf-autonum',
