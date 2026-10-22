@@ -740,6 +740,8 @@ const RUST_PATCHES = [
     ['group-textbox-cursor-nav', 'src/document_core/queries/cursor_nav.rs'],
     ['group-textbox-doc-tree-nav', 'src/document_core/queries/doc_tree_nav.rs'],
     ['group-textbox-rendering', 'src/document_core/queries/rendering.rs'],
+    ['ungroup-matrix-shape', 'src/document_core/commands/object_ops/shape.rs'],
+    ['transparent-shape-shape-layout', 'src/renderer/layout/shape_layout.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));
