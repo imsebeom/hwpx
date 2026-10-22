@@ -715,6 +715,14 @@ const RUST_PATCHES = [
     ['crop-dim-scale', 'src/document_core/commands/object_ops/picture.rs'],
     // 셀 영역 배경과 대각선은 끝 칸의 병합 범위 끝까지, 끝 주소가 가려진 칸이면 셀 영역을 쓰지 않는다(한/글 사본 실험)
     ['cellzone-span-table-layout', 'src/renderer/layout/table_layout.rs'],
+    // 가운뎃점 바로 뒤가 라틴, 숫자면 가운뎃점 앞뒤로 꺾지 않는다(새 정답본 307곳 모두)
+    ['dot-latin-glue-line-breaking', 'src/renderer/composer/line_breaking.rs'],
+    // 어절 단위 한글 낱말은 한자, ・ 에서 끊지 않고, 글자 단위에서 ・ 는 줄 머리 금칙(한/글 사본 실험)
+    ['word-cjk-glue-line-breaking', 'src/renderer/composer/line_breaking.rs'],
+    // 글자 단위 문단은 닫는 부호, 빗금, 쉼표, 붙임표 바로 뒤 한글 앞에서도 꺾는다(latin-hangul-break, bullet-dot-word 뒤에 와야 한다)
+    ['close-hangul-break-line-breaking', 'src/renderer/composer/line_breaking.rs'],
+    // 문단 끝 빈칸 묶음도 처음 두 칸 뒤로는 시작 위치가 줄 폭을 넘으면 다음 줄로(한/글 사본 실험 ts, t2)
+    ['trailing-space-wrap-line-breaking', 'src/renderer/composer/line_breaking.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));
