@@ -713,6 +713,8 @@ const RUST_PATCHES = [
     ['no-base-trim-typeset', 'src/renderer/typeset.rs'],
     // 그림 자르기 값을 원본 크기(orgSz)와 imgDim 사이 비율로 바꿔 읽고 쓴다(두 단위가 다른 그림을 자르면 크게 확대돼 보이던 문제)
     ['crop-dim-scale', 'src/document_core/commands/object_ops/picture.rs'],
+    // 셀 영역 배경과 대각선은 끝 칸의 병합 범위 끝까지, 끝 주소가 가려진 칸이면 셀 영역을 쓰지 않는다(한/글 사본 실험)
+    ['cellzone-span-table-layout', 'src/renderer/layout/table_layout.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));
