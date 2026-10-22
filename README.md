@@ -1,5 +1,9 @@
 # hwpx-skill
 
+![왼쪽 터미널에서 Claude 에게 「멋진 디자인, 이미지와 함께 청파동을 소개해 줘」라고 요청하고, 오른쪽 에디터 창에서 그림, 표, 제목 상자가 든 문서가 실시간으로 만들어지는 화면](docs/images/editor-mode.png)
+
+**터미널에서 Claude 에게 말하면, 옆의 한글 에디터 창에서 문서가 실시간으로 만들어지고 고쳐집니다.** 한컴오피스 없이 돌아가며, 에디터 화면은 한/글 2024 와 같은 줄, 같은 쪽이 되도록 맞춰 두었습니다(아래 [에디터 모드](#에디터-모드-2026-09-25)).
+
 HWPX(한컴오피스 한글 개방형 문서) 생성, 편집, 병합을 위한 Claude Code 커스텀 스킬.
 
 ## 참조 및 크레딧
@@ -141,8 +145,6 @@ python $S/chart_hwpx.py 문서.hwpx 차트본.hwpx --data 자료.csv --type line
 ## 에디터 모드 (2026-09-25)
 
 rhwp-studio 를 로컬에서 띄워, 사용자는 에디터 창에서 보며 고치고 Claude 는 같은 문서를 다시 열지 않고 실시간으로 고친다. 명령과 도구 전체는 [`references/editor-mode.md`](references/editor-mode.md).
-
-![왼쪽 터미널에서 Claude 에게 「멋진 디자인, 이미지와 함께 청파동을 소개해 줘」라고 요청하고, 오른쪽 에디터 창에서 그림, 표, 제목 상자가 든 문서가 실시간으로 만들어지는 화면](docs/images/editor-mode.png)
 
 ```bash
 E="node ~/.claude/skills/hwpx/editor/cli.mjs"
