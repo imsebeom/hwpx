@@ -727,6 +727,8 @@ const RUST_PATCHES = [
     ['ideographic-space-line-breaking', 'src/renderer/composer/line_breaking.rs'],
     // 하이픈 점 ‧ 도 줄 머리 금칙(새 정답본 한글 뒤 70곳 중 0)
     ['hyphen-point-kinsoku-line-breaking', 'src/renderer/composer/line_breaking.rs'],
+    // HWPX 표를 읽을 때 칸 폭을 표 열 격자에 맞춘다(열 폭은 단일 열 칸 최빈값, 마지막 열은 표 폭 - 나머지, 한/글 새 정답본 d007, d046, d200)
+    ['table-grid-width-section', 'src/parser/hwpx/section.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));
