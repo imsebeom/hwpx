@@ -310,6 +310,21 @@ function readWidths(face) {
   }
 }
 
+// 한컴바탕(TTF 이름으로 찾은 것)과 설치되지 않은 글꼴의 대체: 한/글은 라틴(U+0250 미만), 따옴표 ‘’“”, 한글 자모, ・･ 와
+// 한글 음절은 한컴바탕으로, 그 밖의 기호와 한자는 함초롬바탕으로 그린다(lab exp/make_fallback.py, PDF 글꼴 185자)
+const haansoftOwn = (code) => code < 0x250 || (code >= 0x2018 && code <= 0x201d) || (code >= 0x3131 && code <= 0x318e) || code === 0x30fb || code === 0xff65;
+function haansoftSubstitute(name) {
+  const fallback = hcrFallback();
+  return metricsFor('한컴바탕').map(({ file, ranges, ...metric }) => ({
+    ...metric,
+    name,
+    ranges: ranges.map(([start, widths]) => [start, widths.map((w, i) => {
+      const fb = haansoftOwn(start + i) ? undefined : fallback.get(start + i);
+      return fb ? Math.round((fb * metric.em) / 1000) : w;
+    })]),
+  }));
+}
+
 const metricsMemo = new Map();
 /** 글꼴 이름 하나의 폭 표(보통, 있으면 굵은 얼굴). 이 PC 에 없으면 빈 배열 */
 export function metricsFor(name) {
@@ -389,7 +404,18 @@ export function fontMetricsForNames(names, mod) {
       // 한양중고딕, 한양견고딕, 한양견명조 — 내장 표의 × ° ± 와 따옴표가 한/글과 달랐다)
       const hft = !process.env.NO_HFT_METRICS && hftMetrics().get(name);
       if (hft) { result.read.push(name); result.metrics.push(hft); continue; }
-      if (!builtin) result.missing.push(name);
+      if (!builtin) {
+        result.missing.push(name);
+        // 한/글은 설치되지 않은 글꼴을 한컴바탕으로 놓는다(lab exp/make_fallback.py: 없는 이름, KoPubWorld바탕체,
+        // Noto Serif CJK SC 모두 PDF 글꼴이 Haansoft Batang, 글자 폭도 한컴바탕 문서와 같다, 고딕 분류여도 같다).
+        // 엔진 어림(라틴 반각)은 130자 중 67자가 달랐다. 한컴바탕 파일이 없으면 종전대로 엔진 어림
+        result.metrics.push(...haansoftSubstitute(name));
+      }
+      continue;
+    }
+    if (name === '한컴바탕') {
+      result.read.push(name);
+      result.metrics.push(...haansoftSubstitute(name));
       continue;
     }
     result.read.push(name);
