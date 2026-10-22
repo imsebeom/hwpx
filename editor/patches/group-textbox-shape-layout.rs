@@ -70,6 +70,15 @@ fn textbox_vpos_origin_hu(common: &CommonObjAttr, matrix_positioned: bool) -> Op
                             cell_index: claude_group_cell_index(), // [claude-hwpx group-textbox]
                             cell_para_index: ci.cell_para_index,
 // ==== next ====
+                        cell_para_index,
+                        outer_table_control_index,
+                        ..RectangleNode::new(round_px, style, gradient)
+// ==== replace ====
+                        cell_para_index,
+                        outer_table_control_index,
+                        claude_group_code: claude_group_cell_index(), // [claude-hwpx group-textbox]
+                        ..RectangleNode::new(round_px, style, gradient)
+// ==== next ====
                         let pic_cell_ctx = CellContext {
                             in_textbox: true,
                             parent_para_index: para_index,

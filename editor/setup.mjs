@@ -733,9 +733,12 @@ const RUST_PATCHES = [
     ['group-textbox-helpers', 'src/document_core/helpers.rs'],
     ['group-textbox-text-editing', 'src/document_core/commands/text_editing.rs'],
     ['group-textbox-clipboard', 'src/document_core/commands/clipboard.rs'],
+    ['group-textbox-render-tree', 'src/renderer/render_tree.rs'],
     ['group-textbox-shape-layout', 'src/renderer/layout/shape_layout.rs'],
+    ['group-textbox-table', 'src/document_core/commands/object_ops/table.rs'],
     ['group-textbox-cursor-rect', 'src/document_core/queries/cursor_rect.rs'],
     ['group-textbox-cursor-nav', 'src/document_core/queries/cursor_nav.rs'],
+    ['group-textbox-doc-tree-nav', 'src/document_core/queries/doc_tree_nav.rs'],
     ['group-textbox-rendering', 'src/document_core/queries/rendering.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
@@ -951,7 +954,9 @@ for (const [id, rel] of [['wrap-text-labels', 'ui/picture-props-dialog.ts'], ['w
   ['fn-char-format-bridge', 'core/wasm-bridge.ts'], ['fn-char-format-handler', 'engine/input-handler.ts'],
   ['fn-char-format-keyboard', 'engine/input-handler-keyboard.ts'],
   // 인쇄 미리보기 새 창이 막히거나 못 쓰면 화면 안에서 바로 브라우저 인쇄 창을 연다(2026-10-21 로컬 에디터 팝업 차단, 미리보기에서 멈춤)
-  ['print-fallback', 'command/commands/file.ts']]) {
+  ['print-fallback', 'command/commands/file.ts'],
+  // 묶음 안 글상자에서 글을 친 뒤 커서가 제자리에 멈추던 것: 글상자 커서의 칸 번호(묶음 자식 경로)를 0 으로 덮지 않는다(엔진 group-textbox)
+  ['group-textbox-cursor', 'engine/cursor.ts']]) {
   const f = path.join(STUDIO, 'src', ...rel.split('/'));
   let src = fs.readFileSync(f, 'utf8');
   if (src.includes(`[claude-hwpx ${id}]`)) continue;
