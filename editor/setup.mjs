@@ -729,6 +729,14 @@ const RUST_PATCHES = [
     ['hyphen-point-kinsoku-line-breaking', 'src/renderer/composer/line_breaking.rs'],
     // HWPX 표를 읽을 때 칸 폭을 표 열 격자에 맞춘다(열 폭은 단일 열 칸 최빈값, 마지막 열은 표 폭 - 나머지, 한/글 새 정답본 d007, d046, d200)
     ['table-grid-width-section', 'src/parser/hwpx/section.rs'],
+    // 묶음 개체 안 글상자도 편집한다: 글상자 셀 경로 칸 번호에 묶음 자식 경로를 싣고, 글상자를 찾을 때 그 자식에서 찾는다(사용자 보고 워크시트 hwp)
+    ['group-textbox-helpers', 'src/document_core/helpers.rs'],
+    ['group-textbox-text-editing', 'src/document_core/commands/text_editing.rs'],
+    ['group-textbox-clipboard', 'src/document_core/commands/clipboard.rs'],
+    ['group-textbox-shape-layout', 'src/renderer/layout/shape_layout.rs'],
+    ['group-textbox-cursor-rect', 'src/document_core/queries/cursor_rect.rs'],
+    ['group-textbox-cursor-nav', 'src/document_core/queries/cursor_nav.rs'],
+    ['group-textbox-rendering', 'src/document_core/queries/rendering.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));
