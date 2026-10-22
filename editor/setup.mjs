@@ -723,6 +723,10 @@ const RUST_PATCHES = [
     ['close-hangul-break-line-breaking', 'src/renderer/composer/line_breaking.rs'],
     // 문단 끝 빈칸 묶음도 처음 두 칸 뒤로는 시작 위치가 줄 폭을 넘으면 다음 줄로(한/글 사본 실험 ts, t2)
     ['trailing-space-wrap-line-breaking', 'src/renderer/composer/line_breaking.rs'],
+    // 전각 빈칸(U+3000)은 빈칸처럼 뒤에서 꺾고 줄 끝에 매단다(새 정답본 d266, d214)
+    ['ideographic-space-line-breaking', 'src/renderer/composer/line_breaking.rs'],
+    // 하이픈 점 ‧ 도 줄 머리 금칙(새 정답본 한글 뒤 70곳 중 0)
+    ['hyphen-point-kinsoku-line-breaking', 'src/renderer/composer/line_breaking.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));
