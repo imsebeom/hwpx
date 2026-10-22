@@ -744,6 +744,7 @@ const RUST_PATCHES = [
     ['transparent-shape-shape-layout', 'src/renderer/layout/shape_layout.rs'],
     ['paren-dot-break-line-breaking', 'src/renderer/composer/line_breaking.rs'],
     ['symbol-break-line-breaking', 'src/renderer/composer/line_breaking.rs'],
+    ['hft-bold-extra-text-measurement', 'src/renderer/layout/text_measurement.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));
