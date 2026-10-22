@@ -745,6 +745,13 @@ const RUST_PATCHES = [
     ['paren-dot-break-line-breaking', 'src/renderer/composer/line_breaking.rs'],
     ['symbol-break-line-breaking', 'src/renderer/composer/line_breaking.rs'],
     ['hft-bold-extra-text-measurement', 'src/renderer/layout/text_measurement.rs'],
+    // 각주 겹침(가이드북 파트2 합본): 빈 문단 위아래 배치 표 전진에 캡션, 열 때 각주 번호를 순서대로, 쪽에 걸친 표 칸 각주는 표가 끝나는 쪽에,
+    // 본문 문단 맞춤에 문단 안 각주, 줄 나누기에서 각주 안전 여유 빼지 않기(근거 lab README, exp/make_cellnote_split.py 13/13)
+    ['empty-host-caption-typeset', 'src/renderer/typeset.rs'],
+    ['note-renumber-load-document', 'src/document_core/commands/document.rs'],
+    ['cellnote-split-end-typeset', 'src/renderer/typeset.rs'],
+    ['body-note-fit-typeset', 'src/renderer/typeset.rs'],
+    ['split-note-margin-typeset', 'src/renderer/typeset.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));
