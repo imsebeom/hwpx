@@ -258,6 +258,208 @@ EDITS = [
         (" " * 28, "ci.cell_para_index"),
     ]
 ]
+# 경로(cellPath)로 글상자 문단을 찾는 세 자리: 커서 좌표(getCursorRectByPath), 경로 검증, 경로 문단 가변 참조
+_CHECK = (
+    "                    if cell_idx != 0 {\n"
+    "                        return Err(HwpError::RenderError(format!(\n"
+    '                            "경로[{}]: 글상자의 cell_index는 0이어야 합니다 ({})",\n'
+    "                            i, cell_idx\n"
+    "                        )));\n"
+    "                    }\n"
+)
+EDITS += [
+    (
+        "document_core/commands/object_ops/table.rs",
+        _CHECK
+        + "                    let text_box = get_textbox_from_shape_mut(shape).ok_or_else(|| {\n",
+        f"                    // {TAG} 묶음이면 칸 번호에 실은 자식 경로의 글상자\n"
+        "                    let text_box = crate::document_core::helpers::claude_textbox_at_mut(shape, cell_idx).ok_or_else(|| {\n",
+    ),
+    (
+        "document_core/commands/object_ops/table.rs",
+        _CHECK
+        + "                    let text_box = get_textbox_from_shape(shape.as_ref()).ok_or_else(|| {\n",
+        f"                    // {TAG} 묶음이면 칸 번호에 실은 자식 경로의 글상자\n"
+        "                    let text_box = crate::document_core::helpers::claude_textbox_at(shape.as_ref(), cell_idx).ok_or_else(|| {\n",
+    ),
+    (
+        "document_core/queries/cursor_nav.rs",
+        _CHECK
+        + "                    let text_box = get_textbox_from_shape(shape).ok_or_else(|| {\n",
+        f"                    // {TAG} 경로 검사: 묶음이면 칸 번호에 실은 자식 경로의 글상자\n"
+        "                    let text_box = crate::document_core::helpers::claude_textbox_at(shape, cell_idx).ok_or_else(|| {\n",
+    ),
+]
+# 사각형 노드에 묶음 자식 경로를 싣는다(속이 빈 글상자는 글자 조각이 없어 경로를 못 찾는다)
+EDITS += [
+    (
+        "renderer/render_tree.rs",
+        "    /// [Task #1138] 표 셀 내 도형인 경우: outer paragraph 의 표 control 인덱스\n"
+        "    #[serde(default)]\n"
+        "    pub outer_table_control_index: Option<usize>,\n"
+        "}\n"
+        "\n"
+        "impl RectangleNode {\n",
+        "    /// [Task #1138] 표 셀 내 도형인 경우: outer paragraph 의 표 control 인덱스\n"
+        "    #[serde(default)]\n"
+        "    pub outer_table_control_index: Option<usize>,\n"
+        f"    /// {TAG} 묶음 자식이면 글상자 셀 경로 칸 번호(묶음 자식 경로), 아니면 0\n"
+        "    #[serde(skip)]\n"
+        "    pub claude_group_code: usize,\n"
+        "}\n"
+        "\n"
+        "impl RectangleNode {\n",
+    ),
+    (
+        "renderer/render_tree.rs",
+        "            cell_index: None,\n"
+        "            cell_para_index: None,\n"
+        "            outer_table_control_index: None,\n"
+        "        }\n"
+        "    }\n"
+        "}\n"
+        "\n"
+        "/// 타원 노드\n",
+        "            cell_index: None,\n"
+        "            cell_para_index: None,\n"
+        "            outer_table_control_index: None,\n"
+        f"            claude_group_code: 0, // {TAG}\n"
+        "        }\n"
+        "    }\n"
+        "}\n"
+        "\n"
+        "/// 타원 노드\n",
+    ),
+    (
+        "renderer/layout/shape_layout.rs",
+        "                        cell_para_index,\n"
+        "                        outer_table_control_index,\n"
+        "                        ..RectangleNode::new(round_px, style, gradient)\n",
+        "                        cell_para_index,\n"
+        "                        outer_table_control_index,\n"
+        f"                        claude_group_code: claude_group_cell_index(), // {TAG}\n"
+        "                        ..RectangleNode::new(round_px, style, gradient)\n",
+    ),
+]
+# 글상자 빈 자리(글머리 앞 여백 등) 누르기: 진입 위치의 칸 번호를 그 글상자 글자 조각의 경로에서 가져온다
+EDITS += [
+    (
+        "document_core/queries/cursor_rect.rs",
+        "            if let Some((si, pi, ci)) = textbox_meta {\n"
+        "                textbox_bboxes.push(TextBoxBboxInfo {\n",
+        f"            // {TAG} 글상자 노드를 실제로 가진 도형만 빈 자리 후보로 모은다. 묶음의 테두리 다각형(글상자 없음)이\n"
+        "            // 후보가 되어 그 자리를 누르면 없는 글상자로 들어가 글이 안 써졌다(워크시트 「단원 설계의 중점」 틀)\n"
+        "            let textbox_meta = textbox_meta\n"
+        "                .filter(|_| node.children.iter().any(|c| matches!(c.node_type, RenderNodeType::TextBox)));\n"
+        "            if let Some((si, pi, ci)) = textbox_meta {\n"
+        "                textbox_bboxes.push(TextBoxBboxInfo {\n",
+    ),
+    (
+        "document_core/queries/cursor_rect.rs",
+        "        struct TextBoxBboxInfo {\n"
+        "            section_index: usize,\n"
+        "            parent_para_index: usize,\n"
+        "            control_index: usize,\n",
+        "        struct TextBoxBboxInfo {\n"
+        "            section_index: usize,\n"
+        "            parent_para_index: usize,\n"
+        "            control_index: usize,\n"
+        f"            /// {TAG} 묶음 자식 경로(묶음이 아니면 0)\n"
+        "            cell_index: usize,\n",
+    ),
+    (
+        "document_core/queries/cursor_rect.rs",
+        "                textbox_bboxes.push(TextBoxBboxInfo {\n"
+        "                    section_index: si,\n"
+        "                    parent_para_index: pi,\n"
+        "                    control_index: ci,\n",
+        "                textbox_bboxes.push(TextBoxBboxInfo {\n"
+        "                    section_index: si,\n"
+        "                    parent_para_index: pi,\n"
+        "                    control_index: ci,\n"
+        f"                    // {TAG} 사각형은 그릴 때 실은 묶음 경로, 그 밖은 글자 조각의 경로에서\n"
+        "                    cell_index: match &node.node_type {\n"
+        "                        RenderNodeType::Rectangle(r) if r.claude_group_code != 0 => r.claude_group_code,\n"
+        "                        _ => claude_textbox_cell_index(node, ci),\n"
+        "                    },\n",
+    ),
+    (
+        "document_core/queries/cursor_rect.rs",
+        "        fn format_textbox_entry(tb: &TextBoxBboxInfo, page_num: u32) -> String {\n",
+        f"        /// {TAG} 글상자 노드 아래 글자 조각의 셀 경로에서 이 글상자(개체 번호 ci)의 칸 번호(묶음 자식 경로)를 찾는다\n"
+        "        fn claude_textbox_cell_index(node: &RenderNode, ci: usize) -> usize {\n"
+        "            for ch in &node.children {\n"
+        "                if let RenderNodeType::TextRun(ref tr) = ch.node_type {\n"
+        "                    if let Some(ref ctx) = tr.cell_context {\n"
+        "                        if let Some(e) = ctx.path.iter().find(|e| e.control_index == ci) {\n"
+        "                            return e.cell_index;\n"
+        "                        }\n"
+        "                    }\n"
+        "                }\n"
+        "                let v = claude_textbox_cell_index(ch, ci);\n"
+        "                if v != 0 {\n"
+        "                    return v;\n"
+        "                }\n"
+        "            }\n"
+        "            0\n"
+        "        }\n"
+        "\n"
+        "        fn format_textbox_entry(tb: &TextBoxBboxInfo, page_num: u32) -> String {\n",
+    ),
+    (
+        "document_core/queries/cursor_rect.rs",
+        r"                 \"parentParaIndex\":{},\"controlIndex\":{},\"cellIndex\":0,\"cellParaIndex\":0,\
+                 \"cellPath\":[{{\"controlIndex\":{},\"cellIndex\":0,\"cellParaIndex\":0}}],\
+"
+        + "",
+        r"                 \"parentParaIndex\":{},\"controlIndex\":{},\"cellIndex\":{},\"cellParaIndex\":0,\
+                 \"cellPath\":[{{\"controlIndex\":{},\"cellIndex\":{},\"cellParaIndex\":0}}],\
+"
+        + "",
+    ),
+    (
+        "document_core/queries/cursor_rect.rs",
+        "                tb.section_index,\n"
+        "                tb.parent_para_index,\n"
+        "                tb.control_index,\n"
+        "                tb.control_index,\n"
+        "                page_num,\n",
+        "                tb.section_index,\n"
+        "                tb.parent_para_index,\n"
+        "                tb.control_index,\n"
+        "                tb.cell_index,\n"
+        "                tb.control_index,\n"
+        "                tb.cell_index,\n"
+        "                page_num,\n",
+    ),
+]
+# 커서 이동: 경로 문단 찾기, 경로 문단 수, 이동 문맥(방향키로 문단 넘나들기)
+EDITS += [
+    (
+        "document_core/queries/cursor_nav.rs",
+        "                    let text_box = get_textbox_from_shape(shape).ok_or_else(|| {\n"
+        '                        HwpError::RenderError(format!("경로[{}]: 글상자가 아닙니다", i))\n',
+        f"                    // {TAG} 묶음이면 칸 번호에 실은 자식 경로의 글상자\n"
+        "                    let text_box = crate::document_core::helpers::claude_textbox_at(shape, cell_idx).ok_or_else(|| {\n"
+        '                        HwpError::RenderError(format!("경로[{}]: 글상자가 아닙니다", i))\n',
+    ),
+    (
+        "document_core/queries/cursor_nav.rs",
+        "                let text_box = get_textbox_from_shape(shape)\n"
+        '                    .ok_or_else(|| HwpError::RenderError("글상자가 아닙니다".to_string()))?;\n',
+        f"                // {TAG} 묶음이면 칸 번호에 실은 자식 경로의 글상자\n"
+        "                let text_box = crate::document_core::helpers::claude_textbox_at(shape, last.1)\n"
+        '                    .ok_or_else(|| HwpError::RenderError("글상자가 아닙니다".to_string()))?;\n',
+    ),
+    (
+        "document_core/queries/doc_tree_nav.rs",
+        "            if let Control::Shape(s) = ctrl {\n"
+        "                let tb = get_textbox_from_shape(s.as_ref())?;\n",
+        "            if let Control::Shape(s) = ctrl {\n"
+        f"                // {TAG} 묶음이면 칸 번호에 실은 자식 경로의 글상자\n"
+        "                let tb = crate::document_core::helpers::claude_textbox_at(s.as_ref(), entry.cell_idx)?;\n",
+    ),
+]
 # 그림, 수식 두 자리는 같은 꼴이라 앞 줄로 가른다
 EDITS += [
     (

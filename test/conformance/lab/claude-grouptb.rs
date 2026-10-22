@@ -31,7 +31,9 @@ fn main() {
     } else {
         (num("x=\"").unwrap(), num("y=\"").unwrap())
     };
-    let hit = doc.hit_test_native(page, x + 2.0, y - 4.0).unwrap();
+    // CLAUDE_DX=-20 처럼 주면 글자보다 그만큼 왼쪽(글머리 앞 여백 등)을 누른다
+    let dx: f64 = std::env::var("CLAUDE_DX").ok().and_then(|v| v.parse().ok()).unwrap_or(2.0);
+    let hit = doc.hit_test_native(page, x + dx, y - 4.0).unwrap();
     println!("누름 ({x:.1},{y:.1}) → {hit}");
     let h: Value = serde_json::from_str(&hit).unwrap();
     let sec = h["sectionIndex"].as_u64().unwrap() as usize;
@@ -45,6 +47,15 @@ fn main() {
     let after = doc.get_text_in_cell_native(sec, ppi, ci, cell, cpi, 0, 100);
     println!("넣기 결과 {:?}", r.as_ref().map(|_| "ok").map_err(|e| e.to_string()));
     println!("전 {:?}\n후 {:?}", before.map_err(|e| e.to_string()), after.map_err(|e| e.to_string()));
+    // 경로로 커서 찾기(에디터가 쓰는 getCursorRectByPath): 넣은 글 길이만큼 x 가 늘어야 한다
+    let path = format!(r#"[{{"controlIndex":{ci},"cellIndex":{cell},"cellParaIndex":{cpi}}}]"#);
+    let n = ins.chars().count();
+    let mut wdoc = rhwp::wasm_api::HwpDocument::from_bytes(&bytes).unwrap();
+    let _ = wdoc.insert_text_in_cell(sec as u32, ppi as u32, ci as u32, cell as u32, cpi as u32, off as u32, ins);
+    for o in [off, off + n] {
+        let r: String = wdoc.get_cursor_rect_by_path(sec as u32, ppi as u32, &path, o as u32).unwrap_or_default();
+        println!("경로 커서 {o}: {}", r.chars().take(90).collect::<String>());
+    }
     let svg2 = doc.render_page_svg_native(page).unwrap();
     let first = ins.chars().next().unwrap();
     println!("다시 그린 쪽에 넣은 글 있음: {}", svg2.contains(&format!(">{}</text>", first)));
