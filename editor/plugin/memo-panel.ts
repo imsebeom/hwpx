@@ -355,7 +355,29 @@ export function installMemoPanel(host, getInputHandler) {
   const updateButton = () => {
     const label = document.querySelector('#tb-claude-memo .tb-label');
     if (label) label.innerHTML = `메모<br/>${memos.length ? `${memos.length}개` : '보기'}`;
+    for (const e of document.querySelectorAll('[data-cmd="view:claude-memo"]')) e.classList.toggle('active', shown);
   };
+  // 보기 메뉴: 「투명 선」 뒤에 「메모」(2026-10-23 사용자 요청 「메모창을 보고 안 보고 할 메뉴가 없다」). 켜져 있으면 격자 보기처럼 칠한다
+  const addMenu = () => {
+    const reg = getInputHandler()?.dispatcher?.registry;
+    const anchor = document.querySelector('.md-item[data-cmd="view:border-transparent"]');
+    if (!reg || !anchor) return false;
+    if (!reg.get('view:claude-memo')) {
+      reg.register({ id: 'view:claude-memo', label: '메모', canExecute: (ctx) => ctx.hasDocument, execute: () => (shown ? hide(true) : show(true)) });
+    }
+    if (!document.querySelector('.md-item[data-cmd="view:claude-memo"]')) {
+      const item = el('div', 'md-item');
+      item.dataset.cmd = 'view:claude-memo';
+      item.title = '오른쪽 메모 창 보이기/숨기기';
+      item.innerHTML = '<span class="md-icon"></span><span class="md-label">메모</span>';
+      anchor.after(item);
+    }
+    updateButton();
+    return true;
+  };
+  if (!addMenu()) {
+    const t = setInterval(() => { if (addMenu()) clearInterval(t); }, 300);
+  }
   const addButton = () => {
     if (document.getElementById('tb-claude-memo')) return true;
     const anchor = document.getElementById('tb-claude-log') ?? [...document.querySelectorAll('.tb-btn')].find((b) => b.title === '하이퍼링크');
