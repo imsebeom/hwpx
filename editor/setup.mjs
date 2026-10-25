@@ -797,6 +797,9 @@ const RUST_PATCHES = [
     ['charfmt-vpos-chain-formatting', 'src/document_core/commands/formatting.rs'],
     // 상태 표시줄의 고른 글자 수(플러그인 selection-count): 범위 안 표, 글상자, 캡션 글까지 센다
     ['sel-char-count-wasm', 'src/wasm_api.rs'],
+    // 「셀 단위로 나눔」 표 칸 안의 「셀 단위로 나눔」 1×1 중첩 표는 한 쪽보다 작아도 쪽 끝에서 나눈다(한국문화 1단원 사본 실험,
+    // 조각은 자식 칸 CellUnit 으로 재고 legacy 조각 보정은 끈다. 줄 배치 없는 빈 문단은 접지 않고, 낡은 저장 vpos 는 쓰지 않는다)
+    ['cell-nested-split-table-layout', 'src/renderer/layout/table_layout.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));
