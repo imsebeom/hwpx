@@ -642,10 +642,10 @@ def zip_replace(src, dst, replacements):
 # ⚠️ 필수: fix_namespaces 후처리
 import subprocess, sys
 subprocess.run([sys.executable,
-    "C:/Users/hccga/.claude/skills/hwpx/scripts/fix_namespaces.py", dst], check=True)
+    "C:/Users/임세범/.claude/skills/hwpx/scripts/fix_namespaces.py", dst], check=True)
 # 검증
 subprocess.run([sys.executable,
-    "C:/Users/hccga/.claude/skills/hwpx/scripts/validate.py", dst])
+    "C:/Users/임세범/.claude/skills/hwpx/scripts/validate.py", dst])
 ```
 
 > **⚠️ fix_namespaces.py 누락 = 문서 안 열림!**
@@ -690,7 +690,7 @@ def zip_replace_with_images(src, dst, text_replacements, image_replacements):
     os.replace(tmp, dst)
     # ⚠️ 필수 후처리
     subprocess.run([sys.executable,
-        "C:/Users/hccga/.claude/skills/hwpx/scripts/fix_namespaces.py", dst], check=True)
+        "C:/Users/임세범/.claude/skills/hwpx/scripts/fix_namespaces.py", dst], check=True)
 ```
 
 ### 양식 선택 정책
@@ -1877,6 +1877,7 @@ subprocess.run(["python3", f"{SKILL_DIR}/scripts/fix_namespaces.py", "output.hwp
 41. **🔴 텍스트 치환은 `<hp:t>` 안에서만 — XML 전체 `str.replace` 금지**: section0.xml 문자열에 `text.replace(old, new)` 를 걸면 **속성값도 같이 바뀐다.** 2026-09-15 실측(코덱스가 만든 계획서): 「7→4」, 「17→」, 「4.2→」 같은 짧은 키가 `pagePr height="84186"` 을 `8` 로, 여백 `1417` 을 `14` 로, 표 7행 `rowAddr` 를 4 로 바꿨고 **XML 은 유효해서 `validate.py` 를 통과했는데 한글은 그 파일을 열다 멈췄다**(쪽 높이 8 HWPUNIT). 원본과 요소 수 1,706 동일, 속성 다른 요소 413. 처방 = ⓐ 치환은 `hwpx_helpers.replace_in_text_nodes()` 로 한다(태그와 속성은 건드리지 않고 `<hp:t>` 내부 글자만, 인라인 `<hp:tab/>` 조각도 처리). `zip_replace_all.py` 와 `clone_form.py` Phase 1 의 **기본이 이 방식**이고 XML 전체 치환은 `--raw` 를 줘야 한다(짧거나 숫자뿐인 키면 경고) ⓑ `validate.py` 가 **쪽 크기 상식(pagePr 10,000~300,000 HWPUNIT)과 표 격자(cellAddr 중복·빈 칸)** 를 검사한다 — 유효한 XML 이라도 이 둘에 걸리면 INVALID ⓒ 한글이 파일을 열다 멈추면 XML 오류가 아니라 **속성값 오염을 먼저 의심**하고, 글자를 뺀 구조 diff(태그와 속성만 나열해 원본과 대조)로 찾는다. AI 에게 hwpx 편집 스크립트를 쓰게 할 때도 「본문 글자만 바꿔라, 서식과 표 구조는 그대로」를 지시에 넣는다
 42. **🔴 줄 배치(`linesegarray`)는 더미로 두지 않는다 — 더미는 다른 구현체를 깨뜨린다**: 빌더가 넣는 `LINESEG_DUMMY`(한 줄짜리, polaris-dvc JID 11004 대응)는 한글만 다시 조판하고 **rhwp 는 그대로 믿어 문단 전체를 한 줄에 눌러 그린다.** 더미를 걷어도 **글자처럼 취급(`treatAsChar="1"`)하는 표**는 rhwp 가 행을 늘리지 못해 넘친 줄이 아래 표와 겹친다(rhwp 결함 #7419 — 글자처럼 취급하는 표의 비례 축소 규칙이 줄 배치 없는 행을 하한 0 으로 누른다). 그래서 `fix_namespaces.py` 명령줄 실행이 마지막에 `rhwp_convert.apply_layout()` 을 부른다 — 더미를 걷고(`editor/rhwp_layout.mjs`) **① 표 높이를 0 으로 열어 rhwp 가 내용으로 잰 높이를 얻고 ② 그 값을 `hp:sz height` 에 적는다.** 2026-10-02 실측(한글이 설치된 PC 에서 대조): 공문 3건의 줄 배치를 더미로 바꾼 뒤 이 보정을 하면 rhwp PDF 쪽수가 한글과 같아지고(더미 그대로면 2쪽 문서가 1쪽), **그 결과를 한글로 열면 원본과 픽셀 동일(0.000~0.004%)** 이다. 한글은 열 때 줄 배치와 표 높이를 다시 계산하기 때문이다. Node.js 가 필요하고 WASM 엔진(에디터 빌드, 없으면 npm `@rhwp/core`)은 처음 쓸 때 받는다. 할 수 없으면 경고만 내고 더미를 남긴다(한글에서는 문제없다). 2026-09-25~10-01 에는 한글 COM 으로 줄 배치를 계산했으나(`hancom_layout.py`) 한글 없이도 같은 결과가 나와 걷어 냈다
 43. **⚠ 줄 배치가 없는 표 칸 문단은 rhwp(에디터, rhwp PDF)가 마지막 한 글자를 다음 줄로 떨어뜨릴 수 있다**(2026-10-02 실측, 교육력제고 실적 낱장): 칸 폭의 절반밖에 안 되는 줄에서도 「[1차시」 다음 줄에 「]」, 「찾는다」 다음 줄에 「.」만 놓였다. **한글 렌더는 정상**이라 문서가 아니라 rhwp 결함이다. 같은 칸, 같은 문단 모양, 같은 글자 모양의 이웃 문단은 멀쩡해 규칙이 보이지 않고, `breakNonLatinWord` 를 KEEP_WORD 로 바꾸거나 글꼴(휴먼명조 → 맑은 고딕)을 바꿔도 같은 자리가 떨어졌다. 규칙 42 의 `apply_layout()` 은 표 높이만 적고 문단 줄 배치는 비워 두므로 이 증상을 막지 못한다. **한글이 계산한 줄 배치가 들어 있으면 rhwp 도 바르게 나눈다** — 한글이 있는 PC 라면 스킬 밖 빌드 스크립트에서 최종본만 한글로 열어 HWPX 로 다시 저장해 사용자에게 건넨다(규칙 36 에 따라 스킬 안에는 넣지 않는다. 본보기 `2026 수업/교육연구/2026 교육력제고/실적_임세범/hangul_resave.py`). 에디터에서 줄바꿈이 이상하다는 말을 들으면 먼저 한글 PDF 와 대조해 rhwp 쪽 문제인지 가른다
+44. **⚠ 쪽수와 줄 끝을 맞춰야 하는 제출 서식은 rhwp 렌더로 판정하지 않는다**(2026-10-25 표창 공적조서): rhwp PDF 와 에디터에서 한 줄, 6쪽이던 문서가 한글에서는 줄 끝 「등)」, 「구축(2026)」이 넘어가고 7쪽이 됐다(한글 글자 폭이 조금 넓다, 같은 세션 두 번). 칸 오른쪽 끝에 닿은 줄과 쪽 끝까지 찬 표는 한글이 있는 PC 라면 스킬 밖에서 숨은 데스크톱 COM 으로 사본을 PDF 로 저장해 확인한다(`references/hidden_desktop.py`, 본보기 `2026 글로벌 연수 지원/작업/hangul_pdf.py`). 넘치면 자간보다 글자를 줄이는 편이 두 렌더 모두에서 안전하다
 
 ---
 
