@@ -940,7 +940,7 @@ for (const [file, patch] of [['input-handler-table.ts', 'move-drop-table.ts'], [
 
 // 그림 속성의 「본문과의 배치」 단추를 아이콘 대신 글자로(patches/wrap-text-labels.ts), 「본문 위치」 고르기(wrap-text-flow.ts),
 // 오른쪽/아래 정렬 개체를 끄는 방향대로 옮기기(wrap-move-sign.ts),
-// 상태 표시줄 한 쪽~네 쪽 보기(page-view-cmd.ts 명령, page-view-buttons.ts 단추, 스타일은 아래 page-view-buttons.css),
+// 상태 표시줄 한 쪽, 두 쪽, 자동 보기(page-view-cmd.ts 명령, page-view-buttons.ts 단추, 스타일은 아래 page-view-buttons.css),
 // 표 첫 칸, 마지막 칸에서 좌우 화살표로 표 바로 앞뒤로 나가고 들어오기와 표 앞뒤 캐럿 그리기(table-arrow-edge.ts)
 for (const [id, rel] of [['wrap-text-labels', 'ui/picture-props-dialog.ts'], ['wrap-text-flow', 'ui/picture-props-dialog.ts'], ['wrap-move-sign', 'engine/input-handler-picture.ts'],
   ['page-view-cmd', 'command/commands/view.ts'], ['page-view-buttons', 'main.ts'], ['table-arrow-edge', 'engine/cursor.ts'],

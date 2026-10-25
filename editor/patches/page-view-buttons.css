@@ -1,5 +1,5 @@
 
-/* [claude-hwpx page-view-buttons] 한 쪽~네 쪽 보기 단추(patches/page-view-buttons.ts) */
+/* [claude-hwpx page-view-buttons] 한 쪽, 두 쪽, 자동 보기 단추(patches/page-view-buttons.ts) */
 .stb-page-view-group {
   display: inline-flex;
   align-items: center;
@@ -20,6 +20,10 @@
 .stb-page-view-btn.active {
   background: var(--ui-hover);
   border-color: var(--ui-border-strong);
+}
+.stb-page-view-btn.stb-page-view-auto {
+  font-size: 11px;
+  color: var(--color-text-secondary);
 }
 .stb-page-view-btn.active .stb-page-view-icon {
   fill: var(--ui-border-strong);
