@@ -2,7 +2,7 @@
 
     python apply_cell_nested_split.py [--revert]
 
-근거(사본 실험, 한국문화 1단원 삽입본 「푸른 바다로 둘러싸여 있어요」 상자, scratchpad mkvar.py → 한/글 2024 PDF):
+근거(사본 실험, 한국문화 1단원 삽입본 「푸른 바다로 둘러싸여 있어요」 상자, exp/make_cellsplit_var.py → 한/글 2024 PDF):
 바깥 1×1 표(CELL) 칸에 글 세 줄과 1×1 중첩 표(그림 문단, 빈 문단 셋, 글 세 줄)가 있다.
   - 바깥 CELL, 안 CELL: 한/글은 안 표를 쪽 끝에서 나눈다(그림과 「동해」 줄은 앞 쪽, 「서해」부터 다음 쪽)
   - 바깥 CELL, 안 TABLE/NONE: 안 표를 통째로 다음 쪽으로(엔진도 같다)
