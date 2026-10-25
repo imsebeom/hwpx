@@ -35,6 +35,7 @@ import { installCellBlockErase } from './cell-block-erase';
 import { installCellClipboard } from './cell-clipboard';
 import { installPictureCrop } from './picture-crop';
 import { installSystemFonts } from './system-fonts';
+import { installSelectionCount } from './selection-count';
 import * as rhwpWasm from '@wasm/rhwp.js';
 
 // 이름이 이렇게 시작하는 WASM 메서드는 문서를 바꾸지 않는다고 본다.
@@ -542,6 +543,7 @@ export function createClaudePlugin(getInputHandler) {
       installPictureCrop(getInputHandler);
       installContextMenu(getInputHandler);   // 오른쪽 클릭 메뉴를 한/글처럼(지우기, 스타일, 글머리표, 하이퍼링크 등)
       installSystemFonts();   // 이 PC 설치 글꼴을 글꼴 목록에, 고른 글꼴의 폭 표를 엔진에
+      installSelectionCount(getInputHandler);   // 고른 글자 수를 상태 표시줄에(x글자(공란 제외 y글자))
       installLogPanel();
       const memoPanel = installMemoPanel(host, getInputHandler);   // 메모 보기(패널, 걸린 글 표시, `$E memos`)
       installEditLog(host, getInputHandler);   // 사용자 편집을 하나하나 /api/ops 로(`$E changes`)
