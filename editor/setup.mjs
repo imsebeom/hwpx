@@ -795,6 +795,8 @@ const RUST_PATCHES = [
     ['delcol-reflow-table-ops', 'src/document_core/commands/table_ops.rs'],
     // 글자 서식으로 다시 접은 본문 문단의 세로 위치를 앞뒤에 잇는다
     ['charfmt-vpos-chain-formatting', 'src/document_core/commands/formatting.rs'],
+    // 상태 표시줄의 고른 글자 수(플러그인 selection-count): 범위 안 표, 글상자, 캡션 글까지 센다
+    ['sel-char-count-wasm', 'src/wasm_api.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));
