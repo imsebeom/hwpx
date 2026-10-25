@@ -36,6 +36,34 @@ const sh = (command, cwd) => exec(command, [], { cwd, shell: true });
 
 // Node 24.11 의 fs.rmSync/cpSync(recursive)는 한글 경로에서 node 를 통째로 죽인다(0xC0000409,
 // 종료 코드 127, 메시지 없음). 이 폴더 경로에 한글이 있으므로 한 단계씩 도는 구현을 쓴다.
+/**
+ * Rust 빌드 산출물(target)이 한도를 넘으면 cargo clean 으로 비운다. 옛 PC 에서 빌드를 거듭하며 50~80GB 가 쌓였다
+ * (2026-10-25 사용자 지적). 증분 캐시와 디버그 정보는 C:/dev/cargo/config.toml 에서 끄지만, 판이 바뀔 때마다
+ * 의존 꾸러미 산출물이 새로 쌓이는 것은 막지 못해 빌드 전에 잰다. 한도는 HWPX_TARGET_LIMIT_GB(기본 20)
+ */
+function guardTargetSize(env) {
+  const limit = Number(process.env.HWPX_TARGET_LIMIT_GB || 20) * 1024 ** 3;
+  const meta = spawnSync(path.join(cargoBin, 'cargo'), ['metadata', '--format-version', '1', '--no-deps'], { cwd: RHWP, env, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+  const dir = meta.status === 0 ? JSON.parse(meta.stdout).target_directory : null;
+  if (!dir || !fs.existsSync(dir)) return;
+  let size = 0;
+  const walk = (d) => {
+    for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+      const p = path.join(d, e.name);
+      if (e.isDirectory()) walk(p);
+      else if (e.isFile()) size += fs.statSync(p).size;
+    }
+  };
+  walk(dir);
+  const gb = (size / 1024 ** 3).toFixed(1);
+  if (size <= limit) {
+    console.log(`Rust 빌드 산출물 ${dir}: ${gb}GB`);
+    return;
+  }
+  console.log(`⚠ Rust 빌드 산출물 ${dir} 가 ${gb}GB 로 한도를 넘어 cargo clean 합니다(이번 빌드는 처음부터).`);
+  exec(path.join(cargoBin, 'cargo'), ['clean'], { cwd: RHWP, env });
+}
+
 function rmrf(p) {
   if (!fs.existsSync(p)) return;
   if (fs.lstatSync(p).isDirectory()) {
@@ -782,7 +810,8 @@ if (hasRust && RUST_PATCHES.some((p) => !builtIds.includes(p.id))) {
     fs.writeFileSync(f, src);
   }
   const env = { ...process.env, PATH: `${cargoBin}${path.delimiter}${process.env.PATH}` };
-  exec(path.join(cargoBin, 'wasm-pack'), ['build', '--target', 'web', '--release', '--locked', '--out-dir', 'pkg'], { cwd: RHWP, env });
+  guardTargetSize(env);
+  exec(path.join(cargoBin, 'wasm-pack'),['build', '--target', 'web', '--release', '--locked', '--out-dir', 'pkg'], { cwd: RHWP, env });
   fs.writeFileSync(builtMark, `rhwp ${RHWP_VERSION} + ${RUST_PATCHES.map((p) => p.id).join(', ')}\n`);
 } else if (!hasRust && !fs.existsSync(path.join(pkgDir, 'rhwp_bg.wasm'))) {
   fs.mkdirSync(pkgDir, { recursive: true });
