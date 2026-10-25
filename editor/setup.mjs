@@ -780,6 +780,21 @@ const RUST_PATCHES = [
     ['cellnote-split-end-typeset', 'src/renderer/typeset.rs'],
     ['body-note-fit-typeset', 'src/renderer/typeset.rs'],
     ['split-note-margin-typeset', 'src/renderer/typeset.rs'],
+    // AI 편집 순서 시험(tests/edit_sequence.mjs)에서 나온 조판 어긋남: 글자처럼 취급을 바꾼 표의 줄 높이
+    ['tac-toggle-reflow-table-ops', 'src/document_core/commands/table_ops.rs'],
+    // 칸 편집 뒤 글자처럼 취급이 아닌 표는 적힌 높이를 바닥으로 쓰지 않고, 캡션 있는 글자처럼 취급 표는 높이와 줄을 맞춘다
+    ['table-height-sync-text-editing', 'src/document_core/commands/text_editing.rs'],
+    ['edited-nontac-stale-height-measurer', 'src/renderer/height_measurer.rs'],
+    // insertParagraph 새 문단도 Enter 처럼 앞 문단 줄 배치 치수와 표식을 물려받는다
+    ['empty-like-seg-paragraph', 'src/model/paragraph.rs'],
+    // 쪽 설정으로 본문 폭이 바뀌면 각주, 미주 글도 다시 접는다
+    ['reflow-notes-formatting', 'src/document_core/commands/formatting.rs'],
+    // 빈 문단에 0..0 글자 서식을 주면 그 문단의 글자 모양을 바꾼다(format_text 가 빈 칸에도 크기를 입힌다)
+    ['empty-para-char-shape-paragraph', 'src/model/paragraph.rs'],
+    // 지운 열에 걸친 병합 칸 글을 새 폭으로 다시 접는다
+    ['delcol-reflow-table-ops', 'src/document_core/commands/table_ops.rs'],
+    // 글자 서식으로 다시 접은 본문 문단의 세로 위치를 앞뒤에 잇는다
+    ['charfmt-vpos-chain-formatting', 'src/document_core/commands/formatting.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));
