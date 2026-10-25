@@ -800,6 +800,11 @@ const RUST_PATCHES = [
     // 「셀 단위로 나눔」 표 칸 안의 「셀 단위로 나눔」 1×1 중첩 표는 한 쪽보다 작아도 쪽 끝에서 나눈다(한국문화 1단원 사본 실험,
     // 조각은 자식 칸 CellUnit 으로 재고 legacy 조각 보정은 끈다. 줄 배치 없는 빈 문단은 접지 않고, 낡은 저장 vpos 는 쓰지 않는다)
     ['cell-nested-split-table-layout', 'src/renderer/layout/table_layout.rs'],
+    // 한국문화 1단원 1쪽: 줄 배치 없는 문단의 글자처럼 취급 표 여럿은 표마다 바깥 여백 위아래를 두고 쌓고,
+    // 칸 문단에 줄 배치가 빠진 글자처럼 취급 표는 선언 높이로 줄이지 않으며, 마지막 줄 높이에 문단 끝 빈 run 크기를 넣는다
+    ['tac-multi-om-layout', 'src/renderer/layout.rs'],
+    ['tac-stale-grow-height-measurer', 'src/renderer/height_measurer.rs'],
+    ['end-run-height-line-breaking', 'src/renderer/composer/line_breaking.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));
