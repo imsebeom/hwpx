@@ -186,7 +186,9 @@ function rangesIn(doc, target, find) {
   const out = [];
   for (const [i, text] of texts) {
     if (!find) {
-      if (text.length) out.push({ i, start: 0, end: text.length });
+      // 빈 문단도 0..0 으로 넘긴다 — 엔진(empty-para-char-shape)이 그 문단의 글자 모양을 바꾼다. 한/글은 빈 칸을 골라 크기를
+      // 바꾸면 빈 줄 높이도 바뀌는데, 종전에는 건너뛰어 표 전체를 줄여도 빈 칸만 큰 글자로 남았다(2026-10-25)
+      out.push({ i, start: 0, end: text.length });
       continue;
     }
     for (let k = text.indexOf(find); k >= 0; k = text.indexOf(find, k + find.length)) out.push({ i, start: k, end: k + find.length });
@@ -974,6 +976,18 @@ function exec(doc, name, a) {
       const t = findTable(doc, a.table);
       findCell(doc, t, a.from_row, a.from_col);
       findCell(doc, t, a.to_row, a.to_col);
+      // 범위가 이미 병합된 칸을 반만 덮으면 엔진이 「렌더링 오류: 셀 (9,0) span (2,1)이 병합 범위를 벗어납니다」를 그대로 냈다(2026-10-25)
+      const [r0, r1] = [Math.min(a.from_row, a.to_row), Math.max(a.from_row, a.to_row)];
+      const [c0, c1] = [Math.min(a.from_col, a.to_col), Math.max(a.from_col, a.to_col)];
+      const cut = tableCells(doc, t).cells.find((c) => {
+        const inter = c.row <= r1 && c.row + c.rowSpan - 1 >= r0 && c.col <= c1 && c.col + c.colSpan - 1 >= c0;
+        const inside = c.row >= r0 && c.row + c.rowSpan - 1 <= r1 && c.col >= c0 && c.col + c.colSpan - 1 <= c1;
+        return inter && !inside;
+      });
+      if (cut) {
+        const re = cut.row + cut.rowSpan - 1, ce = cut.col + cut.colSpan - 1;
+        throw new Error(`r${cut.row}c${cut.col} 는 r${cut.row}c${cut.col}~r${re}c${ce} 에 걸친 병합 칸이라 범위가 그 칸을 반만 덮습니다. 범위를 그 칸까지 넓히거나 split_cell 로 먼저 나누세요.`);
+      }
       const r = J(doc.mergeTableCells(t.section, t.para, t.ctrl, a.from_row, a.from_col, a.to_row, a.to_col));
       return { result: { ok: true, cellCount: r.cellCount }, mark: { kind: 'table', where: t.id, after: `r${a.from_row}c${a.from_col}~r${a.to_row}c${a.to_col} 병합` } };
     }
