@@ -1,32 +1,24 @@
 
-/* [claude-hwpx page-view-buttons] 한 쪽, 두 쪽, 자동 보기 단추(patches/page-view-buttons.ts) */
+/* [claude-hwpx page-view-buttons] 한 쪽, 두 쪽, 자동, 폭 맞춤, 쪽 맞춤 글자 단추(patches/page-view-buttons.ts) */
 .stb-page-view-group {
   display: inline-flex;
   align-items: center;
   gap: 2px;
-  margin-right: 8px;
+  margin-right: 4px;
 }
-.stb-icon-btn.stb-page-view-btn {
+.stb-icon-btn.stb-text-btn {
   width: auto;
   min-width: 24px;
-  padding: 0 4px;
-}
-.stb-page-view-icon {
-  display: block;
-  fill: none;
-  stroke: var(--color-text-secondary);
-  stroke-width: 1;
+  padding: 0 5px;
+  font-size: 11px;
+  white-space: nowrap;
+  color: var(--color-text-secondary);
 }
 .stb-page-view-btn.active {
   background: var(--ui-hover);
   border-color: var(--ui-border-strong);
-}
-.stb-page-view-btn.stb-page-view-auto {
-  font-size: 11px;
-  color: var(--color-text-secondary);
-}
-.stb-page-view-btn.active .stb-page-view-icon {
-  fill: var(--ui-border-strong);
+  color: var(--color-text);
+  font-weight: 600;
 }
 @media (max-width: 767px) {
   .stb-page-view-group { display: none; }
