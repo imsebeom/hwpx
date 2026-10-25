@@ -12,10 +12,12 @@ import sys
 import pythoncom
 import win32com.client as win32
 
-sys.path.insert(
-    0, r"C:/Users/hccga/Desktop/code/.automation_and_skill/REA/hwp2024/scripts"
-)
-from probe_defaults import Watchdog  # noqa: E402
+# 대화상자 감시기(probe_defaults.Watchdog)가 든 폴더. 비공개 저장소라 공개 코드에 경로를 적지 않고 환경 변수로 받는다
+_probe = os.environ.get("HWP_PROBE_SCRIPTS")
+if not _probe:
+    sys.exit("환경 변수 HWP_PROBE_SCRIPTS 에 probe_defaults.py 가 든 폴더를 지정하세요")
+sys.path.insert(0, _probe)
+from probe_defaults import Watchdog
 
 sys.stdout.reconfigure(encoding="utf-8")
 
