@@ -107,7 +107,50 @@ def shrink(data, ext, inches, dpi, quality, cap, min_side):
         new_ext = ext
     if len(buf.getvalue()) >= len(data) and new_ext == ext:
         return None
-    return buf.getvalue(), new_ext, f"{pw}x{ph} → {im.size[0]}x{im.size[1]}"
+    return (
+        buf.getvalue(),
+        new_ext,
+        f"{pw}x{ph} → {im.size[0]}x{im.size[1]}",
+        (im.size[0] / pw, im.size[1] / ph),
+    )
+
+
+def rescale_pics(xml, ratios):
+    """줄인 그림을 쓰는 개체의 imgDim과 imgClip을 픽셀 비율대로 줄인다.
+
+    한/글은 imgClip을 실제 픽셀 수 × 75 좌표로 읽는다. 픽셀만 줄이고 두면 잘라 낸 그림이
+    엉뚱한 범위로 그려진다(2026-10-27 결과보고서 표지 CORE 그림. rhwp는 imgDim 비율로 그려
+    PDF 대조에서는 드러나지 않았다).
+    """
+
+    def fix(m):
+        pic = m.group(0)
+        ref = re.search(r'binaryItemIDRef="([^"]+)"', pic)
+        if not ref or ref.group(1) not in ratios:
+            return pic
+        kx, ky = ratios[ref.group(1)]
+
+        def dim(d):
+            return (
+                f'<hp:imgDim dimwidth="{round(int(d.group(1)) * kx)}" '
+                f'dimheight="{round(int(d.group(2)) * ky)}"'
+            )
+
+        def clip(c):
+            left, right, top, bottom = map(int, c.groups())
+            return (
+                f'<hp:imgClip left="{round(left * kx)}" right="{round(right * kx)}" '
+                f'top="{round(top * ky)}" bottom="{round(bottom * ky)}"'
+            )
+
+        pic = re.sub(r'<hp:imgDim dimwidth="(\d+)" dimheight="(\d+)"', dim, pic)
+        return re.sub(
+            r'<hp:imgClip left="(-?\d+)" right="(-?\d+)" top="(-?\d+)" bottom="(-?\d+)"',
+            clip,
+            pic,
+        )
+
+    return PIC_RE.sub(fix, xml)
 
 
 MEDIA = {"jpg": "image/jpg", "png": "image/png"}
@@ -136,7 +179,7 @@ def main():
     jpg_media = re.search(r'media-type="(image/jpe?g)"', hpf)
     MEDIA["jpg"] = jpg_media.group(1) if jpg_media else "image/jpeg"
 
-    renamed, out_bin, before, after = {}, {}, 0, 0
+    renamed, out_bin, ratios, before, after = {}, {}, {}, 0, 0
     for n in names:
         if not n.startswith("BinData/"):
             continue
@@ -157,7 +200,9 @@ def main():
         if not r:
             after += len(data)
             continue
-        new, new_ext, note = r
+        new, new_ext, note, ratio = r
+        if ratio != (1.0, 1.0):
+            ratios[stem] = ratio
         after += len(new)
         new_name = f"BinData/{stem}.{new_ext}"
         out_bin[n] = (new_name, new)
@@ -183,6 +228,9 @@ def main():
             n = info.filename
             if n == "Contents/content.hpf":
                 zout.writestr(info, hpf.encode("utf-8"))
+            elif n.startswith("Contents/") and n.endswith(".xml"):
+                xml = zin.read(n).decode("utf-8")
+                zout.writestr(info, rescale_pics(xml, ratios).encode("utf-8"))
             elif n in out_bin:
                 new_name, new = out_bin[n]
                 ni = zipfile.ZipInfo(new_name, info.date_time)
