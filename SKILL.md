@@ -42,6 +42,7 @@ ${CLAUDE_SKILL_DIR}/
 │   ├── writing_optimizer.py     # ★ 공공기관 보고서 글쓰기 자동 변환 (Workflow P, public-doc-to-hwpx 포팅)
 │   ├── gongmun_lint.py          # 공문서 표기법 검수 (행정업무운영 편람, kordoc 규칙 이식, 표준 라이브러리만)
 │   ├── seal_hwpx.py             # 도장 날인: 「(인)」, 「(서명)」 위에 도장 그림을 글 앞으로 (kordoc 이식)
+│   ├── hwpx_shrink_images.py    # ★ 그림 용량 줄이기: 보이는 크기 기준 200dpi(긴 변 최소 800px), BMP는 JPEG로. 붙여 넣은 BMP로 수백 MB가 된 문서용(2026-10-27 결과보고서 268→32MB, rhwp PDF 50쪽 대조)
 │   ├── chart_hwpx.py            # 한글 네이티브 차트 삽입: JSON, CSV 자료로 막대, 선, 원 등 20종 (kordoc 이식)
 │   ├── add_equation.py          # ★ 한컴 네이티브 수식 개체 삽입 (본문·표 셀, 규칙 39)
 │   └── office/{unpack,pack}.py
