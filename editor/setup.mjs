@@ -156,7 +156,10 @@ const RUST_PATCHES = [
     ['field-ex-wasm', 'src/wasm_api.rs', '    /// 현재 본문 위치에 ClickHere 누름틀 필드를 삽입한다.', 'field-ex-wasm'],
     // 오른쪽 클릭 「새 메모」 — 고른 글에 한/글 형식 메모를 건다(patches/memo-new-*.rs)
     ['memo-new', 'src/document_core/queries/field_query.rs', '    /// getFieldList: 모든 필드를 JSON 배열로 반환', 'memo-new-method'],
-    ['memo-new-wasm', 'src/wasm_api.rs', '    /// 현재 본문 위치에 ClickHere 누름틀 필드를 삽입한다.', 'memo-new-wasm']].map(([id, file, anchor, f]) => ({
+    ['memo-new-wasm', 'src/wasm_api.rs', '    /// 현재 본문 위치에 ClickHere 누름틀 필드를 삽입한다.', 'memo-new-wasm'],
+    // 메모 지우기, 본문 고치기(patches/memo-crud-*.rs). 걸린 글은 남기고 표식과 본문만 다룬다
+    ['memo-crud', 'src/document_core/queries/field_query.rs', '    /// getFieldList: 모든 필드를 JSON 배열로 반환', 'memo-crud-method'],
+    ['memo-crud-wasm', 'src/wasm_api.rs', '    /// 현재 본문 위치에 ClickHere 누름틀 필드를 삽입한다.', 'memo-crud-wasm']].map(([id, file, anchor, f]) => ({
     id, file, anchor,
     insert: fs.readFileSync(path.join(HERE, 'patches', `${f}.rs`), 'utf8').replace(/\r\n/g, '\n'),
     done: `[claude-hwpx ${id}]`,

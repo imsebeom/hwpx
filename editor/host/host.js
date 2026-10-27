@@ -173,7 +173,12 @@ const handlers = {
   async slots() { return { ok: true, result: await plugin('slots') }; },
   async tools() { return { ok: true, result: await plugin('tools') }; },
   async goto(cmd) { return { ok: true, result: await plugin('goto', cmd.ref) }; },
-  async memos(cmd) { return { ok: true, result: await plugin('memos', cmd.n) }; },
+  async memos(cmd) {
+    if (!cmd.op) return { ok: true, result: await plugin('memos', cmd.n) };
+    const result = await plugin('memos', cmd.n, cmd.op);
+    await snapshot('claude');
+    return { ok: true, result };
+  },
   async save() {
     const hfMarkers = await headerFooterTexts();
     return { ok: true, base64: toBase64(await studio.exportHwpx()), hfMarkers };

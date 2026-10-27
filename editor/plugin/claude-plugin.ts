@@ -683,8 +683,12 @@ export function createClaudePlugin(getInputHandler) {
         slots: () => host.read((doc) => findSlots(doc)),
         inspect: (type) => host.read((doc) => inspect(doc, type)),
 
-        /** 메모 목록(`$E memos`). 번호를 주면 그 메모가 걸린 글로 사용자 화면과 커서를 옮긴다. */
-        memos(n) {
+        /** 메모 목록(`$E memos`). 번호를 주면 그 메모가 걸린 글로 사용자 화면과 커서를 옮긴다.
+         *  op 를 주면 고친다: {action:'add', ref, text, at?, author?} | {action:'edit', text} | {action:'del'} (edit, del 은 n 번 메모) */
+        memos(n, op) {
+          if (op?.action === 'add') return memoPanel.add(op.ref, op.text, op.at, op.author);
+          if (op?.action === 'edit') return memoPanel.edit(Number(n), op.text);
+          if (op?.action === 'del') return memoPanel.remove(Number(n));
           if (n != null) return memoPanel.go(Number(n));
           const list = memoPanel.list();
           return host.read((doc) => list.map(({ sectionIndex, paraIndex, path, startPara, endPara, ...m }) => ({

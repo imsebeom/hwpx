@@ -5,11 +5,15 @@
  * 같은 줄 높이에 놓이고(글과 함께 스크롤, 겹치면 아래로 밀고, 글에서 카드까지 점선), 목록이던 것을 2026-10-21 사용자 요청으로 바꿨다.
  * 본문에서는 메모가 걸린 글의 바탕을 노랗게 칠하고(층 전체를 darken 으로 섞어 글자 색은 그대로, 반투명 덮기는 글씨를 흐렸다. 2026-10-21) 끝에 번호 표를 붙인다. 패널의 메모를 누르면 걸린 글 앞으로 커서와 화면이 가고, 번호 표를 누르거나
  * 커서가 걸린 글 안에 들어가면 패널에서 그 메모가 강조된다. 메모가 있는 문서를 열면 저절로 보이고, 도구 모음 「메모」 단추로
- * 숨긴다(숨긴 것은 기억한다). 메모 고치기는 없다. 새 메모는 오른쪽 클릭 「새 메모」(k-commands.ts, 엔진 insertMemoEx).
+ * 숨긴다(숨긴 것은 기억한다). 새 메모는 오른쪽 클릭 「새 메모」(k-commands.ts, 엔진 insertMemoEx).
+ * 카드의 「고치기」, 「지우기」는 엔진 updateMemoBody, deleteMemo(patches/memo-crud-*.rs)를 부른다(2026-10-27 사용자 요청 「메모 CRUD」).
+ * 지워도 걸린 글은 남고, 둘 다 스냅샷 하나라 되돌리기 한 번으로 돌아온다. Claude 는 `cli memos add|edit|del` 로 같은 일을 한다.
  *
  * 자료는 엔진 패치 `getMemoList`(patches/memo-list*.rs)에서 온다. 위치는 캐럿 축이라 선택 영역 사각형 API 에 그대로 넣는다.
  * 패치가 없는 WASM(npm 원본)에서는 목록이 비어 단추만 보인다.
  */
+import { resolveTarget } from './doc-tools.js';
+
 const WIDTH = 300;
 const HIDDEN_KEY = 'claude-memo-hidden';
 const pad = (n) => String(n).padStart(2, '0');
@@ -34,6 +38,12 @@ const CSS = `
 .claude-memo-panel .anchor{opacity:.75;font-size:11px;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .claude-memo-panel .body{white-space:pre-wrap;word-break:break-word;line-height:1.45;user-select:text}
 .claude-memo-panel .empty{padding:12px;opacity:.7}
+.claude-memo-panel .acts{display:none;gap:4px}
+.claude-memo-panel li:hover .acts,.claude-memo-panel li.on .acts{display:flex}
+.claude-memo-panel .acts button{border:1px solid #d9c27a;border-radius:3px;background:#fff;color:#6b5200;font-size:10px;padding:0 5px;cursor:pointer}
+.claude-memo-panel .acts button:hover{background:#ffe9a8}
+.claude-memo-panel textarea{width:100%;box-sizing:border-box;min-height:54px;font:inherit;line-height:1.45;resize:vertical}
+.claude-memo-panel .edit-foot{display:flex;gap:4px;justify-content:flex-end;margin-top:3px}
 .claude-memo-layer{position:absolute;left:0;top:0;width:0;height:0;z-index:3;pointer-events:none;mix-blend-mode:darken}
 .claude-memo-hl{position:absolute;background:#ffe98a;pointer-events:none}
 .claude-memo-hl.on{background:#ffcf5c}
@@ -73,6 +83,7 @@ export function installMemoPanel(host, getInputHandler) {
   let refreshTimer = null;
   let watched = null;
   let links = null;   // 걸린 글에서 카드까지 잇는 선(화면 고정 SVG)
+  let editing = -1;   // 본문을 고치는 중인 카드. 그동안은 목록을 다시 그리지 않는다(친 글이 날아간다)
   const userHid = () => { try { return localStorage.getItem(HIDDEN_KEY) === '1'; } catch { return false; } };
 
   const readRaw = () => {
@@ -188,9 +199,40 @@ export function installMemoPanel(host, getInputHandler) {
     links.innerHTML = paths.join('');
   };
 
+  /** 카드 본문을 고치는 칸으로 바꾼다. Ctrl+Enter 저장, Esc 취소 */
+  const startEdit = (li, i) => {
+    const m = memos[i];
+    editing = i;
+    const box = el('textarea', '');
+    box.value = m.text || '';
+    const done = (save) => {
+      editing = -1;
+      if (save && box.value !== (m.text || '')) edit(i + 1, box.value);
+      else refresh();
+    };
+    const ok = el('button', '', '저장');
+    const cancel = el('button', '', '취소');
+    ok.addEventListener('click', () => done(true));
+    cancel.addEventListener('click', () => done(false));
+    box.addEventListener('keydown', (e) => {
+      e.stopPropagation();   // 편집기 단축키가 가로채지 않게
+      if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); done(true); }
+      else if (e.key === 'Escape') { e.preventDefault(); done(false); }
+    });
+    const foot = el('div', 'edit-foot acts');
+    foot.style.display = 'flex';
+    foot.append(ok, cancel);
+    li.querySelector('.body').replaceWith(box);
+    li.append(foot);
+    for (const e of [box, foot]) e.addEventListener('click', (ev) => ev.stopPropagation());
+    box.addEventListener('input', () => placeCards());   // 칸이 커지면 아래 카드를 민다
+    box.focus();
+    placeCards();
+  };
+
   const render = () => {
     updateButton();
-    if (!panel) return;
+    if (!panel || editing >= 0) return;
     panel.querySelector('.count').textContent = memos.length ? `${memos.length}개` : '';
     const list = panel.querySelector('ol');
     if (!memos.length) { list.replaceChildren(el('div', 'empty', '이 문서에는 메모가 없다.')); return; }
@@ -201,6 +243,17 @@ export function installMemoPanel(host, getInputHandler) {
       const head = el('div', 'head');
       head.append(el('span', 'idx', String(i + 1)), el('span', 'who', m.author || '작성자 없음'), el('span', 'when', m.when));
       if (m.page) head.append(el('span', 'page', `${m.page}쪽`));
+      if (canChange()) {
+        const acts = el('span', 'acts');
+        const fix = el('button', '', '고치기');
+        const del = el('button', '', '지우기');
+        fix.title = '메모 본문 고치기(Ctrl+Enter 저장, Esc 취소)';
+        del.title = '메모 지우기(걸린 글은 남는다. Ctrl+Z 로 되돌린다)';
+        fix.addEventListener('click', (e) => { e.stopPropagation(); startEdit(li, i); });
+        del.addEventListener('click', (e) => { e.stopPropagation(); remove(i + 1); });
+        acts.append(fix, del);
+        head.append(acts);
+      }
       li.append(head);
       const anchor = m.anchor.replace(/\s+/g, ' ').trim();
       if (anchor) li.append(el('div', 'anchor', `「${anchor}」`));
@@ -268,6 +321,49 @@ export function installMemoPanel(host, getInputHandler) {
     }
     setActive(i);
     return true;
+  };
+
+  // ── 고치기, 지우기, 새로 달기(n 은 패널 번호, 1부터) ─────────────────────
+  const canChange = () => host.read((doc) => typeof doc.deleteMemo === 'function');
+  /** 스냅샷 하나로 문서를 고친다(되돌리기 한 번). 커서는 제자리 */
+  const change = (operationType, fn) => {
+    const ih = getInputHandler();
+    if (!ih) throw new Error('편집기가 아직 준비되지 않았다');
+    const pos = ih.getCursorPosition?.() ?? ih.cursor.getPosition();
+    let out;
+    ih.executeOperation({ kind: 'snapshot', operationType, operation: (wasm) => { out = JSON.parse(fn(wasm.doc)); return pos; } });
+    if (shown) refresh(); else { load(); updateButton(); }
+    return out;
+  };
+  const pick = (n) => {
+    load();
+    const m = memos[n - 1];
+    if (!m) throw new Error(`메모 ${n} 없음(메모 ${memos.length}개)`);
+    return m;
+  };
+  const remove = (n) => { const m = pick(n); return change('deleteMemo', (doc) => doc.deleteMemo(m.fieldId)); };
+  const edit = (n, text) => { const m = pick(n); return change('updateMemo', (doc) => doc.updateMemoBody(m.fieldId, text)); };
+  /** 좌표(p12, T1r2c1)의 문단에 메모를 단다. at 을 주면 그 글(처음 나오는 곳)에, 없으면 문단 전체에 건다 */
+  const add = (ref, text, at, author) => {
+    const pos = host.read((doc) => resolveTarget(doc, ref));
+    if (!pos) throw new Error(`좌표를 못 찾음: ${ref}`);
+    const inCell = pos.parentParaIndex != null;
+    const whole = host.read((doc) => (pos.length > 0 ? (inCell
+      ? doc.getTextInCell(pos.sectionIndex, pos.parentParaIndex, pos.controlIndex, pos.cellIndex, 0, 0, pos.length)
+      : doc.getTextRange(pos.sectionIndex, pos.paragraphIndex, 0, pos.length)) : ''));
+    const start = at ? whole.indexOf(at) : 0;
+    if (start < 0) throw new Error(`${ref} 에 「${at}」 없음`);
+    const end = at ? start + at.length : pos.length;
+    const now = new Date();
+    const ft = BigInt(now.getTime() + 11644473600000) * 10000n;   // 작성 시각(k-commands.ts 새 메모와 같은 꼴)
+    const r = change('insertMemo', (doc) => doc.insertMemoEx(JSON.stringify({
+      sectionIdx: pos.sectionIndex, paraIdx: pos.paragraphIndex, start, end, body: text, author: author || 'Claude',
+      created: new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().replace(/\.\d+Z$/, 'Z'),
+      fileTime: [Number(ft & 0xffffffffn), Number(ft >> 32n)],
+      path: inCell ? [[pos.controlIndex, pos.cellIndex, 0]] : undefined,
+    })));
+    if (!shown && !userHid()) show(false);
+    return r;
   };
 
   /** 커서 자리가 메모가 걸린 글 안인가 */
@@ -433,5 +529,6 @@ export function installMemoPanel(host, getInputHandler) {
       if (!shown) show(false);
       return go(n - 1);
     },
+    add, edit, remove,
   };
 }

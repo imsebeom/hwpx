@@ -18,6 +18,8 @@
  *                                       (차트, 도장, 메모 만들기, 합치기 등). Ctrl+Z 기록은 끊기니 되돌리려면 builder --undo
  *   node cli.mjs goto <좌표>            사용자 화면의 커서를 그 문단이나 셀로 옮긴다
  *   node cli.mjs memos [번호] [--json]  문서에 달린 메모(작성자, 날짜, 걸린 글, 본문). 번호를 주면 그 메모가 걸린 글로 화면을 옮긴다
+ *   node cli.mjs memos add <p12|T1r2c1> <본문> [--at 걸 글] [--author 이름]   메모 달기(--at 없으면 문단 전체, 작성자 기본 Claude)
+ *   node cli.mjs memos edit <번호> <본문>   메모 본문 고치기       node cli.mjs memos del <번호>   메모 지우기(걸린 글은 남음)
  *   node cli.mjs inspect | slots       행정문서 표기 검수 / 아직 안 채운 칸
  *   node cli.mjs tools                 편집 도구 25종 정의(이름, 설명, 인자)
  *   node cli.mjs changes [--all]       아직 안 읽은 사용자 수정 내역 (읽으면 읽음 처리)
@@ -478,6 +480,19 @@ switch (sub) {
   case 'goto': out((await cmd({ type: 'goto', ref: args[0] })).result ? `이동: ${args[0]}` : `못 찾음: ${args[0]}`); break;
   case 'memos': {
     // 문서에 달린 메모(검토 의견). 번호는 문서 순서이고 에디터 메모 패널의 번호와 같다
+    // add <좌표> <본문> [--at 걸 글] [--author 이름] | edit <번호> <본문> | del <번호>. 본문의 \n 은 줄바꿈(줄마다 메모 문단 하나)
+    const [act, a1, a2] = args;
+    if (['add', 'edit', 'del'].includes(act)) {
+      const opt = (k) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : undefined; };
+      const body = (s) => String(s ?? '').normalize('NFC').replace(/\\n/g, '\n');
+      if (!a1 || (act !== 'del' && a2 == null)) die('사용: memos add <p12|T1r2c1> <본문> [--at 걸 글] [--author 이름] | memos edit <번호> <본문> | memos del <번호>');
+      const op = act === 'add'
+        ? { action: 'add', ref: a1, text: body(a2), at: opt('--at') && body(opt('--at')), author: opt('--author') }
+        : { action: act, text: act === 'edit' ? body(a2) : undefined };
+      await cmd({ type: 'memos', n: act === 'add' ? undefined : Number(a1), op });
+      out(act === 'add' ? `메모를 달았다: ${a1}` : act === 'edit' ? `메모 ${a1} 본문을 고쳤다` : `메모 ${a1} 을 지웠다(걸린 글은 남음, undo 로 되돌림)`);
+      break;
+    }
     const n = args.find((a) => /^\d+$/.test(a));
     if (n) { out((await cmd({ type: 'memos', n: Number(n) })).result ? `이동: 메모 ${n}` : `못 찾음: 메모 ${n}`); break; }
     const list = (await cmd({ type: 'memos' })).result ?? [];
