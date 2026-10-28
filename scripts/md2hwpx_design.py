@@ -28,6 +28,8 @@ from table_page_fit import _table_height as table_height
 from table_page_fit import body_height, char_heights
 
 SCRIPT_DIR = Path(__file__).resolve().parent
+# 하위 스크립트(md2hwpx, validate)가 cp949 로 출력하거나 읽다 죽지 않게 모두 UTF-8 모드로 띄운다(2026-10-28 실측)
+os.environ.setdefault("PYTHONUTF8", "1")
 
 # 강조색, 옅은 색. 옅은 색은 강조색을 흰색에 90% 가까이 섞은 값이다
 THEMES = {
