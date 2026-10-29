@@ -815,6 +815,11 @@ const RUST_PATCHES = [
     ['tac-no-split-typeset', 'src/renderer/typeset.rs'],
     ['overlay-text-host-typeset', 'src/renderer/typeset.rs'],
     ['push-para-base-typeset', 'src/renderer/typeset.rs'],
+    // 학년별 수업 표: 한/글은 열 때 글자처럼 취급 표 높이를 행 내용으로 다시 잰다(낡은 선언 높이로 누르지 않음)
+    ['tac-no-shrink-hwpx-height-measurer', 'src/renderer/height_measurer.rs'],
+    ['tac-no-shrink-hwpx-table-layout', 'src/renderer/layout/table_layout.rs'],
+    ['span-ladder-trust-height-measurer', 'src/renderer/height_measurer.rs'],
+    ['tac-flow-no-trim-typeset', 'src/renderer/typeset.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));
@@ -1070,7 +1075,7 @@ for (const [rel, count] of [['engine/table-object-renderer.ts', 5], ['engine/cel
 for (const [id, rel, tail] of [['nested-table-cache', 'engine/table-bbox-cache.ts'], ['nested-table-cursor', 'engine/cursor.ts'],
   ['nested-table-handler', 'engine/input-handler.ts'], ['nested-table-mouse', 'engine/input-handler-mouse.ts'],
   // 칸 안 그림: 그림 넣기와 파일 끌어 놓기를 칸 문단 안 글자처럼 취급으로, 글자처럼 취급 칸 그림 끌어 옮기기(cell-pic-*.ts)
-  ['cell-pic-place', 'engine/input-handler-table.ts'], ['cell-pic-drop', 'engine/input-handler.ts'],
+  ['cell-pic-place', 'engine/input-handler-table.ts'], ['cell-pic-drop', 'engine/input-handler.ts'], ['cell-pic-paste', 'engine/input-handler-keyboard.ts'],
   ['cell-pic-move', 'engine/input-handler-picture.ts', 'cell-pic-move-fn'], ['cell-pic-move-start', 'engine/input-handler-mouse.ts']]) {
   const f = path.join(STUDIO, 'src', ...rel.split('/'));
   let src = fs.readFileSync(f, 'utf8');

@@ -27,3 +27,13 @@
                     st.vpos_ladder_dirty = false;
                 }
             }
+// ==== next ====
+                                    .unwrap_or(0)
+                                    >= max_tbl_h
+                            };
+// ==== replace ====
+                                    .unwrap_or(0)
+                                    // [claude-hwpx push-para-base] 1px(75) 안의 차이는 반올림이다 — 결과보고서 176, 183번 표는 선언 2445,
+                                    // 저장 줄 2440 이라 기준점이 지워지고 앞 문단 높이로 거꾸로 센 기준점(300 작음)으로 표마다 4px 내려갔다
+                                    >= max_tbl_h - if st.profile.hwpx_container() { 75 } else { 0 }
+                            };
