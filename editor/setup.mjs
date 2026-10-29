@@ -828,6 +828,7 @@ const RUST_PATCHES = [
     ['span-solve-zero-height-measurer', 'src/renderer/height_measurer.rs'],
     ['cellspacing-edge-table-layout', 'src/renderer/layout/table_layout.rs'],
     ['cellspacing-edge-height-measurer', 'src/renderer/height_measurer.rs'],
+    ['span-topdown-height-measurer', 'src/renderer/height_measurer.rs'],
     ['tac-restate-on-open-document', 'src/document_core/commands/document.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
