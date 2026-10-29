@@ -25,7 +25,8 @@ def lines_of(page, k):
         for ln in b.get("lines", []):
             t = re.sub(r"\s+", "", "".join(s["text"] for s in ln["spans"]))
             if len(t) >= 4:
-                out.append((t, ln["bbox"][3] * k))
+                # 글줄 상자 아래 끝은 글꼴 descent 에 따라 달라진다 — 첫 조각의 기준선(origin)을 쓴다
+                out.append((t, ln["spans"][0]["origin"][1] * k))
     return out
 
 

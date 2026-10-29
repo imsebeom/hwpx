@@ -67,6 +67,52 @@ EDITS = [
             "                let combined: f64 = (r..r + span).map(|i| row_heights[i]).sum();\n"
         ),
     ),
+    (
+        "renderer/height_measurer.rs",
+        (
+            "            for &(r, span, total_h) in &constraints {\n"
+            "                let known_sum: f64 = (r..r + span).map(|i| row_heights[i]).sum();\n"
+            "                if total_h > known_sum + 0.5 {\n"
+            "                    row_heights[r + span - 1] += total_h - known_sum;\n"
+            "                }\n"
+            "            }\n"
+        ),
+        (
+            "            // [claude-hwpx span-ladder-trust] HWPX 글자처럼 취급 표는 이 보충을 2-c(칸 내용) 뒤로 미룬다 — 먼저 더하면 2-c 가 다른 행을\n"
+            "            // 키운 뒤에도 남아 묶음이 커진다(결과보고서 160번 표 10행: 엔진 43.4, 한/글 35.9 = c13 선언 9961 - 8행 - 9행)\n"
+            "            let claude_defer_declared_span = !self.is_native_hwp5 && !self.is_hwp3_variant && table.common.treat_as_char;\n"
+            "            for &(r, span, total_h) in &constraints {\n"
+            "                if claude_defer_declared_span {\n"
+            "                    break;\n"
+            "                }\n"
+            "                let known_sum: f64 = (r..r + span).map(|i| row_heights[i]).sum();\n"
+            "                if total_h > known_sum + 0.5 {\n"
+            "                    row_heights[r + span - 1] += total_h - known_sum;\n"
+            "                }\n"
+            "            }\n"
+        ),
+    ),
+    (
+        "renderer/height_measurer.rs",
+        "        // 3단계: 높이가 0인 행은 기본값 적용\n",
+        (
+            "        // [claude-hwpx span-ladder-trust] 미뤄 둔 병합 칸 선언 보충(#2291): 칸 내용으로 키운 뒤에도 선언보다 모자라면 마지막 걸침 행에\n"
+            "        if !self.is_native_hwp5 && !self.is_hwp3_variant && table.common.treat_as_char {\n"
+            "            for cell in &table.cells {\n"
+            "                let r = cell.row as usize;\n"
+            "                let span = cell.row_span as usize;\n"
+            "                if span > 1 && r + span <= row_count && cell.height < 0x8000_0000 {\n"
+            "                    let total_h = hwpunit_to_px(cell.height as i32, self.dpi);\n"
+            "                    let known_sum: f64 = (r..r + span).map(|i| row_heights[i]).sum();\n"
+            "                    if total_h > known_sum + 0.5 {\n"
+            "                        row_heights[r + span - 1] += total_h - known_sum;\n"
+            "                    }\n"
+            "                }\n"
+            "            }\n"
+            "        }\n"
+            "        // 3단계: 높이가 0인 행은 기본값 적용\n"
+        ),
+    ),
 ]
 
 
