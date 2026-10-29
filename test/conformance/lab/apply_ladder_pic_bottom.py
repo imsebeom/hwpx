@@ -1,12 +1,13 @@
-"""개발용: tac-row-ladder 의 칸 사다리 끝에 칸 안 위아래 배치(문단 기준) 그림, 도형의 바닥도 넣는다.
+"""개발용: tac-row-ladder 의 칸 사다리 끝에 칸 안 위아래 배치(문단 기준) 그림, 도형, 표의 바닥도 넣는다.
 
     python apply_ladder_pic_bottom.py [--revert]
 
-근거(2026-10-29 결과보고서 21:27 판 42쪽 「온라인 공간에서 수업 자료 나누기」 표, 216번): 「관련 사진」 칸 그림(5308, 5983, 6855,
-treatAsChar=0, TopAndBottom, flowWithText=1)은 저장 줄(높이 200)에 잡히지 않는다. 한/글은 그림 높이로 행을 키워 그린다(PDF).
-엔진은 글자처럼 취급 표의 행을 「저장 줄 끝 + 칸 여백」과 칸 선언 중 큰 값(tac-row-ladder)으로 정해 선언 67.7, 32.8px 에 머물고,
-그림은 원래 크기로 그려 행 밖으로 겹쳤다. 아래 글줄이 한/글보다 최대 75px 위였다. 칸 측정(DIAG_ROWH req 77.7/84.8/98.4)과도 어긋났다.
-큰 값을 고르므로 저장 줄이 그림 자리를 이미 담은 칸은 그대로다.
+근거:
+  - 결과보고서 21:27 판 42쪽 216번 표 「관련 사진」 칸: 그림(5308, 5983, 6855, treatAsChar=0, TopAndBottom)이 저장 줄(높이 200)에 잡히지 않아
+    행이 선언 67.7, 32.8px 에 머물고 그림은 행 밖으로 겹쳤다. 한/글은 그림 높이로 행을 그린다.
+  - 정답본 d347 76번 표: 칸 안 표(treatAsChar=0, 13144)도 저장 줄에 안 잡혀 사다리가 16778 로 행을 줄였다(한/글 29822). 글자처럼 취급 칸 안
+    표는 저장 줄이 담으므로 넣지 않는다(결과보고서 49번 표).
+큰 값을 고르므로 저장 줄이 개체 자리를 이미 담은 칸은 그대로다. ladder-stack-frag 보다 먼저 적용한다(그 패치가 이 블록의 쌓기 줄을 바꾼다).
 """
 
 import sys
@@ -28,7 +29,7 @@ EDITS = [
         (
             "                        next_top = top.saturating_add(s.line_height).saturating_add(s.line_spacing.max(0));\n"
             "                    }\n"
-            f"                    // {TAG} 칸 안 위아래 배치(문단 기준) 그림, 도형은 저장 줄에 안 잡힌다 — 그 바닥도 사다리 끝으로 본다\n"
+            f"                    // {TAG} 칸 안 위아래 배치(문단 기준) 그림, 도형, 표는 저장 줄에 안 잡힌다 — 그 바닥도 사다리 끝으로 본다\n"
             "                    // (결과보고서 216번 표 사진 칸: 줄 200, 그림 5308 → 한/글은 그림 높이로 행을 그린다)\n"
             "                    for p in &c.paragraphs {\n"
             "                        let para_top = p.line_segs.first().map(|s| s.vertical_pos).unwrap_or(0);\n"
@@ -36,6 +37,8 @@ EDITS = [
             "                            let common = match ctl {\n"
             "                                Control::Picture(pic) => &pic.common,\n"
             "                                Control::Shape(sh) => sh.common(),\n"
+            "                                // 위아래 배치 칸 안 표도 저장 줄에 안 잡힌다(정답본 d347 76번 표: 사다리 16778, 한/글 29822)\n"
+            "                                Control::Table(t) => &t.common,\n"
             "                                _ => continue,\n"
             "                            };\n"
             "                            if common.treat_as_char\n"
