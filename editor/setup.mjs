@@ -820,6 +820,8 @@ const RUST_PATCHES = [
     ['tac-no-shrink-hwpx-table-layout', 'src/renderer/layout/table_layout.rs'],
     ['span-ladder-trust-height-measurer', 'src/renderer/height_measurer.rs'],
     ['tac-flow-no-trim-typeset', 'src/renderer/typeset.rs'],
+    ['tac-stored-line-keep-paragraph-layout', 'src/renderer/layout/paragraph_layout.rs'],
+    ['ladder-pic-bottom-height-measurer', 'src/renderer/height_measurer.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));
