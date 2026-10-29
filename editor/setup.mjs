@@ -822,6 +822,13 @@ const RUST_PATCHES = [
     ['tac-flow-no-trim-typeset', 'src/renderer/typeset.rs'],
     ['tac-stored-line-keep-paragraph-layout', 'src/renderer/layout/paragraph_layout.rs'],
     ['ladder-pic-bottom-height-measurer', 'src/renderer/height_measurer.rs'],
+    // 열 때 글자처럼 취급 표 높이 다시 재기(한/글처럼 적힌 값을 그대로 믿지 않음)와 그것을 정답본에서 맞추는 측정 고침
+    ['ladder-stack-frag-height-measurer', 'src/renderer/height_measurer.rs'],
+    ['zero-span-row-height-measurer', 'src/renderer/height_measurer.rs'],
+    ['span-solve-zero-height-measurer', 'src/renderer/height_measurer.rs'],
+    ['cellspacing-edge-table-layout', 'src/renderer/layout/table_layout.rs'],
+    ['cellspacing-edge-height-measurer', 'src/renderer/height_measurer.rs'],
+    ['tac-restate-on-open-document', 'src/document_core/commands/document.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));
