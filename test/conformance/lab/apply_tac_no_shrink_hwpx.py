@@ -1,0 +1,61 @@
+"""개발용: HWPX 글자처럼 취급 표는 선언 높이(hp:sz)로 행을 비례 축소하지 않는다.
+
+    python apply_tac_no_shrink_hwpx.py [--revert]
+
+근거(2026-10-29 결과보고서 19:46 판과 한/글 13.0 재저장본): 학년별 수업 표 16개의 선언 높이가 낡아 있다(157번 62047, 170번 54420).
+한/글은 열 때 표 높이를 행 내용으로 다시 재서 그리고 저장한다 — 키우기도(157번 62047 → 66690, 170번 54420 → 65991) 줄이기도
+(161번 67717 → 66755) 한다. 칸 cellSz 는 그대로 두고 표 sz 만 바뀐다. 엔진은 #672 규칙(내용이 선언보다 2~150% 크면 선언에
+맞춰 비례 축소)으로 159번 표를 861.6px 로 눌러 그렸다(한/글 890.1px, 차시 행 둘이 17px, 14px 작다). 같은 표를 한/글이 다시
+저장한 판(선언 = 내용)은 엔진도 0.4px 안에서 맞는다.
+"""
+
+import sys
+from pathlib import Path
+
+SRC = Path.home() / ".claude" / "skills" / "hwpx" / "editor" / ".build" / "rhwp" / "src"
+TAG = "[claude-hwpx tac-no-shrink-hwpx]"
+
+EDITS = [
+    ('renderer/height_measurer.rs', '                                        let include_trailing_ls = !is_cell_last_line\n                                            || (cell_para_count > 1\n                                                && table.common.treat_as_char\n                                                && !crate::renderer::para_has_no_stored_line_segs(p));\n                                        if include_trailing_ls {\n                                            let trailing =\n                                                hwpunit_to_px(line.line_spacing, self.dpi);\n                                            // [#6030] TAC 다문단 예외로 포함되는 셀 마지막\n                                            // 줄의 trailing 이 음수(압축 줄간격, 70% 등)면\n                                            // 0 으로 — 뒤에 줄이 없어 압축 대상이 없고,\n                                            // 한글은 마지막 글리프 박스를 lh 그대로 그려\n                                            // 행을 그만큼 키운다(2386771 심사서식 10곳\n                                            // descender 깎임). 양수 trailing 포함 회계\n                                            // (KTX TOC 핀)는 불변.\n                                            let trailing = if is_cell_last_line {\n                                                trailing.max(0.0)\n                                            } else {\n                                                trailing\n                                            };\n                                            h + trailing\n                                        } else {\n                                            h\n                                        }\n                                    })\n                                    .enumerate()\n                                    // [#6299] 앞 줄의 가로 조각은 높이를 다시 더하지 않는다.\n                                    .filter(|(i, _)| !stored_seg_is_row_fragment(p, *i))\n                                    .map(|(_, h)| h)\n                                    .sum();\n                                spacing_before + lines_total + spacing_after\n                            }\n                        })\n                        .sum()\n                };\n                // 중첩 표가 있는 셀: LINE_SEG.line_height에 중첩 표 높이가 미포함.\n', '                                        // [claude-hwpx tac-no-shrink-hwpx] HWPX 는 여러 문단 칸도 마지막 줄 뒤 간격을 빼고 잰다(결과보고서 158번 표:\n                                        // 한/글 행 = 저장 줄 끝 43.3 + 여백 3.8, 엔진은 간격 272 를 더해 3.6px 컸다). #874/#1086 예외는 HWP5, HWP3 만\n                                        let include_trailing_ls = !is_cell_last_line\n                                            || (cell_para_count > 1\n                                                && (self.is_native_hwp5 || self.is_hwp3_variant)\n                                                && table.common.treat_as_char\n                                                && !crate::renderer::para_has_no_stored_line_segs(p));\n                                        if include_trailing_ls {\n                                            let trailing =\n                                                hwpunit_to_px(line.line_spacing, self.dpi);\n                                            // [#6030] TAC 다문단 예외로 포함되는 셀 마지막\n                                            // 줄의 trailing 이 음수(압축 줄간격, 70% 등)면\n                                            // 0 으로 — 뒤에 줄이 없어 압축 대상이 없고,\n                                            // 한글은 마지막 글리프 박스를 lh 그대로 그려\n                                            // 행을 그만큼 키운다(2386771 심사서식 10곳\n                                            // descender 깎임). 양수 trailing 포함 회계\n                                            // (KTX TOC 핀)는 불변.\n                                            let trailing = if is_cell_last_line {\n                                                trailing.max(0.0)\n                                            } else {\n                                                trailing\n                                            };\n                                            h + trailing\n                                        } else {\n                                            h\n                                        }\n                                    })\n                                    .enumerate()\n                                    // [#6299] 앞 줄의 가로 조각은 높이를 다시 더하지 않는다.\n                                    .filter(|(i, _)| !stored_seg_is_row_fragment(p, *i))\n                                    .map(|(_, h)| h)\n                                    .sum();\n                                spacing_before + lines_total + spacing_after\n                            }\n                        })\n                        .sum()\n                };\n                // 중첩 표가 있는 셀: LINE_SEG.line_height에 중첩 표 높이가 미포함.\n'),
+    ('renderer/height_measurer.rs', '                                        let include_trailing_ls = !is_cell_last_line\n                                            || (cell_para_count > 1\n                                                && table.common.treat_as_char\n                                                && !crate::renderer::para_has_no_stored_line_segs(p));\n                                        if include_trailing_ls {\n                                            let trailing =\n                                                hwpunit_to_px(line.line_spacing, self.dpi);\n                                            // [#6030] TAC 다문단 예외로 포함되는 셀 마지막\n                                            // 줄의 trailing 이 음수(압축 줄간격, 70% 등)면\n                                            // 0 으로 — 뒤에 줄이 없어 압축 대상이 없고,\n                                            // 한글은 마지막 글리프 박스를 lh 그대로 그려\n                                            // 행을 그만큼 키운다(2386771 심사서식 10곳\n                                            // descender 깎임). 양수 trailing 포함 회계\n                                            // (KTX TOC 핀)는 불변.\n                                            let trailing = if is_cell_last_line {\n                                                trailing.max(0.0)\n                                            } else {\n                                                trailing\n                                            };\n                                            h + trailing\n                                        } else {\n                                            h\n                                        }\n                                    })\n                                    .enumerate()\n                                    // [#6299] 앞 줄의 가로 조각은 높이를 다시 더하지 않는다.\n                                    .filter(|(i, _)| !stored_seg_is_row_fragment(p, *i))\n                                    .map(|(_, h)| h)\n                                    .sum();\n                                spacing_before + lines_total + spacing_after\n                            }\n                        })\n                        .sum()\n                };\n                // LINE_SEG의 line_height에 이미 셀 내 중첩 표 높이가 반영되어 있으므로\n', '                                        // [claude-hwpx tac-no-shrink-hwpx] HWPX 는 여러 문단 칸도 마지막 줄 뒤 간격을 빼고 잰다(결과보고서 158번 표:\n                                        // 한/글 행 = 저장 줄 끝 43.3 + 여백 3.8, 엔진은 간격 272 를 더해 3.6px 컸다). #874/#1086 예외는 HWP5, HWP3 만\n                                        let include_trailing_ls = !is_cell_last_line\n                                            || (cell_para_count > 1\n                                                && (self.is_native_hwp5 || self.is_hwp3_variant)\n                                                && table.common.treat_as_char\n                                                && !crate::renderer::para_has_no_stored_line_segs(p));\n                                        if include_trailing_ls {\n                                            let trailing =\n                                                hwpunit_to_px(line.line_spacing, self.dpi);\n                                            // [#6030] TAC 다문단 예외로 포함되는 셀 마지막\n                                            // 줄의 trailing 이 음수(압축 줄간격, 70% 등)면\n                                            // 0 으로 — 뒤에 줄이 없어 압축 대상이 없고,\n                                            // 한글은 마지막 글리프 박스를 lh 그대로 그려\n                                            // 행을 그만큼 키운다(2386771 심사서식 10곳\n                                            // descender 깎임). 양수 trailing 포함 회계\n                                            // (KTX TOC 핀)는 불변.\n                                            let trailing = if is_cell_last_line {\n                                                trailing.max(0.0)\n                                            } else {\n                                                trailing\n                                            };\n                                            h + trailing\n                                        } else {\n                                            h\n                                        }\n                                    })\n                                    .enumerate()\n                                    // [#6299] 앞 줄의 가로 조각은 높이를 다시 더하지 않는다.\n                                    .filter(|(i, _)| !stored_seg_is_row_fragment(p, *i))\n                                    .map(|(_, h)| h)\n                                    .sum();\n                                spacing_before + lines_total + spacing_after\n                            }\n                        })\n                        .sum()\n                };\n                // LINE_SEG의 line_height에 이미 셀 내 중첩 표 높이가 반영되어 있으므로\n'),
+    ('renderer/layout/table_layout.rs', '                            let include_trailing_ls = !is_cell_last_line\n                                || (para_count > 1 && table.common.treat_as_char);\n', '                            // [claude-hwpx tac-no-shrink-hwpx] HWPX 는 여러 문단 칸도 마지막 줄 뒤 간격 제외(측정과 같은 회계)\n                            let include_trailing_ls = !is_cell_last_line\n                                || (para_count > 1\n                                    && table.common.treat_as_char\n                                    && (self.profile.get().native_hwp5_layout() || self.profile.get().hwp3_layout()));\n'),
+    (
+        "renderer/height_measurer.rs",
+        (
+            "        let table_height = if table.common.treat_as_char\n"
+            "            && !generator_restated_height\n"
+        ),
+        (
+            f"        // {TAG} HWPX 는 한/글이 열 때 표 높이를 행 내용으로 다시 잰다(선언 높이로 누르지 않는다, 결과보고서 159번 표)\n"
+            "        let claude_hwpx_restates = !self.is_native_hwp5 && !self.is_hwp3_variant;\n"
+            "        let table_height = if table.common.treat_as_char\n"
+            "            && !generator_restated_height\n"
+            "            && !claude_hwpx_restates\n"
+        ),
+    ),
+]
+
+
+def main():
+    revert = "--revert" in sys.argv
+    edits = list(reversed(EDITS)) if revert else EDITS
+    for rel, find, repl in edits:
+        if revert:
+            find, repl = repl, find
+        f = SRC / rel
+        raw = f.read_bytes().decode("utf-8")
+        nl = "\r\n" if "\r\n" in raw else "\n"
+        s = raw.replace("\r\n", "\n")
+        if (find not in s) if revert else (repl in s):
+            print("이미", rel)
+            continue
+        n = s.count(find)
+        if n != 1:
+            sys.exit(f"{rel}: 자리 {n}곳 — {find[:60]!r}")
+        s = s.replace(find, repl)
+        f.write_bytes(s.replace("\n", nl).encode("utf-8"))
+        print("넣음", rel)
+
+
+if __name__ == "__main__":
+    main()
