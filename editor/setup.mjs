@@ -798,6 +798,8 @@ const RUST_PATCHES = [
     ['delcol-reflow-table-ops', 'src/document_core/commands/table_ops.rs'],
     // 글자 서식으로 다시 접은 본문 문단의 세로 위치를 앞뒤에 잇는다
     ['charfmt-vpos-chain-formatting', 'src/document_core/commands/formatting.rs'],
+    // 문단 모양(줄 간격, 위아래 간격)을 바꾼 본문 문단과 그 되돌리기도 세로 위치를 뒤 문단까지 잇는다
+    ['parafmt-vpos-chain-formatting', 'src/document_core/commands/formatting.rs'],
     // 상태 표시줄의 고른 글자 수(플러그인 selection-count): 범위 안 표, 글상자, 캡션 글까지 센다
     ['sel-char-count-wasm', 'src/wasm_api.rs'],
     // 「셀 단위로 나눔」 표 칸 안의 「셀 단위로 나눔」 1×1 중첩 표는 한 쪽보다 작아도 쪽 끝에서 나눈다(한국문화 1단원 사본 실험,
