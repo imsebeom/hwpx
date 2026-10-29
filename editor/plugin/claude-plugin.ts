@@ -617,11 +617,15 @@ export function createClaudePlugin(getInputHandler) {
           doc.splitParagraph(sec, p, off);
           target = after ? p + 1 : p;
         }
-        let maxW = 42520;
+        // 칸: 폭을 안 주면 너비를 칸 안쪽 폭에 맞춘다(작으면 키우고 크면 줄임, 한/글 방식 — 스튜디오 넣기, 붙여넣기, 끌어 놓기와 같다)
+        let cellInner = 0;
         if (inCell) {
-          try { maxW = Math.max(2000, JSON.parse(doc.getCellProperties(sec, pos.parentParaIndex, pos.controlIndex, pos.cellIndex)).width - 1200); } catch { /* 기본값 */ }
+          try {
+            const cp = JSON.parse(doc.getCellProperties(sec, pos.parentParaIndex, pos.controlIndex, pos.cellIndex));
+            cellInner = Math.max(2000, cp.width - cp.paddingLeft - cp.paddingRight);
+          } catch { /* 기본값 */ }
         }
-        const width = im.widthMm ? Math.round((im.widthMm * 7200) / 25.4) : Math.min(im.naturalW * 75, maxW);
+        const width = im.widthMm ? Math.round((im.widthMm * 7200) / 25.4) : cellInner || Math.min(im.naturalW * 75, 42520);
         const height = Math.round((width * im.naturalH) / im.naturalW);
         const bytes = Uint8Array.from(atob(im.base64), (c) => c.charCodeAt(0));
         const opts = {
