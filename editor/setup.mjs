@@ -810,6 +810,11 @@ const RUST_PATCHES = [
     ['tac-multi-om-layout', 'src/renderer/layout.rs'],
     ['tac-stale-grow-height-measurer', 'src/renderer/height_measurer.rs'],
     ['end-run-height-line-breaking', 'src/renderer/composer/line_breaking.rs'],
+    // 결과보고서(학년별 수업 표 16개): 글자처럼 취급 표는 여러 행도, 쪽보다 커도 나누지 않고 낡은 선언 높이로 남은 자리에 넣지 않는다,
+    // 글 + 글 앞으로 1행 표(「활동결과물」 꼬리표)뿐인 소제목은 글 문단으로, 통째로 넘어간 문단의 저장 줄 위치를 새 쪽 기준점으로
+    ['tac-no-split-typeset', 'src/renderer/typeset.rs'],
+    ['overlay-text-host-typeset', 'src/renderer/typeset.rs'],
+    ['push-para-base-typeset', 'src/renderer/typeset.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));
