@@ -839,6 +839,7 @@ const RUST_PATCHES = [
     ['cell-missing-line-gap-document', 'src/document_core/commands/document.rs'],
     ['rowbreak-frame-fit-typeset', 'src/renderer/typeset.rs'],
     ['restate-short-line-document', 'src/document_core/commands/document.rs'],
+    ['nolineseg-tac-line-document', 'src/document_core/commands/document.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));
