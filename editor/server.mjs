@@ -231,10 +231,14 @@ function seqDiff(A, B) {
 }
 
 function saveSnapshot(body) {
-  const bytes = Buffer.from(body.hwpxBase64, 'base64');
-  const tmp = LATEST + '.tmp';
-  fs.writeFileSync(tmp, bytes);
-  fs.renameSync(tmp, LATEST);
+  // 사용자 편집은 글과 위치만 온다(host.js snapshot). latest.hwpx 는 입력이 멎은 뒤 latestOnly 로 따로 온다
+  const bytes = body.hwpxBase64 ? Buffer.from(body.hwpxBase64, 'base64') : null;
+  if (bytes) {
+    const tmp = LATEST + '.tmp';
+    fs.writeFileSync(tmp, bytes);
+    fs.renameSync(tmp, LATEST);
+  }
+  if (body.latestOnly) return {};
   const text = String(body.text ?? '').replace(/\r\n/g, '\n');
   let prev = '';
   try { prev = fs.readFileSync(LATEST_TXT, 'utf8'); } catch { /* 첫 스냅샷 */ }
@@ -268,7 +272,7 @@ function saveSnapshot(body) {
       at: entry.cursor?.cell?.ref ?? (entry.cursor ? `p${entry.cursor.para}` : null),
     });
   }
-  writeSession({ lastSnapshotAt: entry.ts, changeSeq: body.changeSeq, bytes: bytes.length });
+  writeSession({ lastSnapshotAt: entry.ts, changeSeq: body.changeSeq, bytes: bytes?.length });
   return entry;
 }
 

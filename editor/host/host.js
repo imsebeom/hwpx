@@ -96,16 +96,19 @@ async function cursor() {
   try { return await plugin('cursor'); } catch { return null; }
 }
 
-async function snapshot(source) {
+// withBytes=false: 글과 위치만 기록한다. 문서 전체 내보내기는 49쪽 문서에서 주 스레드를 0.9초 막아, 편집마다 하면 줄 간격을
+// 연달아 바꿀 때 화면이 멈췄다(2026-10-30). latest.hwpx 는 입력이 멎은 뒤에 따로 갱신하고, 저장은 그때 새로 내보낸다.
+async function snapshot(source, withBytes = true) {
   const key = await mutationKey();
-  const bytes = await studio.exportHwpx();
+  const bytes = withBytes ? await studio.exportHwpx() : null;
+  if (withBytes) latestKey = key;
   const body = {
     source,
     changeSeq: key,
     text: await docText(),
     model: await plugin('model'),          // 본문 문단 글과 셀 문단 글(좌표 diff 용)
     cursor: await cursor(),
-    hwpxBase64: toBase64(bytes),
+    hwpxBase64: bytes ? toBase64(bytes) : undefined,
   };
   const r = await fetch('/api/snapshot', { method: 'POST', body: JSON.stringify(body) }).then((x) => x.json());
   lastKey = key;
@@ -228,14 +231,32 @@ async function pollLoop() {
 
 // 사용자 편집 감지: 변경 카운터가 바뀌고 1.5초 동안 더 안 바뀌면 한 번 기록한다.
 let pendingKey = null;
+let latestKey = null;      // latest.hwpx 에 담긴 변경 카운터
+let changedKey = null, changedAt = 0;   // 마지막으로 본 변경 카운터와 그때 시각
+const IDLE_MS = 20000;     // 이만큼 입력이 없으면 내보내기(주 스레드를 막는 일)를 한다
+function idleFor(key) {
+  if (key !== changedKey) { changedKey = key; changedAt = Date.now(); }
+  return Date.now() - changedAt;
+}
 setInterval(async () => {
   if (busy || lastKey === null) return;
   try {
     const key = await mutationKey();
-    if (key === lastKey) { pendingKey = null; return; }
+    if (key === lastKey) {
+      pendingKey = null;
+      if (key !== latestKey && idleFor(key) >= IDLE_MS) {
+        const bytes = await studio.exportHwpx();
+        if ((await mutationKey()) === key) {
+          latestKey = key;
+          await fetch('/api/snapshot', { method: 'POST', body: JSON.stringify({ latestOnly: true, hwpxBase64: toBase64(bytes) }) });
+        }
+      }
+      return;
+    }
+    idleFor(key);
     if (key !== pendingKey) { pendingKey = key; return; }   // 아직 입력 중
     pendingKey = null;
-    await snapshot('user');
+    await snapshot('user', false);
   } catch { /* 문서 교체 중이면 다음 주기에 */ }
 }, 1500);
 
@@ -252,14 +273,21 @@ window.__claudeFlushForClose = async () => {
 // getDocumentState 는 부를 때마다 문서 전체를 hwpx 로 내보내 해시를 구한다(58MB 문서에서 1.3초 이상).
 // 매초 부르면 큰 문서에서 주 스레드가 쉬지 못해 모든 응답이 수십 초씩 늦었다(2026-09-29).
 // 그래서 편집 카운터가 바뀌었을 때, 그리고 저장으로 풀렸는지 보려고 dirty 인 동안 10초마다만 묻는다.
-let lastDirty = null, dirtyKey = null, dirtyTick = 0;
+let lastDirty = null, dirtyKey = null, dirtyTick = 0, dirtySince = 0;
 setInterval(async () => {
   const api = window.pywebview?.api;
   if (!api?.set_dirty) return;
   try {
     const key = await mutationKey();
     dirtyTick++;
-    if (lastDirty !== null && key === dirtyKey && !(lastDirty && dirtyTick % 10 === 0)) return;
+    // 바뀐 직후에는 내보내지 않고 「바뀜」으로만 알린다(되돌려 원본과 같아졌는지는 입력이 멎은 뒤 가린다, 창을 닫을 때는 위 flush 가 정확히 잰다)
+    if (dirtyKey !== null && key !== dirtyKey) {
+      dirtyKey = key;
+      dirtySince = Date.now();
+      if (lastDirty !== true) { lastDirty = true; await api.set_dirty(true); }
+      return;
+    }
+    if (lastDirty !== null && !(lastDirty && dirtyTick % 10 === 0 && Date.now() - dirtySince >= IDLE_MS)) return;
     dirtyKey = key;
     const dirty = Boolean((await studio.getDocumentState()).dirty);
     if (dirty !== lastDirty) { lastDirty = dirty; await api.set_dirty(dirty); }
