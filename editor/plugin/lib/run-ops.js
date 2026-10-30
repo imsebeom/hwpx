@@ -359,4 +359,4 @@ export function stepCore(doc, op) {
   return undefined;
 }
 
-export { parseMaybe, EXTRA_TOOLS, EXTRA_RUN, runNestedTool, searchWithNested, paraTextAt, fixInsertedCharShape, similarMethods, clearCellPictures };
+export { resolveNested, pathAt, parseMaybe, EXTRA_TOOLS, EXTRA_RUN, runNestedTool, searchWithNested, paraTextAt, fixInsertedCharShape, similarMethods, clearCellPictures };

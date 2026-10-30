@@ -13,6 +13,7 @@
  * 패치가 없는 WASM(npm 원본)에서는 목록이 비어 단추만 보인다.
  */
 import { resolveTarget } from './doc-tools.js';
+import { resolveNested, pathAt } from './run-ops.js';
 
 const WIDTH = 300;
 const HIDDEN_KEY = 'claude-memo-hidden';
@@ -343,24 +344,50 @@ export function installMemoPanel(host, getInputHandler) {
   };
   const remove = (n) => { const m = pick(n); return change('deleteMemo', (doc) => doc.deleteMemo(m.fieldId)); };
   const edit = (n, text) => { const m = pick(n); return change('updateMemo', (doc) => doc.updateMemoBody(m.fieldId, text)); };
-  /** 좌표(p12, T1r2c1)의 문단에 메모를 단다. at 을 주면 그 글(처음 나오는 곳)에, 없으면 문단 전체에 건다 */
+  /**
+   * 좌표(p12, T1r2c1, 표 속 표 T1r2c1/T1r0c0)에 메모를 단다. at 을 주면 그 글이 처음 나오는 문단의 그 글에(칸은 모든 문단에서 찾는다),
+   * 없으면 문단 전체에(칸은 첫 문단) 건다
+   */
   const add = (ref, text, at, author) => {
-    const pos = host.read((doc) => resolveTarget(doc, ref));
-    if (!pos) throw new Error(`좌표를 못 찾음: ${ref}`);
-    const inCell = pos.parentParaIndex != null;
-    const whole = host.read((doc) => (pos.length > 0 ? (inCell
-      ? doc.getTextInCell(pos.sectionIndex, pos.parentParaIndex, pos.controlIndex, pos.cellIndex, 0, 0, pos.length)
-      : doc.getTextRange(pos.sectionIndex, pos.paragraphIndex, 0, pos.length)) : ''));
-    const start = at ? whole.indexOf(at) : 0;
-    if (start < 0) throw new Error(`${ref} 에 「${at}」 없음`);
-    const end = at ? start + at.length : pos.length;
+    const target = host.read((doc) => {
+      const s0 = String(ref).replace(/\s+/g, '');
+      if (s0.includes('/')) {
+        const x = resolveNested(doc, s0);
+        return { s: x.s, para: x.para, path: x.path };
+      }
+      const pos = resolveTarget(doc, s0);
+      if (!pos) throw new Error(`좌표를 못 찾음: ${ref}`);
+      if (pos.parentParaIndex == null) return { s: pos.sectionIndex, para: pos.paragraphIndex, path: null, length: pos.length };
+      return { s: pos.sectionIndex, para: pos.parentParaIndex, path: [{ controlIndex: pos.controlIndex, cellIndex: pos.cellIndex, cellParaIndex: 0 }] };
+    });
+    let cellPara = 0, start = 0, end = target.length ?? 0;
+    host.read((doc) => {
+      if (!target.path) {
+        if (!at) return;
+        const whole = target.length > 0 ? doc.getTextRange(target.s, target.para, 0, target.length) : '';
+        start = whole.indexOf(at);
+        if (start < 0) throw new Error(`${ref} 에 「${at}」 없음`);
+        end = start + at.length;
+        return;
+      }
+      const pj = (i) => JSON.stringify(pathAt(target.path, i));
+      const n = doc.getCellParagraphCountByPath(target.s, target.para, pj(0));
+      const lenOf = (i) => doc.getCellParagraphLengthByPath(target.s, target.para, pj(i));
+      if (!at) { end = lenOf(0); return; }
+      for (let i = 0; i < n; i++) {
+        const len = lenOf(i);
+        const at0 = len ? doc.getTextInCellByPath(target.s, target.para, pj(i), 0, len).indexOf(at) : -1;
+        if (at0 >= 0) { cellPara = i; start = at0; end = at0 + at.length; return; }
+      }
+      throw new Error(`${ref} 칸의 문단 ${n}개에 「${at}」 없음. 칸 안 표의 글이면 ${ref}/T1r0c0 처럼 적는다`);
+    });
     const now = new Date();
     const ft = BigInt(now.getTime() + 11644473600000) * 10000n;   // 작성 시각(k-commands.ts 새 메모와 같은 꼴)
     const r = change('insertMemo', (doc) => doc.insertMemoEx(JSON.stringify({
-      sectionIdx: pos.sectionIndex, paraIdx: pos.paragraphIndex, start, end, body: text, author: author || 'Claude',
+      sectionIdx: target.s, paraIdx: target.para, start, end, body: text, author: author || 'Claude',
       created: new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().replace(/\.\d+Z$/, 'Z'),
       fileTime: [Number(ft & 0xffffffffn), Number(ft >> 32n)],
-      path: inCell ? [[pos.controlIndex, pos.cellIndex, 0]] : undefined,
+      path: target.path ? pathAt(target.path, cellPara).map((e) => [e.controlIndex, e.cellIndex, e.cellParaIndex]) : undefined,
     })));
     if (!shown && !userHid()) show(false);
     return r;

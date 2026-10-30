@@ -485,7 +485,7 @@ switch (sub) {
     if (['add', 'edit', 'del'].includes(act)) {
       const opt = (k) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : undefined; };
       const body = (s) => String(s ?? '').normalize('NFC').replace(/\\n/g, '\n');
-      if (!a1 || (act !== 'del' && a2 == null)) die('사용: memos add <p12|T1r2c1> <본문> [--at 걸 글] [--author 이름] | memos edit <번호> <본문> | memos del <번호>');
+      if (!a1 || (act !== 'del' && a2 == null)) die('사용: memos add <p12|T1r2c1|T1r2c1/T1r0c0> <본문> [--at 걸 글] [--author 이름] | memos edit <번호> <본문> | memos del <번호>');
       const op = act === 'add'
         ? { action: 'add', ref: a1, text: body(a2), at: opt('--at') && body(opt('--at')), author: opt('--author') }
         : { action: act, text: act === 'edit' ? body(a2) : undefined };

@@ -15,7 +15,7 @@
 import { createHwpCtrl } from '../../../npm/hwpctrl-ocx/src/index.mjs';
 import { createAdoptDocument, isMutating } from '../../../npm/hwpctrl-ocx/src/adapter.mjs';
 import { TOOLS, clean, listTables, outline, resolveTarget, runTool } from './doc-tools.js';
-import { parseMaybe, EXTRA_TOOLS, clearCellPictures, stepCore } from './run-ops.js';
+import { parseMaybe, EXTRA_TOOLS, clearCellPictures, stepCore, resolveNested, pathAt } from './run-ops.js';
 import { detectDocType, findSlots, inspect } from './doc-rules.js';
 import { modelOf } from './collab-ops.js';
 import { installHancomKeys } from './hancom-keys';
@@ -566,7 +566,52 @@ export function createClaudePlugin(getInputHandler) {
        * 첫 줄 위에 빈칸이 생기고 그림이 눌려 그려졌다(2026-09-28 실측, 본문과 칸 모두).
        * 폭을 안 주면 원본 픽셀 크기(1px = 75 HWPUNIT)를 쓰되 본문 150mm, 칸은 칸 폭을 넘지 않게 줄인다.
        */
+      // 표 속 표 칸(좌표 T2r0c0/T1r0c0 이나 그 칸의 커서). 경로로 넣어야 안쪽 칸에 들어간다(2026-10-30 다른 세션 보고: 좌표는 실패, 커서는 바깥 칸으로 갔다)
+      const insertImageNested = (doc, im, x, cursorPara) => {
+        if (im.wrap) throw new Error('칸 안 그림은 아직 글자처럼 취급(--wrap 없이)만 넣을 수 있습니다');
+        const { s, para, path } = x;
+        const paraPath = (i) => JSON.stringify(pathAt(path, i));
+        const count = () => doc.getCellParagraphCountByPath(s, para, paraPath(0));
+        const len = (i) => doc.getCellParagraphLengthByPath(s, para, paraPath(i));
+        let replaced = 0;
+        if (im.replace) {
+          for (let cp = count() - 1; cp >= 0; cp--) {
+            for (let ci = 15; ci >= 0; ci--) {
+              try { doc.getCellPicturePropertiesByPath(s, para, paraPath(cp), ci); } catch { continue; }
+              doc.deleteCellPictureControlByPath(s, para, paraPath(cp), ci);
+              replaced++;
+            }
+          }
+        }
+        const after = !im.at || im.end;
+        let cp = cursorPara ?? 0;
+        if (im.at && im.end) cp = count() - 1;
+        let target;
+        if (count() === 1 && len(0) === 0) {
+          target = 0;   // 빈 칸이면 남은 빈 문단에 바로 넣는다(나누면 빈 문단이 위에 남아 칸이 커진다)
+        } else {
+          doc.splitParagraphInCellByPath(s, para, paraPath(cp), after ? len(cp) : 0, undefined);
+          target = after ? cp + 1 : cp;
+        }
+        const props = JSON.parse(doc.getCellPropertiesByPath(s, para, paraPath(0), path[path.length - 1].cellIndex));
+        const inner = Math.max(2000, props.width - props.paddingLeft - props.paddingRight);
+        const width = im.widthMm ? Math.round((im.widthMm * 7200) / 25.4) : inner;
+        const height = Math.round((width * im.naturalH) / im.naturalW);
+        const r = parseMaybe(doc.insertPictureEx(JSON.stringify({
+          sectionIdx: s, paraIdx: para, charOffset: 0, cellPath: paraPath(target),
+          width, height, naturalWidthPx: im.naturalW, naturalHeightPx: im.naturalH,
+          extension: im.ext, description: im.desc ?? '', paperOffsetXHu: -2147483648, paperOffsetYHu: 0,
+        }), Uint8Array.from(atob(im.base64), (c) => c.charCodeAt(0))));
+        return { ...r, ...(im.replace ? { replaced } : {}), at: `셀 문단 ${target}`, widthMm: +(width * 25.4 / 7200).toFixed(1), heightMm: +(height * 25.4 / 7200).toFixed(1), inCell: true };
+      };
       const insertImage = (doc, im) => {
+        if (im.at && String(im.at).includes('/')) return insertImageNested(doc, im, resolveNested(doc, im.at));
+        if (!im.at) {
+          const cur = getInputHandler()?.getCursorPosition?.();
+          if (cur?.cellPath?.length > 1) {
+            return insertImageNested(doc, im, { s: cur.sectionIndex, para: cur.parentParaIndex, path: cur.cellPath }, cur.cellPath[cur.cellPath.length - 1].cellParaIndex ?? 0);
+          }
+        }
         const pos = im.at ? resolveTarget(doc, im.at) : getInputHandler()?.getCursorPosition?.();
         if (!pos) throw new Error(`그림 넣을 자리를 못 찾음: ${im.at ?? '커서'}`);
         const inCell = pos.parentParaIndex != null;

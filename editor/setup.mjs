@@ -841,6 +841,14 @@ const RUST_PATCHES = [
     ['restate-short-line-document', 'src/document_core/commands/document.rs'],
     ['nolineseg-tac-line-document', 'src/document_core/commands/document.rs'],
     ['cell-square-right-paragraph-layout', 'src/renderer/layout/paragraph_layout.rs'],
+    // 문단 합치기가 필드 끝 표식을 세지 않아 저장 줄 시작이 표식 안을 가리켜 한/글이 문서를 잘랐다(patches/merge-field-end-*.rs)
+    ['merge-field-end-paragraph', 'src/model/paragraph.rs'],
+    ['merge-field-end-section', 'src/serializer/hwpx/section.rs'],
+    // 에디터가 hwpx 에서 내보낸 hwp 도 hwpx 조판 규칙으로, 칸 안 메모 본문도 hwp 에(patches/hwpx-lineage-layout-*.rs)
+    ['hwpx-lineage-layout-document', 'src/model/document.rs'],
+    ['hwpx-lineage-layout-body-text', 'src/serializer/body_text.rs'],
+    // 표 속 표 칸 그림 옆 캐럿과 클릭 판정(patches/nested-pic-caret-*.rs)
+    ['nested-pic-caret-cursor-rect', 'src/document_core/queries/cursor_rect.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));
@@ -1108,7 +1116,7 @@ for (const [id, rel, tail] of [['nested-table-cache', 'engine/table-bbox-cache.t
   ['nested-table-handler', 'engine/input-handler.ts'], ['nested-table-mouse', 'engine/input-handler-mouse.ts'],
   // 칸 안 그림: 그림 넣기와 파일 끌어 놓기를 칸 문단 안 글자처럼 취급으로, 글자처럼 취급 칸 그림 끌어 옮기기(cell-pic-*.ts)
   // 복구본과 latest.hwpx 를 워커에서 내보낸다(plugin/export-worker.ts, 주 스레드 멈춤 약 1초 → 약 30ms)
-  ['export-worker-bridge', 'core/wasm-bridge.ts'], ['export-worker-autosave', 'recovery/autosave-manager.ts'], ['export-worker-main', 'main.ts'],
+  ['export-worker-bridge', 'core/wasm-bridge.ts'], ['export-worker-autosave', 'recovery/autosave-manager.ts'], ['export-worker-main', 'main.ts'], ['recovery-hwpx-format', 'recovery/recovery-format.ts'], ['nested-line-caret', 'engine/cursor.ts'],
   ['cell-pic-place', 'engine/input-handler-table.ts'], ['cell-pic-drop', 'engine/input-handler.ts'], ['cell-pic-paste', 'engine/input-handler-keyboard.ts'],
   ['cell-pic-move', 'engine/input-handler-picture.ts', 'cell-pic-move-fn'], ['cell-pic-move-start', 'engine/input-handler-mouse.ts']]) {
   const f = path.join(STUDIO, 'src', ...rel.split('/'));

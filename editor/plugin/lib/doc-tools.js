@@ -1169,7 +1169,24 @@ function exec(doc, name, a) {
       const hu = Math.round((a.height_mm * 7200) / 25.4);
       const targets = cells.filter((c) => c.rowSpan === 1 && c.row >= from && c.row <= to);
       if (!targets.length) throw new Error('그 행에는 여러 행에 걸친 칸뿐이라 높이를 정할 칸이 없습니다.');
+      // 여러 행에 걸친 칸의 높이에는 그 행들의 몫이 들어 있다. 그대로 두면 한/글이 그 높이를 지켜 행이 줄지 않는다(2026-10-30 채점표가 쪽을 비우고 밀림).
+      // 칸 높이를 읽는 동안 값이 바뀌지 않게 먼저 잰다
+      const before = new Map();
+      for (const c of targets) {
+        const h = J(doc.getCellProperties(t.section, t.para, t.ctrl, c.idx)).height;
+        before.set(c.row, Math.max(before.get(c.row) ?? 0, h));
+      }
       for (const c of targets) doc.setCellProperties(t.section, t.para, t.ctrl, c.idx, JSON.stringify({ height: hu }));
+      for (const c of cells) {
+        if (c.rowSpan === 1 || c.row > to || c.row + c.rowSpan <= from) continue;
+        let cut = 0;
+        for (let r = Math.max(c.row, from); r <= Math.min(c.row + c.rowSpan - 1, to); r++) {
+          if (before.has(r)) cut += before.get(r) - hu;
+        }
+        if (!cut) continue;
+        const h = J(doc.getCellProperties(t.section, t.para, t.ctrl, c.idx)).height;
+        doc.setCellProperties(t.section, t.para, t.ctrl, c.idx, JSON.stringify({ height: Math.max(hu, h - cut) }));
+      }
       // 실제로 그려진 높이(mm): 쪽마다 나뉜 조각을 (행, 쪽)별로 가장 큰 것만 더한다
       const frag = new Map();
       for (const b of J(doc.getTableCellBboxes(t.section, t.para, t.ctrl))) {
