@@ -315,6 +315,13 @@ function serveStatic(req, res, urlPath) {
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
   const p = url.pathname;
+  // 다른 웹사이트가 이 로컬 서버를 부르지 못하게 한다(CSRF, DNS 리바인딩). 스튜디오, 호스트는 같은 출처이고 CLI 는 Origin 이 없다
+  const hostOk = /^(localhost|127\.0\.0\.1)(:\d+)?$/.test(req.headers.host ?? '');
+  let originOk = true;
+  if (req.headers.origin) {
+    try { originOk = new URL(req.headers.origin).host === req.headers.host; } catch { originOk = false; }
+  }
+  if (!hostOk || !originOk) return sendJson(res, 403, { ok: false, error: '허용되지 않은 출처' });
   try {
     if (p === '/api/log' && req.method === 'POST') {   // 호스트 페이지(화면 저장, 오류)와 CLI(start, save)가 남기는 기록
       const { ev, ...data } = await readBody(req);
@@ -404,8 +411,10 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/latest' && req.method === 'POST') {   // 워커가 내보낸 latest.hwpx(바이너리 그대로)
       const chunks = [];
       for await (const c of req) chunks.push(c);
+      const body = Buffer.concat(chunks);
+      if (body[0] !== 0x50 || body[1] !== 0x4b) return sendJson(res, 400, { ok: false, error: 'hwpx 가 아니다' });
       const tmp = LATEST + '.tmp';
-      fs.writeFileSync(tmp, Buffer.concat(chunks));
+      fs.writeFileSync(tmp, body);
       fs.renameSync(tmp, LATEST);
       return sendJson(res, 200, { ok: true });
     }
