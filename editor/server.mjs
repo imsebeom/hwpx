@@ -47,6 +47,8 @@ const queue = [];              // 브라우저가 아직 안 가져간 명령
 const waiting = new Map();     // id → { resolve, timer }  (CLI 가 결과를 기다리는 중)
 let pollers = [];              // 대기 중인 브라우저 long-poll 응답
 let lastPollAt = 0;
+// 서버가 뜰 때마다 새 번호. 옛 서버에서 문서를 연 브라우저 탭이 같은 포트의 새 서버에 다시 붙어 명령을 나눠 받지 못하게 한다(2026-10-30)
+const SERVER_SID = `${process.pid}-${Date.now()}`;
 let lastAppPollAt = 0;   // 앱 창(app.py, ?client=app)이 마지막으로 명령을 받으러 온 때
 
 function dispatch() {
@@ -381,7 +383,11 @@ const server = http.createServer(async (req, res) => {
       if (body.type === 'run') logEvent('run', { ops: summarizeOps(body.ops), ok: Boolean(result?.ok), result: clip(result?.ok ? result.result : result?.error, 400) });
       return sendJson(res, 200, result);
     }
+    if (p === '/api/session') return sendJson(res, 200, { ok: true, session: SERVER_SID });
     if (p === '/api/poll') {
+      // 앱 창은 서버를 다시 띄우면 다시 붙는 것이 정상이다(cli start 가 open 을 보낸다). 브라우저 탭만 세션을 가린다
+      const sid = url.searchParams.get('sid');
+      if (sid && sid !== SERVER_SID && url.searchParams.get('client') !== 'app') return sendJson(res, 200, { id: 0, type: 'stale' });
       lastPollAt = Date.now();
       // 앱 창이 붙어 있으면 브라우저 탭은 물러나게 한다. 두 화면이 명령을 나눠 받으면 편집과 측정이 뒤섞인다(2026-10-21)
       const isApp = url.searchParams.get('client') === 'app';
@@ -428,7 +434,8 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/save-source' && req.method === 'POST') {   // 화면 저장(Ctrl+S, 저장 단추): 연결된 원본에 쓴다
       const s = readSession();
       if (!s.source || !/\.hwpx$/i.test(s.source)) return sendJson(res, 400, { ok: false, error: '연결된 hwpx 가 없다' });
-      const { base64, hfMarkers } = await readBody(req);
+      const { base64, hfMarkers, sid } = await readBody(req);
+      if (sid && sid !== SERVER_SID) return sendJson(res, 409, { ok: false, error: '이 창은 끝난 에디터 세션이라 원본에 저장하지 않는다' });
       const fix = fixHfFields(Buffer.from(base64, 'base64'), hfMarkers ?? []);
       const img = s.proxyMap ? restoreImages(fix.buf, s.proxyMap) : null;   // 그림 축소 보기면 원본 그림으로
       if (img) fix.buf = img.buf;

@@ -47,6 +47,8 @@ export function installEditLog(host, getInputHandler) {
   const flush = () => {
     timer = null;
     if (!queue.length) return;
+    // 끝난 세션의 창이면 새 서버 기록에 섞지 않는다(host.js)
+    if ((window.parent as any)?.__claudeStale) { queue = []; return; }
     const body = JSON.stringify({ ops: queue });
     queue = [];
     fetch('/api/ops', { method: 'POST', body }).catch(() => {});

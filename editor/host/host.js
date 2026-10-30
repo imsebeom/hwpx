@@ -68,6 +68,8 @@ function fromBase64(b64) {
 }
 
 const plugin = (method, ...args) => studio.plugins.invoke('claude', method, args);
+// 이 창을 연 서버의 세션 번호. 서버가 바뀌면 브라우저 탭은 멈춘다(앱 창은 다시 붙는다)
+const SID = await fetch('/api/session').then((x) => x.json()).then((x) => x.session).catch(() => null);
 const run = (ops) => plugin('run', ops);
 
 async function docText() {
@@ -99,6 +101,7 @@ async function cursor() {
 // withBytes=false: 글과 위치만 기록한다. 문서 전체 내보내기는 49쪽 문서에서 주 스레드를 0.9초 막아, 편집마다 하면 줄 간격을
 // 연달아 바꿀 때 화면이 멈췄다(2026-10-30). latest.hwpx 는 입력이 멎은 뒤 워커에서 갱신하고, 저장은 그때 새로 내보낸다.
 async function snapshot(source, withBytes = true) {
+  if (window.__claudeStale) return;
   const key = await mutationKey();
   const bytes = withBytes ? await studio.exportHwpx() : null;
   if (withBytes) latestKey = key;
@@ -135,7 +138,7 @@ function bindSourceHandle(fileName) {
         async close() {
           const bytes = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
           parts.reduce((at, p) => { bytes.set(p, at); return at + p.length; }, 0);
-          const body = { base64: toBase64(bytes), hfMarkers: await headerFooterTexts() };
+          const body = { base64: toBase64(bytes), hfMarkers: await headerFooterTexts(), sid: CLIENT === 'app' ? undefined : SID };
           const r = await fetch('/api/save-source', { method: 'POST', body: JSON.stringify(body) }).then((x) => x.json());
           if (!r.ok) throw new Error(r.error || '저장 실패');
           log(`저장: ${r.path}`);
@@ -199,12 +202,19 @@ async function pollLoop() {
   for (;;) {
     let cmd;
     try {
-      cmd = await fetch(`/api/poll?client=${CLIENT}&inst=${encodeURIComponent(INST)}`).then((x) => x.json());
+      cmd = await fetch(`/api/poll?client=${CLIENT}&inst=${encodeURIComponent(INST)}&sid=${encodeURIComponent(SID ?? '')}`).then((x) => x.json());
       setStatus('Claude 연결됨', 'ok');
     } catch {
       setStatus('브리지 서버 끊김', 'err');
       await new Promise((r) => setTimeout(r, 2000));
       continue;
+    }
+    if (cmd.type === 'stale') {
+      // 문서는 그대로 둔다(저장 안 한 편집이 있을 수 있다). 명령, 기록, 원본 저장만 멈춘다
+      window.__claudeStale = true;
+      setStatus('끝난 에디터 세션이다. 명령을 받지 않고 원본에 저장하지 않는다. 새 창을 쓰고 이 창은 닫아도 된다', 'err');
+      log('서버가 새로 떠 이 창은 멈췄다');
+      return;
     }
     if (cmd.type === 'yield') {
       setStatus(CLIENT === 'app' ? '이 창은 다른 에디터 서버에 붙어 있어 쉰다. 닫아도 된다' : '앱 창이 열려 이 탭은 Claude 명령을 받지 않는다', 'err');
@@ -239,7 +249,7 @@ function idleFor(key) {
   return Date.now() - changedAt;
 }
 setInterval(async () => {
-  if (busy || lastKey === null) return;
+  if (busy || lastKey === null || window.__claudeStale) return;
   try {
     const key = await mutationKey();
     if (key === lastKey) {
