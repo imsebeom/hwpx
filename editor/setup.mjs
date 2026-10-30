@@ -849,6 +849,10 @@ const RUST_PATCHES = [
     ['hwpx-lineage-layout-body-text', 'src/serializer/body_text.rs'],
     // 표 속 표 칸 그림 옆 캐럿과 클릭 판정(patches/nested-pic-caret-*.rs)
     ['nested-pic-caret-cursor-rect', 'src/document_core/queries/cursor_rect.rs'],
+    // 줄을 다시 나눌 때 글머리, 내어쓰기 비트를 한/글 규칙대로(patches/line-head-flags-*.rs)
+    ['line-head-flags-line-breaking', 'src/renderer/composer/line_breaking.rs'],
+    ['line-head-flags-composer', 'src/renderer/composer.rs'],
+    ['line-head-flags-document', 'src/document_core/commands/document.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));
