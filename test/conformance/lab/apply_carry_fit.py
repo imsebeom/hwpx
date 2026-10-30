@@ -92,4 +92,9 @@ EDITS = [
             "        prev = Some((last.vertical_pos + last.line_height + last.line_spacing, after, is_float));\n"
         ),
     ),
+    (
+        LB,
+        '        if shift != 0 {\n            for seg in para.line_segs.iter_mut() {\n                seg.vertical_pos -= shift;\n            }\n        }\n',
+        '        if shift != 0 {\n            for seg in para.line_segs.iter_mut() {\n                seg.vertical_pos -= shift;\n            }\n        }\n        // [claude-hwpx stale-tac-line] 한 줄 문단의 글자처럼 취급 표보다 줄이 짧으면(표를 키우고 줄을 안 고친 낡은 값) 표 높이로 맞추고 뒤 문단을 민다. 절반 미만은 더미 줄이라 뺀다\n        if para.line_segs.len() == 1 {\n            let target = para.controls.iter().find_map(|c| match c {\n                Control::Table(t) if t.common.treat_as_char => {\n                    Some(t.common.height as i32 + t.outer_margin_top as i32 + t.outer_margin_bottom as i32)\n                }\n                _ => None,\n            });\n            if let Some(target) = target {\n                let h = para.line_segs[0].line_height;\n                if h < target - 2 && h * 2 >= target {\n                    para.line_segs[0].line_height = target;\n                    para.line_segs[0].text_height = para.line_segs[0].text_height.max(target);\n                    shift -= target - h;\n                }\n            }\n        }\n',
+    ),
 ]
