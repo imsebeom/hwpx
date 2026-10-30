@@ -159,7 +159,10 @@ const RUST_PATCHES = [
     ['memo-new-wasm', 'src/wasm_api.rs', '    /// 현재 본문 위치에 ClickHere 누름틀 필드를 삽입한다.', 'memo-new-wasm'],
     // 메모 지우기, 본문 고치기(patches/memo-crud-*.rs). 걸린 글은 남기고 표식과 본문만 다룬다
     ['memo-crud', 'src/document_core/queries/field_query.rs', '    /// getFieldList: 모든 필드를 JSON 배열로 반환', 'memo-crud-method'],
-    ['memo-crud-wasm', 'src/wasm_api.rs', '    /// 현재 본문 위치에 ClickHere 누름틀 필드를 삽입한다.', 'memo-crud-wasm']].map(([id, file, anchor, f]) => ({
+    ['memo-crud-wasm', 'src/wasm_api.rs', '    /// 현재 본문 위치에 ClickHere 누름틀 필드를 삽입한다.', 'memo-crud-wasm'],
+    // 메모 본문 서식(patches/memo-rich-*.rs)
+    ['memo-rich', 'src/document_core/queries/field_query.rs', '    /// getFieldList: 모든 필드를 JSON 배열로 반환', 'memo-rich-method'],
+    ['memo-rich-wasm', 'src/wasm_api.rs', '    /// 현재 본문 위치에 ClickHere 누름틀 필드를 삽입한다.', 'memo-rich-wasm']].map(([id, file, anchor, f]) => ({
     id, file, anchor,
     insert: fs.readFileSync(path.join(HERE, 'patches', `${f}.rs`), 'utf8').replace(/\r\n/g, '\n'),
     done: `[claude-hwpx ${id}]`,
@@ -849,10 +852,16 @@ const RUST_PATCHES = [
     ['hwpx-lineage-layout-body-text', 'src/serializer/body_text.rs'],
     // 표 속 표 칸 그림 옆 캐럿과 클릭 판정(patches/nested-pic-caret-*.rs)
     ['nested-pic-caret-cursor-rect', 'src/document_core/queries/cursor_rect.rs'],
+    // hwp 구역 끝 메모 목록을 품는 빈 문단을 본문으로 읽지 않는다
+    ['memo-tail-root', 'src/parser/body_text.rs'],
     // 줄을 다시 나눌 때 글머리, 내어쓰기 비트를 한/글 규칙대로(patches/line-head-flags-*.rs)
     ['line-head-flags-line-breaking', 'src/renderer/composer/line_breaking.rs'],
     ['line-head-flags-composer', 'src/renderer/composer.rs'],
     ['line-head-flags-document', 'src/document_core/commands/document.rs'],
+    // 저장 세로 위치가 앞 문단 끝보다 벌어진 낡은 값을 열 때 닫는다(patches/stale-vpos-gap-*.rs)
+    ['stale-vpos-gap-line-breaking', 'src/renderer/composer/line_breaking.rs'],
+    ['stale-vpos-gap-composer', 'src/renderer/composer.rs'],
+    ['stale-vpos-gap-document', 'src/document_core/commands/document.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));
@@ -1120,7 +1129,7 @@ for (const [id, rel, tail] of [['nested-table-cache', 'engine/table-bbox-cache.t
   ['nested-table-handler', 'engine/input-handler.ts'], ['nested-table-mouse', 'engine/input-handler-mouse.ts'],
   // 칸 안 그림: 그림 넣기와 파일 끌어 놓기를 칸 문단 안 글자처럼 취급으로, 글자처럼 취급 칸 그림 끌어 옮기기(cell-pic-*.ts)
   // 복구본과 latest.hwpx 를 워커에서 내보낸다(plugin/export-worker.ts, 주 스레드 멈춤 약 1초 → 약 30ms)
-  ['export-worker-bridge', 'core/wasm-bridge.ts'], ['export-worker-autosave', 'recovery/autosave-manager.ts'], ['export-worker-main', 'main.ts'], ['recovery-hwpx-format', 'recovery/recovery-format.ts'], ['nested-line-caret', 'engine/cursor.ts'],
+  ['export-worker-bridge', 'core/wasm-bridge.ts'], ['export-worker-autosave', 'recovery/autosave-manager.ts'], ['export-worker-main', 'main.ts'], ['recovery-hwpx-format', 'recovery/recovery-format.ts'], ['nested-line-caret', 'engine/cursor.ts'], ['pic-esc-stay', 'engine/cursor.ts'], ['char-dialog-caret', 'command/commands/format.ts'], ['save-progress', 'command/commands/file.ts'],
   ['cell-pic-place', 'engine/input-handler-table.ts'], ['cell-pic-drop', 'engine/input-handler.ts'], ['cell-pic-paste', 'engine/input-handler-keyboard.ts'],
   ['cell-pic-move', 'engine/input-handler-picture.ts', 'cell-pic-move-fn'], ['cell-pic-move-start', 'engine/input-handler-mouse.ts']]) {
   const f = path.join(STUDIO, 'src', ...rel.split('/'));

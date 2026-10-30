@@ -746,6 +746,7 @@ export function createClaudePlugin(getInputHandler) {
           if (op?.action === 'add') return memoPanel.add(op.ref, op.text, op.at, op.author);
           if (op?.action === 'edit') return memoPanel.edit(Number(n), op.text);
           if (op?.action === 'del') return memoPanel.remove(Number(n));
+          if (op?.action === 'format') return memoPanel.formatRich(Number(n), op.at, op.props);
           if (n != null) return memoPanel.go(Number(n));
           const list = memoPanel.list();
           return host.read((doc) => list.map(({ sectionIndex, paraIndex, path, startPara, endPara, ...m }) => ({
@@ -792,6 +793,11 @@ export function createClaudePlugin(getInputHandler) {
               const a = sel.start;
               const b = sel.end;
               if (a.parentParaIndex != null) {
+                if ((a.cellPath?.length ?? 1) > 1) {
+                  // 표 속 표: 평평한 좌표로 읽으면 바깥 칸을 읽거나 오류가 나 state 의 cursor 가 비었다
+                  if (JSON.stringify(a.cellPath) !== JSON.stringify(b.cellPath)) return '';
+                  return doc.getTextInCellByPath(a.sectionIndex, a.parentParaIndex, JSON.stringify(a.cellPath), a.charOffset, b.charOffset - a.charOffset);
+                }
                 if (a.cellIndex !== b.cellIndex || a.cellParaIndex !== b.cellParaIndex) return '';
                 return doc.getTextInCell(a.sectionIndex, a.parentParaIndex, a.controlIndex, a.cellIndex,
                   a.cellParaIndex, a.charOffset, b.charOffset - a.charOffset);

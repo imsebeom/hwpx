@@ -482,6 +482,18 @@ switch (sub) {
     // 문서에 달린 메모(검토 의견). 번호는 문서 순서이고 에디터 메모 패널의 번호와 같다
     // add <좌표> <본문> [--at 걸 글] [--author 이름] | edit <번호> <본문> | del <번호>. 본문의 \n 은 줄바꿈(줄마다 메모 문단 하나)
     const [act, a1, a2] = args;
+    // format <번호> [--at 글] [--bold] [--italic] [--underline] [--strike] [--no-bold ...] [--color #rrggbb]: 메모 본문 서식
+    if (act === 'format') {
+      const flag = (k, key, props) => { if (args.includes(`--${k}`)) props[key] = true; if (args.includes(`--no-${k}`)) props[key] = false; };
+      const props = {};
+      flag('bold', 'bold', props); flag('italic', 'italic', props); flag('underline', 'underline', props); flag('strike', 'strikethrough', props);
+      const val = (k) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : undefined; };
+      if (val('--color')) props.textColor = val('--color');
+      if (!a1 || !Object.keys(props).length) die('사용: memos format <번호> [--at 글] [--bold] [--italic] [--underline] [--strike] [--no-bold ...] [--color #rrggbb]');
+      await cmd({ type: 'memos', n: Number(a1), op: { action: 'format', at: val('--at'), props } });
+      out(`메모 ${a1} 서식을 바꿨다`);
+      break;
+    }
     if (['add', 'edit', 'del'].includes(act)) {
       const opt = (k) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : undefined; };
       const body = (s) => String(s ?? '').normalize('NFC').replace(/\\n/g, '\n');

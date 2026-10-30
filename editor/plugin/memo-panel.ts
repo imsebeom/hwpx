@@ -43,6 +43,10 @@ const CSS = `
 .claude-memo-panel li:hover .acts,.claude-memo-panel li.on .acts{display:flex}
 .claude-memo-panel .acts button{border:1px solid #d9c27a;border-radius:3px;background:#fff;color:#6b5200;font-size:10px;padding:0 5px;cursor:pointer}
 .claude-memo-panel .acts button:hover{background:#ffe9a8}
+.claude-memo-panel .memo-edit{min-height:54px;border:1px solid #bbb;padding:3px 4px;white-space:pre-wrap;word-break:break-word;line-height:1.45;outline:none;background:var(--color-surface-raised,#fff);user-select:text}
+.claude-memo-panel .memo-tools{display:flex;gap:2px;margin-bottom:3px;align-items:center}
+.claude-memo-panel .memo-tools button{width:22px;height:20px;padding:0;font-size:12px;cursor:pointer}
+.claude-memo-panel .memo-tools input[type=color]{width:24px;height:20px;padding:0;border:1px solid #bbb}
 .claude-memo-panel textarea{width:100%;box-sizing:border-box;min-height:54px;font:inherit;line-height:1.45;resize:vertical}
 .claude-memo-panel .edit-foot{display:flex;gap:4px;justify-content:flex-end;margin-top:3px}
 .claude-memo-layer{position:absolute;left:0;top:0;width:0;height:0;z-index:3;pointer-events:none;mix-blend-mode:darken}
@@ -86,6 +90,92 @@ export function installMemoPanel(host, getInputHandler) {
   let links = null;   // 걸린 글에서 카드까지 잇는 선(화면 고정 SVG)
   let editing = -1;   // 본문을 고치는 중인 카드. 그동안은 목록을 다시 그리지 않는다(친 글이 날아간다)
   const userHid = () => { try { return localStorage.getItem(HIDDEN_KEY) === '1'; } catch { return false; } };
+
+  // ── 메모 본문 서식 ── 조각 [[{t,cs,bold,italic,underline,strikethrough,textColor}]] 을 그리고, 고친 칸에서 다시 읽는다
+  const readRich = (fieldId) => {
+    try { return host.read((doc) => (typeof doc.getMemoRich === 'function' ? JSON.parse(doc.getMemoRich(fieldId)) : null)); } catch { return null; }
+  };
+  const fillRich = (box, rich, fallback) => {
+    box.textContent = '';
+    if (!rich?.length) { box.textContent = fallback; return; }
+    for (const runs of rich) {
+      const line = document.createElement('div');
+      for (const r of runs) {
+        const sp = document.createElement('span');
+        sp.textContent = r.t;
+        if (r.cs != null) sp.dataset.cs = String(r.cs);
+        if (r.bold) sp.style.fontWeight = '700';
+        if (r.italic) sp.style.fontStyle = 'italic';
+        const deco = [r.underline && 'underline', r.strikethrough && 'line-through'].filter(Boolean).join(' ');
+        if (deco) sp.style.textDecorationLine = deco;
+        if (r.textColor && r.textColor.toLowerCase() !== '#000000') { sp.style.color = r.textColor; sp.dataset.color = r.textColor; }
+        line.append(sp);
+      }
+      if (!runs.length) line.append(document.createElement('br'));
+      box.append(line);
+    }
+  };
+  const cssHex = (c) => {
+    const m = String(c).match(/\d+/g);
+    return m ? `#${m.slice(0, 3).map((x) => Number(x).toString(16).padStart(2, '0')).join('')}` : '#000000';
+  };
+  const readEdited = (box) => {
+    const base = getComputedStyle(box).color;
+    const paras = [];
+    const runOf = (node) => {
+      const host0 = node.parentElement;
+      const cs = getComputedStyle(host0);
+      let underline = false, strikethrough = false;
+      for (let e = host0; e && e !== box.parentElement; e = e.parentElement) {
+        const d = getComputedStyle(e).textDecorationLine;
+        if (d.includes('underline') || ['U', 'INS'].includes(e.tagName)) underline = true;
+        if (d.includes('line-through') || ['S', 'STRIKE', 'DEL'].includes(e.tagName)) strikethrough = true;
+        if (e === box) break;
+      }
+      const r = { t: node.nodeValue, bold: parseInt(cs.fontWeight, 10) >= 600, italic: cs.fontStyle === 'italic', underline, strikethrough };
+      const shape = host0.closest('[data-cs]');
+      if (shape) r.cs = Number(shape.dataset.cs);
+      if (cs.color !== base) r.textColor = cssHex(cs.color);
+      else if (host0.closest('[data-color]')) r.textColor = host0.closest('[data-color]').dataset.color;
+      return r;
+    };
+    const walk = (node, cur) => {
+      for (const c of node.childNodes) {
+        if (c.nodeType === 3) { if (c.nodeValue) cur.push(runOf(c)); }
+        else if (c.nodeName === 'BR') { if (c.nextSibling || !cur.length) { if (c.nextSibling) { paras.push(cur); cur = []; } } }
+        else if (['DIV', 'P'].includes(c.nodeName)) {
+          if (cur.length) { paras.push(cur); cur = []; }
+          const inner = [];
+          paras.push(walk(c, inner));
+        } else cur = walk(c, cur);
+      }
+      return cur;
+    };
+    const last = walk(box, []);
+    if (last.length) paras.push(last);
+    const same = (a, b) => ['cs', 'bold', 'italic', 'underline', 'strikethrough', 'textColor'].every((k) => a[k] === b[k]);
+    return paras.map((runs) => runs.reduce((acc, r) => {
+      if (acc.length && same(acc[acc.length - 1], r)) acc[acc.length - 1].t += r.t; else acc.push({ ...r });
+      return acc;
+    }, []));
+  };
+  const editRich = (n, rich) => { const m = pick(n); return change('updateMemo', (doc) => doc.updateMemoRich(m.fieldId, JSON.stringify(rich))); };
+  /** 메모 본문(at 을 주면 처음 나오는 그 글)에 서식을 얹는다. props: bold, italic, underline, strikethrough, textColor */
+  const formatRich = (n, at, props) => {
+    const m = pick(n);
+    const rich = readRich(m.fieldId);
+    if (!rich) throw new Error('메모 서식을 읽지 못함');
+    let done = !at;
+    const out = rich.map((runs) => runs.flatMap((r) => {
+      if (!at) return [{ ...r, ...props }];
+      const i = done ? -1 : r.t.indexOf(at);
+      if (i < 0) return [r];
+      done = true;
+      return [{ ...r, t: r.t.slice(0, i) }, { ...r, t: at, ...props }, { ...r, t: r.t.slice(i + at.length) }].filter((x) => x.t);
+    }));
+    if (!done) throw new Error(`메모 ${n} 본문에 「${at}」 없음`);
+    return editRich(n, out);
+  };
 
   const readRaw = () => {
     try { return host.read((doc) => (typeof doc.getMemoList === 'function' ? JSON.parse(doc.getMemoList()) : [])); } catch { return []; }
@@ -204,13 +294,44 @@ export function installMemoPanel(host, getInputHandler) {
   const startEdit = (li, i) => {
     const m = memos[i];
     editing = i;
-    const box = el('textarea', '');
-    box.value = m.text || '';
+    const box = el('div', 'memo-edit');
+    box.contentEditable = 'true';
+    fillRich(box, m.rich, m.text || '');
+    const before = () => JSON.stringify(readEdited(box));
+    const start = before();
     const done = (save) => {
       editing = -1;
-      if (save && box.value !== (m.text || '')) edit(i + 1, box.value);
+      const rich = save && before() !== start ? readEdited(box) : null;
+      if (rich) editRich(i + 1, rich);
       else refresh();
     };
+    // 굵게, 기울임, 밑줄, 취소선, 글자색(한/글 메모처럼 본문에 글자 모양을 준다). Ctrl+B, I, U 는 칸이 스스로 처리한다
+    const tools = el('div', 'memo-tools');
+    for (const [label, cmd, style] of [['가', 'bold', 'font-weight:700'], ['가', 'italic', 'font-style:italic'], ['가', 'underline', 'text-decoration:underline'], ['가', 'strikeThrough', 'text-decoration:line-through']]) {
+      const b = el('button', '', label);
+      b.type = 'button';
+      b.title = { bold: '굵게(Ctrl+B)', italic: '기울임(Ctrl+I)', underline: '밑줄(Ctrl+U)', strikeThrough: '취소선' }[cmd];
+      b.style.cssText = style;
+      b.addEventListener('mousedown', (e) => { e.preventDefault(); document.execCommand('styleWithCSS', false, 'true'); document.execCommand(cmd); });
+      tools.append(b);
+    }
+    const color = el('input', '');
+    color.type = 'color';
+    color.title = '글자색';
+    let saved = null;
+    color.addEventListener('mousedown', () => { const s = window.getSelection(); saved = s?.rangeCount ? s.getRangeAt(0).cloneRange() : null; });
+    color.addEventListener('change', () => {
+      const s = window.getSelection();
+      box.focus();
+      if (saved) { s.removeAllRanges(); s.addRange(saved); }
+      document.execCommand('styleWithCSS', false, 'true');
+      document.execCommand('foreColor', false, color.value);
+    });
+    tools.append(color);
+    box.addEventListener('paste', (e) => {
+      e.preventDefault();
+      document.execCommand('insertText', false, e.clipboardData.getData('text/plain'));
+    });
     const ok = el('button', '', '저장');
     const cancel = el('button', '', '취소');
     ok.addEventListener('click', () => done(true));
@@ -223,9 +344,9 @@ export function installMemoPanel(host, getInputHandler) {
     const foot = el('div', 'edit-foot acts');
     foot.style.display = 'flex';
     foot.append(ok, cancel);
-    li.querySelector('.body').replaceWith(box);
+    li.querySelector('.body').replaceWith(tools, box);
     li.append(foot);
-    for (const e of [box, foot]) e.addEventListener('click', (ev) => ev.stopPropagation());
+    for (const e of [tools, box, foot]) e.addEventListener('click', (ev) => ev.stopPropagation());
     box.addEventListener('input', () => placeCards());   // 칸이 커지면 아래 카드를 민다
     box.focus();
     placeCards();
@@ -258,7 +379,9 @@ export function installMemoPanel(host, getInputHandler) {
       li.append(head);
       const anchor = m.anchor.replace(/\s+/g, ' ').trim();
       if (anchor) li.append(el('div', 'anchor', `「${anchor}」`));
-      li.append(el('div', 'body', m.text || '(본문 없음)'));
+      const body = el('div', 'body', m.text || '(본문 없음)');
+      if (m.text) fillRich(body, m.rich, m.text);
+      li.append(body);
       // 본문 글을 끌어서 고르는 중이면(복사하려는 것) 옮겨 가지 않는다
       li.addEventListener('click', () => { if (!String(window.getSelection?.() ?? '')) go(i); });
       return li;
@@ -270,6 +393,7 @@ export function installMemoPanel(host, getInputHandler) {
     let near = { page: 0, y: 0, x: 0 };
     memos = readRaw().map((r, seq) => {
       const m = { ...r, seq, author: r.author || String(r.command || '').split('/')[5] || '', when: memoDate(r.createdAt, r.command) };
+      m.rich = readRich(m.fieldId);
       measure(m);
       const first = m.rects[0] ?? m.caret;
       if (first) near = { page: first.pageIndex, y: first.y, x: first.x };
@@ -556,6 +680,6 @@ export function installMemoPanel(host, getInputHandler) {
       if (!shown) show(false);
       return go(n - 1);
     },
-    add, edit, remove,
+    add, edit, remove, formatRich,
   };
 }
