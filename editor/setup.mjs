@@ -862,6 +862,10 @@ const RUST_PATCHES = [
     ['stale-vpos-gap-line-breaking', 'src/renderer/composer/line_breaking.rs'],
     ['stale-vpos-gap-composer', 'src/renderer/composer.rs'],
     ['stale-vpos-gap-document', 'src/document_core/commands/document.rs'],
+    // 정답본 쪽수(patches/block-host-reset-*.rs, carry-fit-*.rs)
+    ['block-host-reset-typeset', 'src/renderer/typeset.rs'],
+    ['carry-fit-typeset', 'src/renderer/typeset.rs'],
+    ['carry-fit-line-breaking', 'src/renderer/composer/line_breaking.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));
