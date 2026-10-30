@@ -831,6 +831,10 @@ const RUST_PATCHES = [
     ['span-topdown-height-measurer', 'src/renderer/height_measurer.rs'],
     ['tac-restate-on-open-document', 'src/document_core/commands/document.rs'],
     ['nolineseg-table-restate-document', 'src/document_core/commands/document.rs'],
+    // 회귀 모음 한/글 대조로 찾은 것: 어울림 그림 칸 바닥, 다시 재기 뒤 쪽 리셋 지키기, 더미 줄 배치 칸 선언 키우기
+    ['ladder-square-pic-height-measurer', 'src/renderer/height_measurer.rs'],
+    ['restate-keep-reset-document', 'src/document_core/commands/document.rs'],
+    ['dummy-cell-grow-table-layout', 'src/renderer/layout/table_layout.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));
