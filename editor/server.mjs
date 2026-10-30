@@ -321,7 +321,10 @@ const server = http.createServer(async (req, res) => {
   if (req.headers.origin) {
     try { originOk = new URL(req.headers.origin).host === req.headers.host; } catch { originOk = false; }
   }
-  if (!hostOk || !originOk) return sendJson(res, 403, { ok: false, error: '허용되지 않은 출처' });
+  // <img> 같은 GET 은 Origin 이 없다. 브라우저가 붙이는 Sec-Fetch-Site 로 /api/ 의 교차 사이트 요청을 막는다(CLI 는 이 머리가 없다)
+  const fetchSite = req.headers['sec-fetch-site'];
+  const siteOk = !p.startsWith('/api/') || !fetchSite || fetchSite === 'same-origin' || fetchSite === 'none';
+  if (!hostOk || !originOk || !siteOk) return sendJson(res, 403, { ok: false, error: '허용되지 않은 출처' });
   try {
     if (p === '/api/log' && req.method === 'POST') {   // 호스트 페이지(화면 저장, 오류)와 CLI(start, save)가 남기는 기록
       const { ev, ...data } = await readBody(req);
