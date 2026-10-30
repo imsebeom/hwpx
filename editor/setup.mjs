@@ -1096,6 +1096,8 @@ for (const [rel, count] of [['engine/table-object-renderer.ts', 5], ['engine/cel
 for (const [id, rel, tail] of [['nested-table-cache', 'engine/table-bbox-cache.ts'], ['nested-table-cursor', 'engine/cursor.ts'],
   ['nested-table-handler', 'engine/input-handler.ts'], ['nested-table-mouse', 'engine/input-handler-mouse.ts'],
   // 칸 안 그림: 그림 넣기와 파일 끌어 놓기를 칸 문단 안 글자처럼 취급으로, 글자처럼 취급 칸 그림 끌어 옮기기(cell-pic-*.ts)
+  // 복구본 자동 저장을 입력이 멎고 60초 뒤로(10초면 잠깐 쉴 때마다 문서 전체 내보내기로 화면이 멈췄다)
+  ['autosave-idle', 'main.ts'],
   ['cell-pic-place', 'engine/input-handler-table.ts'], ['cell-pic-drop', 'engine/input-handler.ts'], ['cell-pic-paste', 'engine/input-handler-keyboard.ts'],
   ['cell-pic-move', 'engine/input-handler-picture.ts', 'cell-pic-move-fn'], ['cell-pic-move-start', 'engine/input-handler-mouse.ts']]) {
   const f = path.join(STUDIO, 'src', ...rel.split('/'));

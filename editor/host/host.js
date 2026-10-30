@@ -233,7 +233,7 @@ async function pollLoop() {
 let pendingKey = null;
 let latestKey = null;      // latest.hwpx 에 담긴 변경 카운터
 let changedKey = null, changedAt = 0;   // 마지막으로 본 변경 카운터와 그때 시각
-const IDLE_MS = 20000;     // 이만큼 입력이 없으면 내보내기(주 스레드를 막는 일)를 한다
+const IDLE_MS = 90000;     // 이만큼 입력이 없으면 내보내기(주 스레드를 막는 일)를 한다. 복구본 자동 저장(60초)과 겹치지 않게
 function idleFor(key) {
   if (key !== changedKey) { changedKey = key; changedAt = Date.now(); }
   return Date.now() - changedAt;
