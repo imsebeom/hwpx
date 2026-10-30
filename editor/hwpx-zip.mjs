@@ -117,10 +117,30 @@ export function stripDummyLinesegs(buf) {
   let removed = 0;
   for (const e of entries) {
     if (!/^Contents\/section\d+\.xml$/.test(e.name)) continue;
-    const xml = e.data.toString('utf8');
+    let xml = e.data.toString('utf8');
+    // 쪽 번호와 글자처럼 취급 표가 함께 든 문단의 더미는 남긴다. 한/글은 표를 다음 쪽으로 보내 쪽 번호만 있는 쪽을 남기고(강의일지, 더미가 있어도 없어도 3쪽),
+    // 엔진은 이 더미를 보고 같은 판단을 한다(엔진 패치 pagenum-tac-break). 칸 안 줄은 건드리지 않는다
+    const KEEP = '\u0000CLAUDE_KEEP_LINESEG\u0000';
+    for (let at = xml.indexOf('<hp:pageNum'); at >= 0; at = xml.indexOf('<hp:pageNum', at + 1)) {
+      let depth = 0;
+      const re = /<hp:p [^>]*>|<\/hp:p>/g;
+      re.lastIndex = at;
+      for (let m = re.exec(xml); m; m = re.exec(xml)) {
+        if (m[0] !== '</hp:p>') { depth++; continue; }
+        if (depth-- > 0) continue;
+        const from = m.index - LINESEG_DUMMY.length;
+        // 쪽 높이에 가까운 표만(작은 표는 더미를 걷어야 다시 잰다, 회귀 c15)
+        const size = /<hp:tbl\b[^>]*><hp:sz [^>]*?height="(\d+)"/.exec(xml.slice(at, from));
+        if (xml.startsWith(LINESEG_DUMMY, from) && size && Number(size[1]) >= 60000) {
+          xml = xml.slice(0, from) + KEEP + xml.slice(m.index);
+        }
+        break;
+      }
+    }
     const n = xml.split(LINESEG_DUMMY).length - 1;
+    xml = xml.split(LINESEG_DUMMY).join('').split(KEEP).join(LINESEG_DUMMY);
     if (!n) continue;
-    e.data = Buffer.from(xml.split(LINESEG_DUMMY).join(''), 'utf8');
+    e.data = Buffer.from(xml, 'utf8');
     removed += n;
   }
   return removed ? { buf: writeZip(entries), removed } : { buf, removed: 0 };

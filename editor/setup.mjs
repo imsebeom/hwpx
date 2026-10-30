@@ -866,6 +866,12 @@ const RUST_PATCHES = [
     ['block-host-reset-typeset', 'src/renderer/typeset.rs'],
     ['carry-fit-typeset', 'src/renderer/typeset.rs'],
     ['carry-fit-line-breaking', 'src/renderer/composer/line_breaking.rs'],
+    // 쪽 번호 뒤 표(강의일지), 칸 어울림 그림 띠(c70), 저장된 칸 안 나눔(d129)
+    ['pagenum-tac-break-typeset', 'src/renderer/typeset.rs'],
+    ['cell-picture-band-line-breaking', 'src/renderer/composer/line_breaking.rs'],
+    ['cell-picture-band-composer', 'src/renderer/composer.rs'],
+    ['cell-picture-band-document', 'src/document_core/commands/document.rs'],
+    ['hard-break-keep-typeset', 'src/renderer/typeset.rs'],
   ].flatMap(([id, file]) => {
     const blocks = fs.readFileSync(path.join(HERE, 'patches', `${id}.rs`), 'utf8').replace(/\r\n/g, '\n')
       .replace(/^\/\/ ==== find ====\n/, '').split('\n// ==== next ====\n').map((b) => b.split('\n// ==== replace ====\n'));
