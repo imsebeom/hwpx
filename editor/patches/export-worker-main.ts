@@ -7,4 +7,5 @@
 autosaveManager.connect(eventBus);
 // ==== replace ====
 autosaveManager.connect(eventBus);
+(window as unknown as { __claudeIsDirty?: unknown }).__claudeIsDirty = () => documentState.isDirty();
 (window as unknown as { __claudeExportInWorker?: unknown }).__claudeExportInWorker = (kind: 'hwp' | 'hwpx', postTo?: string) => wasm.exportInWorker(kind, postTo);

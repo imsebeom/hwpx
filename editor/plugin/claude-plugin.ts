@@ -676,6 +676,8 @@ export function createClaudePlugin(getInputHandler) {
 
         mutations: () => mutations,
         /** 입력이 멎은 뒤 latest.hwpx 갱신: 워커에서 내보내 서버로 바로 보낸다(큰 바이트를 호스트로 넘기지 않으려고) */
+        // 저장 안 한 편집 표지. getDocumentState 는 해시를 구하려고 문서 전체를 주 스레드에서 내보내므로 주기적으로 부르지 않는다
+        isDirty: () => Boolean((window as any).__claudeIsDirty?.()),
         flushLatest: () => {
           (window as any).__claudeExportInWorker('hwpx', '/api/latest')
             .catch((e: unknown) => console.warn('[latest] 갱신 실패:', e));

@@ -273,30 +273,17 @@ window.__claudeFlushForClose = async () => {
   let recorded = false;
   if (lastKey !== null && (await mutationKey()) !== lastKey) { await snapshot('user'); recorded = true; }
   // 1초 주기 알림이 닿기 전에 닫을 수 있으니 저장 여부를 함께 돌려준다(app.py 가 확인 대화상자 여부로 쓴다)
-  return { recorded, dirty: Boolean((await studio.getDocumentState()).dirty) };
+  return { recorded, dirty: await plugin('isDirty') };
 };
 
 // 앱 창(app.py)에 저장 안 한 편집이 있는지 알린다. 있으면 창을 닫을 때 확인 대화상자가 뜬다.
-// getDocumentState 는 부를 때마다 문서 전체를 hwpx 로 내보내 해시를 구한다(58MB 문서에서 1.3초 이상).
-// 매초 부르면 큰 문서에서 주 스레드가 쉬지 못해 모든 응답이 수십 초씩 늦었다(2026-09-29).
-// 그래서 편집 카운터가 바뀌었을 때, 그리고 저장으로 풀렸는지 보려고 dirty 인 동안 10초마다만 묻는다.
-let lastDirty = null, dirtyKey = null, dirtyTick = 0, dirtySince = 0;
+// getDocumentState 는 부를 때마다 문서 전체를 hwpx 로 내보내 해시를 구하므로(49쪽 문서 1.4초 멈춤, 2026-10-30 앱 창 실측) 플래그만 읽는다.
+let lastDirty = null;
 setInterval(async () => {
   const api = window.pywebview?.api;
   if (!api?.set_dirty) return;
   try {
-    const key = await mutationKey();
-    dirtyTick++;
-    // 바뀐 직후에는 내보내지 않고 「바뀜」으로만 알린다(되돌려 원본과 같아졌는지는 입력이 멎은 뒤 가린다, 창을 닫을 때는 위 flush 가 정확히 잰다)
-    if (dirtyKey !== null && key !== dirtyKey) {
-      dirtyKey = key;
-      dirtySince = Date.now();
-      if (lastDirty !== true) { lastDirty = true; await api.set_dirty(true); }
-      return;
-    }
-    if (lastDirty !== null && !(lastDirty && dirtyTick % 10 === 0 && Date.now() - dirtySince >= IDLE_MS)) return;
-    dirtyKey = key;
-    const dirty = Boolean((await studio.getDocumentState()).dirty);
+    const dirty = await plugin('isDirty');
     if (dirty !== lastDirty) { lastDirty = dirty; await api.set_dirty(dirty); }
   } catch { /* 문서 교체 중이면 다음 주기에 */ }
 }, 1000);
