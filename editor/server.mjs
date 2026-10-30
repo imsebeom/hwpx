@@ -231,14 +231,13 @@ function seqDiff(A, B) {
 }
 
 function saveSnapshot(body) {
-  // 사용자 편집은 글과 위치만 온다(host.js snapshot). latest.hwpx 는 입력이 멎은 뒤 latestOnly 로 따로 온다
+  // 사용자 편집은 글과 위치만 온다(host.js snapshot). latest.hwpx 는 입력이 멎은 뒤 /api/latest 로 따로 온다
   const bytes = body.hwpxBase64 ? Buffer.from(body.hwpxBase64, 'base64') : null;
   if (bytes) {
     const tmp = LATEST + '.tmp';
     fs.writeFileSync(tmp, bytes);
     fs.renameSync(tmp, LATEST);
   }
-  if (body.latestOnly) return {};
   const text = String(body.text ?? '').replace(/\r\n/g, '\n');
   let prev = '';
   try { prev = fs.readFileSync(LATEST_TXT, 'utf8'); } catch { /* 첫 스냅샷 */ }
@@ -400,6 +399,14 @@ const server = http.createServer(async (req, res) => {
       const body = await readBody(req);
       const w = waiting.get(body.id);
       if (w) { clearTimeout(w.timer); waiting.delete(body.id); w.resolve(body); }
+      return sendJson(res, 200, { ok: true });
+    }
+    if (p === '/api/latest' && req.method === 'POST') {   // 워커가 내보낸 latest.hwpx(바이너리 그대로)
+      const chunks = [];
+      for await (const c of req) chunks.push(c);
+      const tmp = LATEST + '.tmp';
+      fs.writeFileSync(tmp, Buffer.concat(chunks));
+      fs.renameSync(tmp, LATEST);
       return sendJson(res, 200, { ok: true });
     }
     if (p === '/api/snapshot' && req.method === 'POST') {

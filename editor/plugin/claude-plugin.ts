@@ -675,6 +675,12 @@ export function createClaudePlugin(getInputHandler) {
         },
 
         mutations: () => mutations,
+        /** 입력이 멎은 뒤 latest.hwpx 갱신: 워커에서 내보내 서버로 바로 보낸다(큰 바이트를 호스트로 넘기지 않으려고) */
+        flushLatest: () => {
+          (window as any).__claudeExportInWorker('hwpx', '/api/latest')
+            .catch((e: unknown) => console.warn('[latest] 갱신 실패:', e));
+          return true;
+        },
         /**
          * 글꼴 폭 표 등록(엔진 패치 font-metrics-runtime). 서버가 설치된 글꼴 파일에서 읽은 것을 호스트가 문서를 열기 전에
          * 넘긴다. 엔진에 폭 표가 없는 글꼴도 한/글처럼 실제 글꼴 폭으로 줄을 나눈다. 반환: 새로 등록한 얼굴 수

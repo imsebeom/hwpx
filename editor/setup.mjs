@@ -886,7 +886,7 @@ if (hasRust && RUST_PATCHES.some((p) => !builtIds.includes(p.id))) {
 }
 
 // 3. claude 플러그인 복사와 allowlist 등록
-for (const f of ['claude-plugin.ts', 'hancom-keys.ts', 'edit-log.ts', 'k-commands.ts', 'log-panel.ts', 'memo-panel.ts', 'color-palette.ts', 'para-preview.ts', 'dialog-enter.ts', 'cell-block-erase.ts', 'cell-clipboard.ts', 'picture-crop.ts', 'context-menu.ts', 'move-drop.ts', 'system-fonts.ts', 'selection-count.ts']) fs.copyFileSync(path.join(HERE, 'plugin', f), path.join(STUDIO, 'src', 'plugin', f));
+for (const f of ['claude-plugin.ts', 'hancom-keys.ts', 'edit-log.ts', 'k-commands.ts', 'log-panel.ts', 'memo-panel.ts', 'color-palette.ts', 'para-preview.ts', 'dialog-enter.ts', 'cell-block-erase.ts', 'cell-clipboard.ts', 'picture-crop.ts', 'context-menu.ts', 'move-drop.ts', 'system-fonts.ts', 'selection-count.ts', 'export-worker.ts']) fs.copyFileSync(path.join(HERE, 'plugin', f), path.join(STUDIO, 'src', 'plugin', f));
 // 편집 도구 라이브러리(lib/SOURCE.md)도 같은 자리로. 플러그인이 './doc-tools.js' 로 부른다.
 for (const f of ['doc-tools.js', 'doc-rules.js', 'collab-ops.js', 'run-ops.js']) {
   fs.copyFileSync(path.join(HERE, 'plugin', 'lib', f), path.join(STUDIO, 'src', 'plugin', f));
@@ -1091,13 +1091,24 @@ for (const [rel, count] of [['engine/table-object-renderer.ts', 5], ['engine/cel
   }
 }
 
+// 워커를 ES 모듈로 묶는다(내보내기 워커가 wasm 글루를 import 한다. 기본 iife 는 코드 분할을 못 한다)
+{
+  const f = path.join(STUDIO, 'vite.config.ts');
+  const src = fs.readFileSync(f, 'utf8');
+  if (!src.includes('[claude-hwpx export-worker-vite]')) {
+    const out = src.replace(/export default defineConfig\(\{\r?\n/, (m) => `${m}  worker: { format: 'es' }, // [claude-hwpx export-worker-vite]\n`);
+    if (out === src) throw new Error('vite.config.ts 패치 자리를 못 찾았다');
+    fs.writeFileSync(f, out);
+  }
+}
+
 // 표 속 표를 마우스로 고르거나 크기를 바꿀 수 없던 것(patches/nested-table-*.ts, 엔진 nested-table-*.rs).
 // 상류 devel #7214, #7442 를 v0.8.6 에 옮긴 것: 칸 경로를 캐시, 테두리 클릭, 끌기, 키보드 조절까지 싣는다
 for (const [id, rel, tail] of [['nested-table-cache', 'engine/table-bbox-cache.ts'], ['nested-table-cursor', 'engine/cursor.ts'],
   ['nested-table-handler', 'engine/input-handler.ts'], ['nested-table-mouse', 'engine/input-handler-mouse.ts'],
   // 칸 안 그림: 그림 넣기와 파일 끌어 놓기를 칸 문단 안 글자처럼 취급으로, 글자처럼 취급 칸 그림 끌어 옮기기(cell-pic-*.ts)
-  // 복구본 자동 저장을 입력이 멎고 60초 뒤로(10초면 잠깐 쉴 때마다 문서 전체 내보내기로 화면이 멈췄다)
-  ['autosave-idle', 'main.ts'],
+  // 복구본과 latest.hwpx 를 워커에서 내보낸다(plugin/export-worker.ts, 주 스레드 멈춤 약 1초 → 약 30ms)
+  ['export-worker-bridge', 'core/wasm-bridge.ts'], ['export-worker-autosave', 'recovery/autosave-manager.ts'], ['export-worker-main', 'main.ts'],
   ['cell-pic-place', 'engine/input-handler-table.ts'], ['cell-pic-drop', 'engine/input-handler.ts'], ['cell-pic-paste', 'engine/input-handler-keyboard.ts'],
   ['cell-pic-move', 'engine/input-handler-picture.ts', 'cell-pic-move-fn'], ['cell-pic-move-start', 'engine/input-handler-mouse.ts']]) {
   const f = path.join(STUDIO, 'src', ...rel.split('/'));

@@ -97,7 +97,7 @@ async function cursor() {
 }
 
 // withBytes=false: 글과 위치만 기록한다. 문서 전체 내보내기는 49쪽 문서에서 주 스레드를 0.9초 막아, 편집마다 하면 줄 간격을
-// 연달아 바꿀 때 화면이 멈췄다(2026-10-30). latest.hwpx 는 입력이 멎은 뒤에 따로 갱신하고, 저장은 그때 새로 내보낸다.
+// 연달아 바꿀 때 화면이 멈췄다(2026-10-30). latest.hwpx 는 입력이 멎은 뒤 워커에서 갱신하고, 저장은 그때 새로 내보낸다.
 async function snapshot(source, withBytes = true) {
   const key = await mutationKey();
   const bytes = withBytes ? await studio.exportHwpx() : null;
@@ -233,7 +233,7 @@ async function pollLoop() {
 let pendingKey = null;
 let latestKey = null;      // latest.hwpx 에 담긴 변경 카운터
 let changedKey = null, changedAt = 0;   // 마지막으로 본 변경 카운터와 그때 시각
-const IDLE_MS = 90000;     // 이만큼 입력이 없으면 내보내기(주 스레드를 막는 일)를 한다. 복구본 자동 저장(60초)과 겹치지 않게
+const IDLE_MS = 20000;     // 이만큼 입력이 없으면 latest.hwpx 를 갱신한다(워커에서 내보낸다)
 function idleFor(key) {
   if (key !== changedKey) { changedKey = key; changedAt = Date.now(); }
   return Date.now() - changedAt;
@@ -245,11 +245,8 @@ setInterval(async () => {
     if (key === lastKey) {
       pendingKey = null;
       if (key !== latestKey && idleFor(key) >= IDLE_MS) {
-        const bytes = await studio.exportHwpx();
-        if ((await mutationKey()) === key) {
-          latestKey = key;
-          await fetch('/api/snapshot', { method: 'POST', body: JSON.stringify({ latestOnly: true, hwpxBase64: toBase64(bytes) }) });
-        }
+        latestKey = key;
+        await plugin('flushLatest');
       }
       return;
     }
